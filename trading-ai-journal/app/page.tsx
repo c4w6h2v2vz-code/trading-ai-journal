@@ -3,9 +3,9 @@ export default function Home() {
     <main className="min-h-screen bg-[#050505] text-white">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
         <div className="text-xl font-bold">Trading AI Journal</div>
-        <button className="rounded-full border border-white/20 px-5 py-2 text-sm text-white/80 hover:bg-white/10">
+        <a href="/login" className="rounded-full border border-white/20 px-5 py-2 text-sm text-white/80 hover:bg-white/10">
           Login
-        </button>
+        </a>
       </nav>
 
       <section className="mx-auto grid min-h-[80vh] max-w-7xl items-center gap-12 px-6 py-16 lg:grid-cols-2">
@@ -24,12 +24,12 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap gap-4">
-            <button className="rounded-xl bg-blue-600 px-6 py-3 font-medium hover:bg-blue-700">
+            <a href="/register" className="rounded-xl bg-blue-600 px-6 py-3 font-medium hover:bg-blue-700">
               Start Free
-            </button>
-            <button className="rounded-xl border border-white/20 px-6 py-3 font-medium text-white/80 hover:bg-white/10">
+            </a>
+            <a href="/journal" className="rounded-xl border border-white/20 px-6 py-3 font-medium text-white/80 hover:bg-white/10">
               See Features
-            </button>
+            </a>
           </div>
         </div>
 
