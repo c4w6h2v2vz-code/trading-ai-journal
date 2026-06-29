@@ -68,7 +68,7 @@ export default function JournalPage() {
       result: formData.get("result"),
       notes: formData.get("notes"),
       image_url: imageUrl,
-    };
+    };image_url: string | null;
 
     const { error } = editingTrade
       ? await supabase.from("trades").update(tradeData).eq("id", editingTrade.id)
@@ -172,9 +172,13 @@ export default function JournalPage() {
                       <td className="p-3">{trade.result}</td>
                       <td className="p-3">
                         {trade.image_url ? (
-                          <a href={trade.image_url} target="_blank" className="text-blue-400 underline">
-                            View
-                          </a>
+                          <a href={trade.image_url} target="_blank">
+  <img
+    src={trade.image_url}
+    alt="Trade screenshot"
+    className="h-20 w-32 rounded-lg object-cover border border-white/10 hover:opacity-80"
+  />
+</a>
                         ) : (
                           <span className="text-white/40">No image</span>
                         )}
