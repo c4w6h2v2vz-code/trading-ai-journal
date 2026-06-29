@@ -66,8 +66,7 @@ export default function JournalPage() {
   type="submit"
   className="md:col-span-2 rounded-xl bg-blue-600 py-3 font-semibold hover:bg-blue-700"
 >
-  Save Trade
-</button>
+ 
               Save Trade
             </button>
           </form>
