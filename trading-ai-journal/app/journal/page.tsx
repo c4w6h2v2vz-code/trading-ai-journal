@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AppShell from "@/components/AppShell";
 
 type Trade = {
   id: string;
+  user_id: string;
   pair: string;
   session: string;
   entry_price: number;
@@ -17,19 +20,41 @@ type Trade = {
 };
 
 export default function JournalPage() {
+  const router = useRouter();
+
   const [message, setMessage] = useState("");
   const [trades, setTrades] = useState<Trade[]>([]);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [image, setImage] = useState<File | null>(null);
 
+  async function getCurrentUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      router.push("/login");
+      return null;
+    }
+
+    return user;
+  }
+
   async function loadTrades() {
+    const user = await getCurrentUser();
+    if (!user) return;
+
     const { data, error } = await supabase
       .from("trades")
       .select("*")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (error) setMessage("Error loading trades: " + error.message);
-    else setTrades(data || []);
+    if (error) {
+      setMessage("Error loading trades: " + error.message);
+    } else {
+      setTrades(data || []);
+    }
   }
 
   useEffect(() => {
@@ -39,11 +64,14 @@ export default function JournalPage() {
   async function saveTrade(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const user = await getCurrentUser();
+    if (!user) return;
+
     const formData = new FormData(event.currentTarget);
     let imageUrl = editingTrade?.image_url || "";
 
     if (image) {
-      const fileName = `${Date.now()}-${image.name}`;
+      const fileName = `${user.id}/${Date.now()}-${image.name}`;
 
       const { error: uploadError } = await supabase.storage
         .from("trade-screenshots")
@@ -60,6 +88,7 @@ export default function JournalPage() {
     }
 
     const tradeData = {
+      user_id: user.id,
       pair: formData.get("pair"),
       session: formData.get("session"),
       entry_price: Number(formData.get("entry_price")),
@@ -71,13 +100,21 @@ export default function JournalPage() {
     };
 
     const { error } = editingTrade
-      ? await supabase.from("trades").update(tradeData).eq("id", editingTrade.id)
+      ? await supabase
+          .from("trades")
+          .update(tradeData)
+          .eq("id", editingTrade.id)
+          .eq("user_id", user.id)
       : await supabase.from("trades").insert(tradeData);
 
     if (error) {
       setMessage("Error: " + error.message);
     } else {
-      setMessage(editingTrade ? "Trade updated successfully ✅" : "Trade saved successfully ✅");
+      setMessage(
+        editingTrade
+          ? "Trade updated successfully ✅"
+          : "Trade saved successfully ✅"
+      );
       setEditingTrade(null);
       setImage(null);
       event.currentTarget.reset();
@@ -88,25 +125,35 @@ export default function JournalPage() {
   async function deleteTrade(id: string) {
     if (!confirm("Are you sure you want to delete this trade?")) return;
 
-    const { error } = await supabase.from("trades").delete().eq("id", id);
+    const user = await getCurrentUser();
+    if (!user) return;
 
-    if (error) setMessage("Error deleting trade: " + error.message);
-    else {
+    const { error } = await supabase
+      .from("trades")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      setMessage("Error deleting trade: " + error.message);
+    } else {
       setMessage("Trade deleted successfully ✅");
       loadTrades();
     }
   }
 
   return (
-    <main className="min-h-screen bg-[#050505] text-white">
+    <AppShell>
       <div className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-10">
           <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
             Trade Execution Journal
           </p>
+
           <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
             Trading Journal
           </h1>
+
           <p className="mt-3 text-white/50">
             Log trades, screenshots, mistakes, psychology, and performance.
           </p>
@@ -119,23 +166,44 @@ export default function JournalPage() {
         )}
 
         <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold">
-                {editingTrade ? "Edit Trade" : "Add New Trade"}
-              </h2>
-              <p className="text-sm text-white/40">
-                Record the trade details and attach a chart screenshot.
-              </p>
-            </div>
-          </div>
+          <h2 className="mb-2 text-2xl font-semibold">
+            {editingTrade ? "Edit Trade" : "Add New Trade"}
+          </h2>
+
+          <p className="mb-6 text-sm text-white/40">
+            Record the trade details and attach a chart screenshot.
+          </p>
 
           <form onSubmit={saveTrade} className="grid gap-4 md:grid-cols-2">
-            <Input name="pair" placeholder="Pair e.g. EURUSD" defaultValue={editingTrade?.pair || ""} />
-            <Input name="session" placeholder="Session e.g. London" defaultValue={editingTrade?.session || ""} />
-            <Input name="entry_price" placeholder="Entry price" defaultValue={editingTrade?.entry_price || ""} />
-            <Input name="exit_price" placeholder="Exit price" defaultValue={editingTrade?.exit_price || ""} />
-            <Input name="profit_loss" placeholder="Profit / Loss" defaultValue={editingTrade?.profit_loss || ""} />
+            <Input
+              name="pair"
+              placeholder="Pair e.g. EURUSD"
+              defaultValue={editingTrade?.pair || ""}
+            />
+
+            <Input
+              name="session"
+              placeholder="Session e.g. London"
+              defaultValue={editingTrade?.session || ""}
+            />
+
+            <Input
+              name="entry_price"
+              placeholder="Entry price"
+              defaultValue={editingTrade?.entry_price || ""}
+            />
+
+            <Input
+              name="exit_price"
+              placeholder="Exit price"
+              defaultValue={editingTrade?.exit_price || ""}
+            />
+
+            <Input
+              name="profit_loss"
+              placeholder="Profit / Loss"
+              defaultValue={editingTrade?.profit_loss || ""}
+            />
 
             <select
               name="result"
@@ -182,12 +250,10 @@ export default function JournalPage() {
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-          <div className="mb-6">
-            <h2 className="text-2xl font-semibold">Trade History</h2>
-            <p className="text-sm text-white/40">
-              Your latest trades, screenshots, and actions.
-            </p>
-          </div>
+          <h2 className="text-2xl font-semibold">Trade History</h2>
+          <p className="mb-6 text-sm text-white/40">
+            Your latest private trades, screenshots, and actions.
+          </p>
 
           {trades.length === 0 ? (
             <p className="text-white/40">No trades saved yet.</p>
@@ -201,9 +267,11 @@ export default function JournalPage() {
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
                       <h3 className="text-xl font-bold">{trade.pair}</h3>
+
                       <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
                         {trade.session}
                       </span>
+
                       <span
                         className={`rounded-full px-3 py-1 text-xs ${
                           trade.result === "Win"
@@ -218,11 +286,29 @@ export default function JournalPage() {
                     </div>
 
                     <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
-                      <p>Entry: <span className="text-white">{trade.entry_price}</span></p>
-                      <p>Exit: <span className="text-white">{trade.exit_price}</span></p>
+                      <p>
+                        Entry:{" "}
+                        <span className="text-white">
+                          {trade.entry_price}
+                        </span>
+                      </p>
+
+                      <p>
+                        Exit:{" "}
+                        <span className="text-white">
+                          {trade.exit_price}
+                        </span>
+                      </p>
+
                       <p>
                         P/L:{" "}
-                        <span className={trade.profit_loss >= 0 ? "text-green-400" : "text-red-400"}>
+                        <span
+                          className={
+                            trade.profit_loss >= 0
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }
+                        >
                           {trade.profit_loss}
                         </span>
                       </p>
@@ -237,7 +323,11 @@ export default function JournalPage() {
 
                   <div>
                     {trade.image_url ? (
-                      <a href={trade.image_url} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={trade.image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <img
                           src={trade.image_url}
                           alt="Trade screenshot"
@@ -272,7 +362,7 @@ export default function JournalPage() {
           )}
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }
 
