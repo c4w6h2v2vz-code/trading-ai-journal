@@ -12,7 +12,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }
 
-  const links = [
+  const links = [{ name: "Risk Manager", href: "/risk-manager" },
   { name: "Dashboard", href: "/dashboard" },
   { name: "Journal", href: "/journal" },
   { name: "Calendar", href: "/calendar" },
