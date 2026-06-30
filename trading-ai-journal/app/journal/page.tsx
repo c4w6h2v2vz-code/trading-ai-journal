@@ -31,6 +31,10 @@ export default function JournalPage() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [image, setImage] = useState<File | null>(null);
+  const [pairFilter, setPairFilter] = useState("");
+const [resultFilter, setResultFilter] = useState("All");
+const [strategyFilter, setStrategyFilter] = useState("All");
+const [gradeFilter, setGradeFilter] = useState("All");
 
   async function getCurrentUser() {
     const {
@@ -144,7 +148,22 @@ export default function JournalPage() {
       loadTrades();
     }
   }
+const filteredTrades = trades.filter((trade) => {
+  const matchesPair =
+    pairFilter === "" ||
+    trade.pair.toLowerCase().includes(pairFilter.toLowerCase());
 
+  const matchesResult =
+    resultFilter === "All" || trade.result === resultFilter;
+
+  const matchesStrategy =
+    strategyFilter === "All" || trade.strategy === strategyFilter;
+
+  const matchesGrade =
+    gradeFilter === "All" || trade.grade === gradeFilter;
+
+  return matchesPair && matchesResult && matchesStrategy && matchesGrade;
+});
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-6 py-8">
@@ -215,13 +234,55 @@ export default function JournalPage() {
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
           <h2 className="text-2xl font-semibold">Trade History</h2>
-          <p className="mb-6 text-sm text-white/40">Your latest private trades and execution data.</p>
+          <p className="mb-6 text-sm text-white/40">Your latest private trades and execution data.</p><div className="mb-6 grid gap-3 md:grid-cols-4">
+  <input
+    value={pairFilter}
+    onChange={(e) => setPairFilter(e.target.value)}
+    placeholder="Search pair..."
+    className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
+  />
+
+  <select
+    value={resultFilter}
+    onChange={(e) => setResultFilter(e.target.value)}
+    className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
+  >
+    <option>All</option>
+    <option>Win</option>
+    <option>Loss</option>
+    <option>Break Even</option>
+  </select>
+
+  <select
+    value={strategyFilter}
+    onChange={(e) => setStrategyFilter(e.target.value)}
+    className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
+  >
+    <option>All</option>
+    <option>SMC</option>
+    <option>Breakout</option>
+    <option>Scalping</option>
+  </select>
+
+  <select
+    value={gradeFilter}
+    onChange={(e) => setGradeFilter(e.target.value)}
+    className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
+  >
+    <option>All</option>
+    <option>A+</option>
+    <option>A</option>
+    <option>B</option>
+    <option>C</option>
+    <option>D</option>
+  </select>
+</div>
 
           {trades.length === 0 ? (
             <p className="text-white/40">No trades saved yet.</p>
           ) : (
             <div className="space-y-4">
-              {trades.map((trade) => (
+              {filteredTrades.map((trade) => (
                 <div key={trade.id} className="grid gap-4 rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20 lg:grid-cols-[1fr_150px_180px]">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
