@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+
   Area,
   AreaChart,
   Bar,
@@ -15,7 +16,8 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
+  
+} from "recharts";import AnalyticsCards from "@/components/dashboard/AnalyticsCards";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 
@@ -169,9 +171,10 @@ export default function DashboardPage() {
         </div>
 
         <div className="mb-8 grid gap-4 lg:grid-cols-3">
-          <InfoCard title="Best Pair" value={bestPair} />
+          <InfoCard title="Best Pair" value={bestPair} /><AnalyticsCards trades={trades} />
           <InfoCard title="Best Session" value={bestSession} />
           <InfoCard
+          
             title="AI Coach Note"
             value={
               totalTrades === 0
