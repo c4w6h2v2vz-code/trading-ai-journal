@@ -1,5 +1,5 @@
 "use client";
-
+import AICoachSummary from "@/components/dashboard/AICoachSummary";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -172,6 +172,7 @@ export default function DashboardPage() {
 
         <div className="mb-8 grid gap-4 lg:grid-cols-3">
           <InfoCard title="Best Pair" value={bestPair} /><AnalyticsCards trades={trades} />
+          <AICoachSummary trades={trades} />
           <InfoCard title="Best Session" value={bestSession} />
           <InfoCard
           
