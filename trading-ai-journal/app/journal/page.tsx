@@ -148,7 +148,7 @@ export default function JournalPage() {
     setEditingTrade(null);
     setImage(null);
     form.reset();
-    await loadTrades();
+    window.location.reload();
     setSaving(false);
   }
 
