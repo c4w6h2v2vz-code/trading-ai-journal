@@ -2,6 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 
@@ -87,12 +101,23 @@ export default function DashboardPage() {
   const bestSession = getBestGroup(trades, "session");
 
   let runningProfit = 0;
-  const equityCurve = trades.map((trade) => {
+  const equityData = trades.map((trade, index) => {
     runningProfit += Number(trade.profit_loss);
-    return runningProfit;
+
+    return {
+      name: `Trade ${index + 1}`,
+      equity: runningProfit,
+      profit: Number(trade.profit_loss),
+    };
   });
 
-  const maxEquity = Math.max(...equityCurve.map((v) => Math.abs(v)), 1);
+  const dailyData = getDailyData(trades);
+
+  const winLossData = [
+    { name: "Wins", value: wins.length },
+    { name: "Losses", value: losses.length },
+  ];
+
   const recentTrades = [...trades].reverse().slice(0, 6);
 
   return (
@@ -107,7 +132,7 @@ export default function DashboardPage() {
               Performance Dashboard
             </h1>
             <p className="mt-3 text-white/50">
-              Your private wins, losses, sessions, pairs, and equity growth.
+              Professional charts for your private trading performance.
             </p>
           </div>
 
@@ -164,27 +189,95 @@ export default function DashboardPage() {
             Your running profit/loss over time.
           </p>
 
-          {equityCurve.length === 0 ? (
+          {equityData.length === 0 ? (
             <p className="text-white/40">No data yet.</p>
           ) : (
-            <div className="flex h-72 items-end gap-2 rounded-2xl border border-white/10 bg-black/40 p-4">
-              {equityCurve.map((value, index) => (
-                <div
-                  key={index}
-                  className={`flex-1 rounded-t-xl ${
-                    value >= 0 ? "bg-green-500" : "bg-red-500"
-                  }`}
-                  style={{
-                    height: `${Math.max(
-                      8,
-                      (Math.abs(value) / maxEquity) * 100
-                    )}%`,
-                  }}
-                  title={`Trade ${index + 1}: ${value}`}
-                />
-              ))}
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={equityData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
+                  <XAxis dataKey="name" stroke="#ffffff60" />
+                  <YAxis stroke="#ffffff60" />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#111",
+                      border: "1px solid #ffffff20",
+                      borderRadius: "12px",
+                      color: "#fff",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="equity"
+                    stroke="#22c55e"
+                    fill="#22c55e33"
+                    strokeWidth={3}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           )}
+        </div>
+
+        <div className="mb-8 grid gap-4 lg:grid-cols-2">
+          <ChartCard title="Daily Profit / Loss">
+            {dailyData.length === 0 ? (
+              <p className="text-white/40">No data yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={dailyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
+                  <XAxis dataKey="date" stroke="#ffffff60" />
+                  <YAxis stroke="#ffffff60" />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#111",
+                      border: "1px solid #ffffff20",
+                      borderRadius: "12px",
+                      color: "#fff",
+                    }}
+                  />
+                  <Bar dataKey="profit" radius={[8, 8, 0, 0]}>
+                    {dailyData.map((entry, index) => (
+                      <Cell
+                        key={index}
+                        fill={entry.profit >= 0 ? "#22c55e" : "#ef4444"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          <ChartCard title="Win vs Loss">
+            {totalTrades === 0 ? (
+              <p className="text-white/40">No data yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={winLossData}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={100}
+                    label
+                  >
+                    <Cell fill="#22c55e" />
+                    <Cell fill="#ef4444" />
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      background: "#111",
+                      border: "1px solid #ffffff20",
+                      borderRadius: "12px",
+                      color: "#fff",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
@@ -248,6 +341,20 @@ function getBestGroup(trades: Trade[], key: "pair" | "session") {
   return sorted.length > 0 ? `${sorted[0][0]} (${sorted[0][1]})` : "No data";
 }
 
+function getDailyData(trades: Trade[]) {
+  const days: Record<string, number> = {};
+
+  trades.forEach((trade) => {
+    const date = new Date(trade.created_at).toLocaleDateString();
+    days[date] = (days[date] || 0) + Number(trade.profit_loss);
+  });
+
+  return Object.entries(days).map(([date, profit]) => ({
+    date,
+    profit,
+  }));
+}
+
 function StatCard({
   title,
   value,
@@ -279,6 +386,21 @@ function InfoCard({ title, value }: { title: string; value: string }) {
     <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-black/30">
       <p className="text-sm text-white/40">{title}</p>
       <h2 className="mt-3 text-xl font-bold text-white">{value}</h2>
+    </div>
+  );
+}
+
+function ChartCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
+      <h2 className="mb-6 text-2xl font-semibold">{title}</h2>
+      {children}
     </div>
   );
 }
