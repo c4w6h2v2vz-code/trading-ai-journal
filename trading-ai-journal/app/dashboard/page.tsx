@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import AppShell from "@/components/AppShell";
 
 type Trade = {
   id: string;
@@ -82,7 +83,7 @@ export default function DashboardPage() {
   const recentTrades = [...trades].reverse().slice(0, 6);
 
   return (
-    <main className="min-h-screen bg-[#050505] text-white">
+    <AppShell>
       <div className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -145,14 +146,10 @@ export default function DashboardPage() {
         </div>
 
         <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold">Equity Curve</h2>
-              <p className="text-sm text-white/40">
-                Your running profit/loss over time.
-              </p>
-            </div>
-          </div>
+          <h2 className="text-2xl font-semibold">Equity Curve</h2>
+          <p className="mb-6 text-sm text-white/40">
+            Your running profit/loss over time.
+          </p>
 
           {equityCurve.length === 0 ? (
             <p className="text-white/40">No data yet.</p>
@@ -175,10 +172,8 @@ export default function DashboardPage() {
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-          <div className="mb-6">
-            <h2 className="text-2xl font-semibold">Recent Trades</h2>
-            <p className="text-sm text-white/40">Latest saved trades.</p>
-          </div>
+          <h2 className="text-2xl font-semibold">Recent Trades</h2>
+          <p className="mb-6 text-sm text-white/40">Latest saved trades.</p>
 
           {recentTrades.length === 0 ? (
             <p className="text-white/40">No trades found yet.</p>
@@ -220,7 +215,7 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }
 
