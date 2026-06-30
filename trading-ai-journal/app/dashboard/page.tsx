@@ -78,47 +78,94 @@ export default function DashboardPage() {
     return runningProfit;
   });
 
+  const maxEquity = Math.max(...equityCurve.map((v) => Math.abs(v)), 1);
+  const recentTrades = [...trades].reverse().slice(0, 6);
+
   return (
-    <main className="min-h-screen bg-black text-white p-8">
-      <div className="mx-auto max-w-7xl">
-        <h1 className="text-4xl font-bold mb-2">Analytics Dashboard</h1>
-        <p className="text-gray-400 mb-8">
-          Track your trading performance like a professional.
-        </p>
+    <main className="min-h-screen bg-[#050505] text-white">
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
+              Professional Trading Analytics
+            </p>
+            <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
+              Performance Dashboard
+            </h1>
+            <p className="mt-3 text-white/50">
+              Track your wins, losses, sessions, pairs, and equity growth.
+            </p>
+          </div>
 
-        <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <Card title="Total Trades" value={totalTrades.toString()} />
-          <Card title="Win Rate" value={`${winRate}%`} />
-          <Card title="Total Profit" value={totalProfit.toString()} />
-          <Card title="Best Trade" value={bestTrade.toString()} />
+          <div
+            className={`rounded-2xl border px-5 py-4 ${
+              totalProfit >= 0
+                ? "border-green-500/20 bg-green-500/10"
+                : "border-red-500/20 bg-red-500/10"
+            }`}
+          >
+            <p className="text-sm text-white/50">Net P/L</p>
+            <p
+              className={`text-3xl font-bold ${
+                totalProfit >= 0 ? "text-green-400" : "text-red-400"
+              }`}
+            >
+              {totalProfit}
+            </p>
+          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <Card title="Wins" value={wins.length.toString()} />
-          <Card title="Losses" value={losses.length.toString()} />
-          <Card title="Average Win" value={averageWin} />
-          <Card title="Average Loss" value={averageLoss} />
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Total Trades" value={totalTrades.toString()} />
+          <StatCard title="Win Rate" value={`${winRate}%`} highlight="blue" />
+          <StatCard title="Wins" value={wins.length.toString()} highlight="green" />
+          <StatCard title="Losses" value={losses.length.toString()} highlight="red" />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 mb-8">
-          <Card title="Worst Trade" value={worstTrade.toString()} />
-          <Card title="Best Pair" value={bestPair} />
-          <Card title="Best Session" value={bestSession} />
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Best Trade" value={bestTrade.toString()} highlight="green" />
+          <StatCard title="Worst Trade" value={worstTrade.toString()} highlight="red" />
+          <StatCard title="Average Win" value={averageWin} />
+          <StatCard title="Average Loss" value={averageLoss} />
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 mb-8">
-          <h2 className="text-2xl font-semibold mb-6">Equity Curve</h2>
+        <div className="mb-8 grid gap-4 lg:grid-cols-3">
+          <InfoCard title="Best Pair" value={bestPair} />
+          <InfoCard title="Best Session" value={bestSession} />
+          <InfoCard
+            title="AI Coach Note"
+            value={
+              totalTrades === 0
+                ? "Add more trades to unlock better insights."
+                : wins.length > losses.length
+                ? "Your performance is positive. Keep tracking rules and psychology."
+                : "Review your losing trades and reduce repeated mistakes."
+            }
+          />
+        </div>
+
+        <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold">Equity Curve</h2>
+              <p className="text-sm text-white/40">
+                Your running profit/loss over time.
+              </p>
+            </div>
+          </div>
 
           {equityCurve.length === 0 ? (
-            <p className="text-gray-400">No data yet.</p>
+            <p className="text-white/40">No data yet.</p>
           ) : (
-            <div className="flex items-end gap-2 h-64 border-b border-white/10">
+            <div className="flex h-72 items-end gap-2 rounded-2xl border border-white/10 bg-black/40 p-4">
               {equityCurve.map((value, index) => (
                 <div
                   key={index}
-                  className="flex-1 rounded-t bg-blue-600"
+                  className={`flex-1 rounded-t-xl ${
+                    value >= 0 ? "bg-green-500" : "bg-red-500"
+                  }`}
                   style={{
-                    height: `${Math.max(10, Math.abs(value))}%`,
+                    height: `${Math.max(8, (Math.abs(value) / maxEquity) * 100)}%`,
                   }}
                   title={`Trade ${index + 1}: ${value}`}
                 />
@@ -127,40 +174,45 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="text-2xl font-semibold mb-6">Recent Trades</h2>
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold">Recent Trades</h2>
+            <p className="text-sm text-white/40">Latest saved trades.</p>
+          </div>
 
-          {trades.length === 0 ? (
-            <p className="text-gray-400">No trades found yet.</p>
+          {recentTrades.length === 0 ? (
+            <p className="text-white/40">No trades found yet.</p>
           ) : (
             <div className="space-y-3">
-              {[...trades].reverse().map((trade) => (
+              {recentTrades.map((trade) => (
                 <div
                   key={trade.id}
-                  className="rounded-xl border border-white/10 bg-black/40 p-4"
+                  className="rounded-2xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20"
                 >
-                  <div className="flex justify-between gap-4">
+                  <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="font-semibold">{trade.pair}</p>
-                      <p className="text-sm text-gray-400">{trade.session}</p>
+                      <p className="text-lg font-semibold">{trade.pair}</p>
+                      <p className="text-sm text-white/40">{trade.session}</p>
                     </div>
 
                     <div className="text-right">
                       <p
-                        className={
+                        className={`text-lg font-bold ${
                           trade.profit_loss >= 0
                             ? "text-green-400"
                             : "text-red-400"
-                        }
+                        }`}
                       >
                         {trade.profit_loss}
                       </p>
-                      <p className="text-sm text-gray-400">{trade.result}</p>
+                      <p className="text-sm text-white/40">{trade.result}</p>
                     </div>
                   </div>
 
                   {trade.notes && (
-                    <p className="mt-3 text-sm text-gray-400">{trade.notes}</p>
+                    <p className="mt-3 rounded-xl bg-white/[0.03] p-3 text-sm text-white/50">
+                      {trade.notes}
+                    </p>
                   )}
                 </div>
               ))}
@@ -185,11 +237,37 @@ function getBestGroup(trades: Trade[], key: "pair" | "session") {
   return sorted.length > 0 ? `${sorted[0][0]} (${sorted[0][1]})` : "No data";
 }
 
-function Card({ title, value }: { title: string; value: string }) {
+function StatCard({
+  title,
+  value,
+  highlight,
+}: {
+  title: string;
+  value: string;
+  highlight?: "green" | "red" | "blue";
+}) {
+  const color =
+    highlight === "green"
+      ? "text-green-400"
+      : highlight === "red"
+      ? "text-red-400"
+      : highlight === "blue"
+      ? "text-blue-400"
+      : "text-white";
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-      <p className="text-gray-400">{title}</p>
-      <h2 className="text-3xl font-bold mt-2">{value}</h2>
+    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-black/30">
+      <p className="text-sm text-white/40">{title}</p>
+      <h2 className={`mt-3 text-3xl font-bold ${color}`}>{value}</h2>
+    </div>
+  );
+}
+
+function InfoCard({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-black/30">
+      <p className="text-sm text-white/40">{title}</p>
+      <h2 className="mt-3 text-xl font-bold text-white">{value}</h2>
     </div>
   );
 }
