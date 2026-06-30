@@ -89,13 +89,17 @@ export default function TradeDetailsPage() {
               </h1>
 
               <p className="mt-3 text-white/50">
-                Full breakdown of this trade.
+                Full breakdown and AI-style review of this trade.
               </p>
             </div>
 
+            <AICoachReview trade={trade} />
+
             <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
               <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-                <h2 className="mb-4 text-2xl font-semibold">Chart Screenshot</h2>
+                <h2 className="mb-4 text-2xl font-semibold">
+                  Chart Screenshot
+                </h2>
 
                 {trade.image_url ? (
                   <a href={trade.image_url} target="_blank" rel="noopener noreferrer">
@@ -149,19 +153,131 @@ export default function TradeDetailsPage() {
                 </p>
               </div>
             </div>
-
-            <div className="mt-6 rounded-3xl border border-blue-500/20 bg-blue-500/10 p-6 shadow-2xl shadow-black/40">
-              <h2 className="mb-3 text-2xl font-semibold text-blue-300">
-                AI Coach Placeholder
-              </h2>
-              <p className="text-white/60">
-                Soon this section will analyze your trade, find mistakes, and give you improvement advice.
-              </p>
-            </div>
           </>
         )}
       </div>
     </AppShell>
+  );
+}
+
+function AICoachReview({ trade }: { trade: Trade }) {
+  const riskScore = calculateRiskScore(trade);
+  const psychologyScore = calculatePsychologyScore(trade);
+  const executionScore = calculateExecutionScore(trade);
+  const totalScore = Math.round((riskScore + psychologyScore + executionScore) / 3);
+
+  const feedback = getCoachFeedback(trade, totalScore);
+
+  return (
+    <div className="mb-6 rounded-3xl border border-blue-500/20 bg-blue-500/10 p-6 shadow-2xl shadow-black/40">
+      <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
+        AI Coach Review
+      </p>
+
+      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+        <div className="rounded-3xl border border-white/10 bg-black/40 p-6 text-center">
+          <p className="text-sm text-white/40">Trade Score</p>
+          <p
+            className={`mt-3 text-6xl font-bold ${
+              totalScore >= 75
+                ? "text-green-400"
+                : totalScore >= 50
+                ? "text-yellow-400"
+                : "text-red-400"
+            }`}
+          >
+            {totalScore}
+          </p>
+          <p className="mt-2 text-sm text-white/40">out of 100</p>
+        </div>
+
+        <div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <ScoreCard title="Risk" score={riskScore} />
+            <ScoreCard title="Psychology" score={psychologyScore} />
+            <ScoreCard title="Execution" score={executionScore} />
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/40 p-4">
+            <p className="text-sm text-white/40">Coach Feedback</p>
+            <p className="mt-2 text-white/70">{feedback}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function calculateRiskScore(trade: Trade) {
+  let score = 60;
+
+  if (Number(trade.risk_reward || 0) >= 2) score += 25;
+  else if (Number(trade.risk_reward || 0) >= 1.5) score += 15;
+  else if (Number(trade.risk_reward || 0) > 0) score += 5;
+
+  if (trade.profit_loss >= 0) score += 10;
+
+  return Math.min(score, 100);
+}
+
+function calculatePsychologyScore(trade: Trade) {
+  let score = 80;
+
+  if (trade.emotion === "FOMO") score -= 30;
+  if (trade.emotion === "Revenge") score -= 35;
+  if (trade.emotion === "Fear") score -= 20;
+  if (trade.emotion === "Greed") score -= 20;
+  if (trade.emotion === "Calm") score += 10;
+  if (trade.emotion === "Confident") score += 5;
+
+  return Math.max(Math.min(score, 100), 0);
+}
+
+function calculateExecutionScore(trade: Trade) {
+  let score = 70;
+
+  if (trade.grade === "A+") score += 25;
+  if (trade.grade === "A") score += 15;
+  if (trade.grade === "B") score += 5;
+  if (trade.grade === "C") score -= 10;
+  if (trade.grade === "D") score -= 25;
+
+  if (trade.mistake && trade.mistake.trim().length > 0) score -= 15;
+  if (trade.result === "Win") score += 5;
+
+  return Math.max(Math.min(score, 100), 0);
+}
+
+function getCoachFeedback(trade: Trade, score: number) {
+  if (trade.emotion === "FOMO") {
+    return "This trade shows FOMO risk. Before entering, wait for confirmation and avoid chasing price.";
+  }
+
+  if (trade.emotion === "Revenge") {
+    return "This trade may be affected by revenge trading. After a loss, take a break before the next setup.";
+  }
+
+  if (trade.mistake) {
+    return `Main improvement: fix this repeated mistake — ${trade.mistake}. Write a rule to prevent it next time.`;
+  }
+
+  if (Number(trade.risk_reward || 0) < 1.5) {
+    return "Your risk/reward is low. Try to wait for trades where the reward is at least 1.5R to 2R.";
+  }
+
+  if (score >= 80) {
+    return "Strong trade quality. Keep following this process and track if this setup repeats profitably.";
+  }
+
+  return "This is a decent trade, but keep improving entry quality, psychology, and risk/reward.";
+}
+
+function ScoreCard({ title, score }: { title: string; score: number }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
+      <p className="text-sm text-white/40">{title}</p>
+      <p className="mt-2 text-2xl font-bold text-blue-300">{score}</p>
+    </div>
   );
 }
 
