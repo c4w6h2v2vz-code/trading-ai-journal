@@ -134,7 +134,7 @@ export default function JournalPage() {
           .eq("id", editingTrade.id)
           .eq("user_id", user.id)
       : await supabase.from("trades").insert([tradeData]);
-
+console.log("Trade saved successfully");
     if (error) {
       alert("Save error: " + error.message);
       setMessage("Save error: " + error.message);
@@ -148,8 +148,8 @@ export default function JournalPage() {
     setEditingTrade(null);
     setImage(null);
     form.reset();
-    window.location.reload();
-    setSaving(false);
+    await loadTrades();
+setSaving(false);
   }
 
   async function deleteTrade(id: string) {
