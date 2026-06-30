@@ -223,7 +223,12 @@ const filteredTrades = trades.filter((trade) => {
             <button type="submit" className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700">
               {editingTrade ? "Update Trade" : "Save Trade"}
             </button>
-
+<button
+  onClick={() => router.push(`/journal/trade/${trade.id}`)}
+  className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
+>
+  View
+</button>
             {editingTrade && (
               <button type="button" onClick={() => setEditingTrade(null)} className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold transition hover:bg-white/20">
                 Cancel Edit
