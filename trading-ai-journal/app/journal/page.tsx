@@ -27,14 +27,16 @@ type Trade = {
 
 export default function JournalPage() {
   const router = useRouter();
+
   const [message, setMessage] = useState("");
   const [trades, setTrades] = useState<Trade[]>([]);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [image, setImage] = useState<File | null>(null);
+
   const [pairFilter, setPairFilter] = useState("");
-const [resultFilter, setResultFilter] = useState("All");
-const [strategyFilter, setStrategyFilter] = useState("All");
-const [gradeFilter, setGradeFilter] = useState("All");
+  const [resultFilter, setResultFilter] = useState("All");
+  const [strategyFilter, setStrategyFilter] = useState("All");
+  const [gradeFilter, setGradeFilter] = useState("All");
 
   async function getCurrentUser() {
     const {
@@ -59,8 +61,11 @@ const [gradeFilter, setGradeFilter] = useState("All");
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (error) setMessage("Error loading trades: " + error.message);
-    else setTrades(data || []);
+    if (error) {
+      setMessage("Error loading trades: " + error.message);
+    } else {
+      setTrades(data || []);
+    }
   }
 
   useEffect(() => {
@@ -122,7 +127,11 @@ const [gradeFilter, setGradeFilter] = useState("All");
     if (error) {
       setMessage("Error: " + error.message);
     } else {
-      setMessage(editingTrade ? "Trade updated successfully ✅" : "Trade saved successfully ✅");
+      setMessage(
+        editingTrade
+          ? "Trade updated successfully ✅"
+          : "Trade saved successfully ✅"
+      );
       setEditingTrade(null);
       setImage(null);
       event.currentTarget.reset();
@@ -142,28 +151,31 @@ const [gradeFilter, setGradeFilter] = useState("All");
       .eq("id", id)
       .eq("user_id", user.id);
 
-    if (error) setMessage("Error deleting trade: " + error.message);
-    else {
+    if (error) {
+      setMessage("Error deleting trade: " + error.message);
+    } else {
       setMessage("Trade deleted successfully ✅");
       loadTrades();
     }
   }
-const filteredTrades = trades.filter((trade) => {
-  const matchesPair =
-    pairFilter === "" ||
-    trade.pair.toLowerCase().includes(pairFilter.toLowerCase());
 
-  const matchesResult =
-    resultFilter === "All" || trade.result === resultFilter;
+  const filteredTrades = trades.filter((trade) => {
+    const matchesPair =
+      pairFilter === "" ||
+      trade.pair.toLowerCase().includes(pairFilter.toLowerCase());
 
-  const matchesStrategy =
-    strategyFilter === "All" || trade.strategy === strategyFilter;
+    const matchesResult =
+      resultFilter === "All" || trade.result === resultFilter;
 
-  const matchesGrade =
-    gradeFilter === "All" || trade.grade === gradeFilter;
+    const matchesStrategy =
+      strategyFilter === "All" || trade.strategy === strategyFilter;
 
-  return matchesPair && matchesResult && matchesStrategy && matchesGrade;
-});
+    const matchesGrade =
+      gradeFilter === "All" || trade.grade === gradeFilter;
+
+    return matchesPair && matchesResult && matchesStrategy && matchesGrade;
+  });
+
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-6 py-8">
@@ -171,11 +183,14 @@ const filteredTrades = trades.filter((trade) => {
           <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
             Pro Trade Journal
           </p>
+
           <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
             Trading Journal
           </h1>
+
           <p className="mt-3 text-white/50">
-            Track strategy, direction, emotion, mistakes, grade, risk/reward, and screenshots.
+            Track strategy, direction, emotion, mistakes, grade, risk/reward,
+            and screenshots.
           </p>
         </div>
 
@@ -191,19 +206,77 @@ const filteredTrades = trades.filter((trade) => {
           </h2>
 
           <form onSubmit={saveTrade} className="mt-6 grid gap-4 md:grid-cols-2">
-            <Input name="pair" placeholder="Pair e.g. EURUSD" defaultValue={editingTrade?.pair || ""} />
-            <Select name="direction" defaultValue={editingTrade?.direction || "Buy"} options={["Buy", "Sell"]} />
-            <Input name="strategy" placeholder="Strategy e.g. SMC, Breakout" defaultValue={editingTrade?.strategy || ""} />
-            <Input name="session" placeholder="Session e.g. London" defaultValue={editingTrade?.session || ""} />
-            <Input name="entry_price" placeholder="Entry price" defaultValue={editingTrade?.entry_price || ""} />
-            <Input name="exit_price" placeholder="Exit price" defaultValue={editingTrade?.exit_price || ""} />
-            <Input name="profit_loss" placeholder="Profit / Loss" defaultValue={editingTrade?.profit_loss || ""} />
-            <Input name="risk_reward" placeholder="Risk Reward e.g. 2.5" defaultValue={editingTrade?.risk_reward || ""} />
+            <Input
+              name="pair"
+              placeholder="Pair e.g. EURUSD"
+              defaultValue={editingTrade?.pair || ""}
+            />
 
-            <Select name="result" defaultValue={editingTrade?.result || "Win"} options={["Win", "Loss", "Break Even"]} />
-            <Select name="grade" defaultValue={editingTrade?.grade || "A"} options={["A+", "A", "B", "C", "D"]} />
-            <Select name="emotion" defaultValue={editingTrade?.emotion || "Calm"} options={["Calm", "Confident", "Fear", "Greed", "FOMO", "Revenge"]} />
-            <Input name="mistake" placeholder="Mistake e.g. Early entry" defaultValue={editingTrade?.mistake || ""} />
+            <Select
+              name="direction"
+              defaultValue={editingTrade?.direction || "Buy"}
+              options={["Buy", "Sell"]}
+            />
+
+            <Input
+              name="strategy"
+              placeholder="Strategy e.g. SMC, Breakout"
+              defaultValue={editingTrade?.strategy || ""}
+            />
+
+            <Input
+              name="session"
+              placeholder="Session e.g. London"
+              defaultValue={editingTrade?.session || ""}
+            />
+
+            <Input
+              name="entry_price"
+              placeholder="Entry price"
+              defaultValue={editingTrade?.entry_price || ""}
+            />
+
+            <Input
+              name="exit_price"
+              placeholder="Exit price"
+              defaultValue={editingTrade?.exit_price || ""}
+            />
+
+            <Input
+              name="profit_loss"
+              placeholder="Profit / Loss"
+              defaultValue={editingTrade?.profit_loss || ""}
+            />
+
+            <Input
+              name="risk_reward"
+              placeholder="Risk Reward e.g. 2.5"
+              defaultValue={editingTrade?.risk_reward || ""}
+            />
+
+            <Select
+              name="result"
+              defaultValue={editingTrade?.result || "Win"}
+              options={["Win", "Loss", "Break Even"]}
+            />
+
+            <Select
+              name="grade"
+              defaultValue={editingTrade?.grade || "A"}
+              options={["A+", "A", "B", "C", "D"]}
+            />
+
+            <Select
+              name="emotion"
+              defaultValue={editingTrade?.emotion || "Calm"}
+              options={["Calm", "Confident", "Fear", "Greed", "FOMO", "Revenge"]}
+            />
+
+            <Input
+              name="mistake"
+              placeholder="Mistake e.g. Early entry"
+              defaultValue={editingTrade?.mistake || ""}
+            />
 
             <textarea
               name="notes"
@@ -220,17 +293,19 @@ const filteredTrades = trades.filter((trade) => {
               className="md:col-span-2 rounded-2xl border border-white/10 bg-black/50 p-4 text-white"
             />
 
-            <button type="submit" className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700">
+            <button
+              type="submit"
+              className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700"
+            >
               {editingTrade ? "Update Trade" : "Save Trade"}
             </button>
-<button
-  onClick={() => router.push(`/journal/trade/${trade.id}`)}
-  className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
->
-  View
-</button>
+
             {editingTrade && (
-              <button type="button" onClick={() => setEditingTrade(null)} className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold transition hover:bg-white/20">
+              <button
+                type="button"
+                onClick={() => setEditingTrade(null)}
+                className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold transition hover:bg-white/20"
+              >
                 Cancel Edit
               </button>
             )}
@@ -239,56 +314,66 @@ const filteredTrades = trades.filter((trade) => {
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
           <h2 className="text-2xl font-semibold">Trade History</h2>
-          <p className="mb-6 text-sm text-white/40">Your latest private trades and execution data.</p><div className="mb-6 grid gap-3 md:grid-cols-4">
-  <input
-    value={pairFilter}
-    onChange={(e) => setPairFilter(e.target.value)}
-    placeholder="Search pair..."
-    className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
-  />
 
-  <select
-    value={resultFilter}
-    onChange={(e) => setResultFilter(e.target.value)}
-    className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
-  >
-    <option>All</option>
-    <option>Win</option>
-    <option>Loss</option>
-    <option>Break Even</option>
-  </select>
+          <p className="mb-6 text-sm text-white/40">
+            Your latest private trades and execution data.
+          </p>
 
-  <select
-    value={strategyFilter}
-    onChange={(e) => setStrategyFilter(e.target.value)}
-    className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
-  >
-    <option>All</option>
-    <option>SMC</option>
-    <option>Breakout</option>
-    <option>Scalping</option>
-  </select>
+          <div className="mb-6 grid gap-3 md:grid-cols-4">
+            <input
+              value={pairFilter}
+              onChange={(e) => setPairFilter(e.target.value)}
+              placeholder="Search pair..."
+              className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
+            />
 
-  <select
-    value={gradeFilter}
-    onChange={(e) => setGradeFilter(e.target.value)}
-    className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
-  >
-    <option>All</option>
-    <option>A+</option>
-    <option>A</option>
-    <option>B</option>
-    <option>C</option>
-    <option>D</option>
-  </select>
-</div>
+            <select
+              value={resultFilter}
+              onChange={(e) => setResultFilter(e.target.value)}
+              className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
+            >
+              <option>All</option>
+              <option>Win</option>
+              <option>Loss</option>
+              <option>Break Even</option>
+            </select>
+
+            <select
+              value={strategyFilter}
+              onChange={(e) => setStrategyFilter(e.target.value)}
+              className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
+            >
+              <option>All</option>
+              <option>SMC</option>
+              <option>Breakout</option>
+              <option>Scalping</option>
+            </select>
+
+            <select
+              value={gradeFilter}
+              onChange={(e) => setGradeFilter(e.target.value)}
+              className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
+            >
+              <option>All</option>
+              <option>A+</option>
+              <option>A</option>
+              <option>B</option>
+              <option>C</option>
+              <option>D</option>
+            </select>
+          </div>
 
           {trades.length === 0 ? (
             <p className="text-white/40">No trades saved yet.</p>
+          ) : filteredTrades.length === 0 ? (
+            <p className="text-white/40">No trades match your filters.</p>
           ) : (
             <div className="space-y-4">
               {filteredTrades.map((trade) => (
-                <div key={trade.id} className="grid gap-4 rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20 lg:grid-cols-[1fr_150px_180px]">
+                <div
+                  key={trade.id}
+                  className="grid gap-4 rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20 lg:grid-cols-[1fr_150px_220px]"
+                >
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
                       <h3 className="text-xl font-bold">{trade.pair}</h3>
@@ -299,12 +384,47 @@ const filteredTrades = trades.filter((trade) => {
                     </div>
 
                     <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
-                      <p>Session: <span className="text-white">{trade.session}</span></p>
-                      <p>Entry: <span className="text-white">{trade.entry_price}</span></p>
-                      <p>Exit: <span className="text-white">{trade.exit_price}</span></p>
-                      <p>P/L: <span className={trade.profit_loss >= 0 ? "text-green-400" : "text-red-400"}>{trade.profit_loss}</span></p>
-                      <p>R:R: <span className="text-white">{trade.risk_reward || "N/A"}</span></p>
-                      <p>Emotion: <span className="text-white">{trade.emotion || "N/A"}</span></p>
+                      <p>
+                        Session:{" "}
+                        <span className="text-white">{trade.session}</span>
+                      </p>
+
+                      <p>
+                        Entry:{" "}
+                        <span className="text-white">{trade.entry_price}</span>
+                      </p>
+
+                      <p>
+                        Exit:{" "}
+                        <span className="text-white">{trade.exit_price}</span>
+                      </p>
+
+                      <p>
+                        P/L:{" "}
+                        <span
+                          className={
+                            trade.profit_loss >= 0
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }
+                        >
+                          {trade.profit_loss}
+                        </span>
+                      </p>
+
+                      <p>
+                        R:R:{" "}
+                        <span className="text-white">
+                          {trade.risk_reward || "N/A"}
+                        </span>
+                      </p>
+
+                      <p>
+                        Emotion:{" "}
+                        <span className="text-white">
+                          {trade.emotion || "N/A"}
+                        </span>
+                      </p>
                     </div>
 
                     {trade.mistake && (
@@ -322,8 +442,16 @@ const filteredTrades = trades.filter((trade) => {
 
                   <div>
                     {trade.image_url ? (
-                      <a href={trade.image_url} target="_blank" rel="noopener noreferrer">
-                        <img src={trade.image_url} alt="Trade screenshot" className="h-28 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80" />
+                      <a
+                        href={trade.image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <img
+                          src={trade.image_url}
+                          alt="Trade screenshot"
+                          className="h-28 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80"
+                        />
                       </a>
                     ) : (
                       <div className="flex h-28 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-sm text-white/30">
@@ -333,10 +461,24 @@ const filteredTrades = trades.filter((trade) => {
                   </div>
 
                   <div className="flex items-center gap-2 lg:justify-end">
-                    <button onClick={() => setEditingTrade(trade)} className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-400 hover:bg-yellow-500/20">
+                    <button
+                      onClick={() => router.push(`/journal/trade/${trade.id}`)}
+                      className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
+                    >
+                      View
+                    </button>
+
+                    <button
+                      onClick={() => setEditingTrade(trade)}
+                      className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-400 hover:bg-yellow-500/20"
+                    >
                       Edit
                     </button>
-                    <button onClick={() => deleteTrade(trade.id)} className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20">
+
+                    <button
+                      onClick={() => deleteTrade(trade.id)}
+                      className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20"
+                    >
                       Delete
                     </button>
                   </div>
@@ -350,15 +492,40 @@ const filteredTrades = trades.filter((trade) => {
   );
 }
 
-function Input({ name, placeholder, defaultValue }: { name: string; placeholder: string; defaultValue: string | number }) {
+function Input({
+  name,
+  placeholder,
+  defaultValue,
+}: {
+  name: string;
+  placeholder: string;
+  defaultValue: string | number;
+}) {
   return (
-    <input name={name} defaultValue={defaultValue} className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500" placeholder={placeholder} />
+    <input
+      name={name}
+      defaultValue={defaultValue}
+      className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
+      placeholder={placeholder}
+    />
   );
 }
 
-function Select({ name, defaultValue, options }: { name: string; defaultValue: string; options: string[] }) {
+function Select({
+  name,
+  defaultValue,
+  options,
+}: {
+  name: string;
+  defaultValue: string;
+  options: string[];
+}) {
   return (
-    <select name={name} defaultValue={defaultValue} className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500">
+    <select
+      name={name}
+      defaultValue={defaultValue}
+      className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
+    >
       {options.map((option) => (
         <option key={option}>{option}</option>
       ))}
