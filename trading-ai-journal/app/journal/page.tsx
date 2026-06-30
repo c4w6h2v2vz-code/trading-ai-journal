@@ -10,6 +10,12 @@ type Trade = {
   user_id: string;
   pair: string;
   session: string;
+  strategy: string | null;
+  direction: string | null;
+  grade: string | null;
+  emotion: string | null;
+  mistake: string | null;
+  risk_reward: number | null;
   entry_price: number;
   exit_price: number;
   profit_loss: number;
@@ -21,7 +27,6 @@ type Trade = {
 
 export default function JournalPage() {
   const router = useRouter();
-
   const [message, setMessage] = useState("");
   const [trades, setTrades] = useState<Trade[]>([]);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
@@ -50,11 +55,8 @@ export default function JournalPage() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      setMessage("Error loading trades: " + error.message);
-    } else {
-      setTrades(data || []);
-    }
+    if (error) setMessage("Error loading trades: " + error.message);
+    else setTrades(data || []);
   }
 
   useEffect(() => {
@@ -91,6 +93,12 @@ export default function JournalPage() {
       user_id: user.id,
       pair: formData.get("pair"),
       session: formData.get("session"),
+      strategy: formData.get("strategy"),
+      direction: formData.get("direction"),
+      grade: formData.get("grade"),
+      emotion: formData.get("emotion"),
+      mistake: formData.get("mistake"),
+      risk_reward: Number(formData.get("risk_reward")),
       entry_price: Number(formData.get("entry_price")),
       exit_price: Number(formData.get("exit_price")),
       profit_loss: Number(formData.get("profit_loss")),
@@ -110,11 +118,7 @@ export default function JournalPage() {
     if (error) {
       setMessage("Error: " + error.message);
     } else {
-      setMessage(
-        editingTrade
-          ? "Trade updated successfully ✅"
-          : "Trade saved successfully ✅"
-      );
+      setMessage(editingTrade ? "Trade updated successfully ✅" : "Trade saved successfully ✅");
       setEditingTrade(null);
       setImage(null);
       event.currentTarget.reset();
@@ -134,9 +138,8 @@ export default function JournalPage() {
       .eq("id", id)
       .eq("user_id", user.id);
 
-    if (error) {
-      setMessage("Error deleting trade: " + error.message);
-    } else {
+    if (error) setMessage("Error deleting trade: " + error.message);
+    else {
       setMessage("Trade deleted successfully ✅");
       loadTrades();
     }
@@ -147,15 +150,13 @@ export default function JournalPage() {
       <div className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-10">
           <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
-            Trade Execution Journal
+            Pro Trade Journal
           </p>
-
           <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
             Trading Journal
           </h1>
-
           <p className="mt-3 text-white/50">
-            Log trades, screenshots, mistakes, psychology, and performance.
+            Track strategy, direction, emotion, mistakes, grade, risk/reward, and screenshots.
           </p>
         </div>
 
@@ -170,50 +171,20 @@ export default function JournalPage() {
             {editingTrade ? "Edit Trade" : "Add New Trade"}
           </h2>
 
-          <p className="mb-6 text-sm text-white/40">
-            Record the trade details and attach a chart screenshot.
-          </p>
+          <form onSubmit={saveTrade} className="mt-6 grid gap-4 md:grid-cols-2">
+            <Input name="pair" placeholder="Pair e.g. EURUSD" defaultValue={editingTrade?.pair || ""} />
+            <Select name="direction" defaultValue={editingTrade?.direction || "Buy"} options={["Buy", "Sell"]} />
+            <Input name="strategy" placeholder="Strategy e.g. SMC, Breakout" defaultValue={editingTrade?.strategy || ""} />
+            <Input name="session" placeholder="Session e.g. London" defaultValue={editingTrade?.session || ""} />
+            <Input name="entry_price" placeholder="Entry price" defaultValue={editingTrade?.entry_price || ""} />
+            <Input name="exit_price" placeholder="Exit price" defaultValue={editingTrade?.exit_price || ""} />
+            <Input name="profit_loss" placeholder="Profit / Loss" defaultValue={editingTrade?.profit_loss || ""} />
+            <Input name="risk_reward" placeholder="Risk Reward e.g. 2.5" defaultValue={editingTrade?.risk_reward || ""} />
 
-          <form onSubmit={saveTrade} className="grid gap-4 md:grid-cols-2">
-            <Input
-              name="pair"
-              placeholder="Pair e.g. EURUSD"
-              defaultValue={editingTrade?.pair || ""}
-            />
-
-            <Input
-              name="session"
-              placeholder="Session e.g. London"
-              defaultValue={editingTrade?.session || ""}
-            />
-
-            <Input
-              name="entry_price"
-              placeholder="Entry price"
-              defaultValue={editingTrade?.entry_price || ""}
-            />
-
-            <Input
-              name="exit_price"
-              placeholder="Exit price"
-              defaultValue={editingTrade?.exit_price || ""}
-            />
-
-            <Input
-              name="profit_loss"
-              placeholder="Profit / Loss"
-              defaultValue={editingTrade?.profit_loss || ""}
-            />
-
-            <select
-              name="result"
-              defaultValue={editingTrade?.result || "Win"}
-              className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-            >
-              <option>Win</option>
-              <option>Loss</option>
-              <option>Break Even</option>
-            </select>
+            <Select name="result" defaultValue={editingTrade?.result || "Win"} options={["Win", "Loss", "Break Even"]} />
+            <Select name="grade" defaultValue={editingTrade?.grade || "A"} options={["A+", "A", "B", "C", "D"]} />
+            <Select name="emotion" defaultValue={editingTrade?.emotion || "Calm"} options={["Calm", "Confident", "Fear", "Greed", "FOMO", "Revenge"]} />
+            <Input name="mistake" placeholder="Mistake e.g. Early entry" defaultValue={editingTrade?.mistake || ""} />
 
             <textarea
               name="notes"
@@ -230,19 +201,12 @@ export default function JournalPage() {
               className="md:col-span-2 rounded-2xl border border-white/10 bg-black/50 p-4 text-white"
             />
 
-            <button
-              type="submit"
-              className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700"
-            >
+            <button type="submit" className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700">
               {editingTrade ? "Update Trade" : "Save Trade"}
             </button>
 
             {editingTrade && (
-              <button
-                type="button"
-                onClick={() => setEditingTrade(null)}
-                className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold transition hover:bg-white/20"
-              >
+              <button type="button" onClick={() => setEditingTrade(null)} className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold transition hover:bg-white/20">
                 Cancel Edit
               </button>
             )}
@@ -251,68 +215,37 @@ export default function JournalPage() {
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
           <h2 className="text-2xl font-semibold">Trade History</h2>
-          <p className="mb-6 text-sm text-white/40">
-            Your latest private trades, screenshots, and actions.
-          </p>
+          <p className="mb-6 text-sm text-white/40">Your latest private trades and execution data.</p>
 
           {trades.length === 0 ? (
             <p className="text-white/40">No trades saved yet.</p>
           ) : (
             <div className="space-y-4">
               {trades.map((trade) => (
-                <div
-                  key={trade.id}
-                  className="grid gap-4 rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20 lg:grid-cols-[1fr_140px_180px]"
-                >
+                <div key={trade.id} className="grid gap-4 rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20 lg:grid-cols-[1fr_150px_180px]">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
                       <h3 className="text-xl font-bold">{trade.pair}</h3>
-
-                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
-                        {trade.session}
-                      </span>
-
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs ${
-                          trade.result === "Win"
-                            ? "bg-green-500/10 text-green-400"
-                            : trade.result === "Loss"
-                            ? "bg-red-500/10 text-red-400"
-                            : "bg-blue-500/10 text-blue-400"
-                        }`}
-                      >
-                        {trade.result}
-                      </span>
+                      <Badge text={trade.direction || "N/A"} />
+                      <Badge text={trade.strategy || "No strategy"} />
+                      <Badge text={trade.grade || "No grade"} />
+                      <Badge text={trade.result} />
                     </div>
 
                     <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
-                      <p>
-                        Entry:{" "}
-                        <span className="text-white">
-                          {trade.entry_price}
-                        </span>
-                      </p>
-
-                      <p>
-                        Exit:{" "}
-                        <span className="text-white">
-                          {trade.exit_price}
-                        </span>
-                      </p>
-
-                      <p>
-                        P/L:{" "}
-                        <span
-                          className={
-                            trade.profit_loss >= 0
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }
-                        >
-                          {trade.profit_loss}
-                        </span>
-                      </p>
+                      <p>Session: <span className="text-white">{trade.session}</span></p>
+                      <p>Entry: <span className="text-white">{trade.entry_price}</span></p>
+                      <p>Exit: <span className="text-white">{trade.exit_price}</span></p>
+                      <p>P/L: <span className={trade.profit_loss >= 0 ? "text-green-400" : "text-red-400"}>{trade.profit_loss}</span></p>
+                      <p>R:R: <span className="text-white">{trade.risk_reward || "N/A"}</span></p>
+                      <p>Emotion: <span className="text-white">{trade.emotion || "N/A"}</span></p>
                     </div>
+
+                    {trade.mistake && (
+                      <p className="mt-4 rounded-2xl bg-red-500/10 p-3 text-sm text-red-300">
+                        Mistake: {trade.mistake}
+                      </p>
+                    )}
 
                     {trade.notes && (
                       <p className="mt-4 rounded-2xl bg-white/[0.03] p-3 text-sm text-white/50">
@@ -323,16 +256,8 @@ export default function JournalPage() {
 
                   <div>
                     {trade.image_url ? (
-                      <a
-                        href={trade.image_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <img
-                          src={trade.image_url}
-                          alt="Trade screenshot"
-                          className="h-28 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80"
-                        />
+                      <a href={trade.image_url} target="_blank" rel="noopener noreferrer">
+                        <img src={trade.image_url} alt="Trade screenshot" className="h-28 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80" />
                       </a>
                     ) : (
                       <div className="flex h-28 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-sm text-white/30">
@@ -342,17 +267,10 @@ export default function JournalPage() {
                   </div>
 
                   <div className="flex items-center gap-2 lg:justify-end">
-                    <button
-                      onClick={() => setEditingTrade(trade)}
-                      className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-400 hover:bg-yellow-500/20"
-                    >
+                    <button onClick={() => setEditingTrade(trade)} className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-400 hover:bg-yellow-500/20">
                       Edit
                     </button>
-
-                    <button
-                      onClick={() => deleteTrade(trade.id)}
-                      className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20"
-                    >
+                    <button onClick={() => deleteTrade(trade.id)} className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20">
                       Delete
                     </button>
                   </div>
@@ -366,21 +284,26 @@ export default function JournalPage() {
   );
 }
 
-function Input({
-  name,
-  placeholder,
-  defaultValue,
-}: {
-  name: string;
-  placeholder: string;
-  defaultValue: string | number;
-}) {
+function Input({ name, placeholder, defaultValue }: { name: string; placeholder: string; defaultValue: string | number }) {
   return (
-    <input
-      name={name}
-      defaultValue={defaultValue}
-      className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-      placeholder={placeholder}
-    />
+    <input name={name} defaultValue={defaultValue} className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500" placeholder={placeholder} />
+  );
+}
+
+function Select({ name, defaultValue, options }: { name: string; defaultValue: string; options: string[] }) {
+  return (
+    <select name={name} defaultValue={defaultValue} className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500">
+      {options.map((option) => (
+        <option key={option}>{option}</option>
+      ))}
+    </select>
+  );
+}
+
+function Badge({ text }: { text: string }) {
+  return (
+    <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
+      {text}
+    </span>
   );
 }
