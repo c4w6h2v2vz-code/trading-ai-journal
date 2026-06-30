@@ -68,7 +68,7 @@ export default function JournalPage() {
       result: formData.get("result"),
       notes: formData.get("notes"),
       image_url: imageUrl,
-    };image_url: string | null;
+    };
 
     const { error } = editingTrade
       ? await supabase.from("trades").update(tradeData).eq("id", editingTrade.id)
