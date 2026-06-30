@@ -13,10 +13,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const links = [
-    { name: "Dashboard", href: "/dashboard" },
-    { name: "Journal", href: "/journal" },
-    { name: "Settings", href: "/settings" },
-  ];
+  { name: "Dashboard", href: "/dashboard" },
+  { name: "Journal", href: "/journal" },
+  { name: "Calendar", href: "/calendar" },
+  { name: "Settings", href: "/settings" },
+];
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
