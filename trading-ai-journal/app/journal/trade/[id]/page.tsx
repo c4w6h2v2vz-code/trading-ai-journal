@@ -23,6 +23,11 @@ type Trade = {
   notes: string;
   image_url: string | null;
   created_at: string;
+  ai_score: number | null;
+  ai_risk_score: number | null;
+  ai_psychology_score: number | null;
+  ai_execution_score: number | null;
+  ai_feedback: string | null;
 };
 
 export default function TradeDetailsPage() {
@@ -56,7 +61,35 @@ export default function TradeDetailsPage() {
         return;
       }
 
-      setTrade(data);
+      const riskScore = calculateRiskScore(data);
+      const psychologyScore = calculatePsychologyScore(data);
+      const executionScore = calculateExecutionScore(data);
+      const totalScore = Math.round(
+        (riskScore + psychologyScore + executionScore) / 3
+      );
+      const feedback = getCoachFeedback(data, totalScore);
+
+      await supabase
+        .from("trades")
+        .update({
+          ai_score: totalScore,
+          ai_risk_score: riskScore,
+          ai_psychology_score: psychologyScore,
+          ai_execution_score: executionScore,
+          ai_feedback: feedback,
+        })
+        .eq("id", data.id)
+        .eq("user_id", user.id);
+
+      setTrade({
+        ...data,
+        ai_score: totalScore,
+        ai_risk_score: riskScore,
+        ai_psychology_score: psychologyScore,
+        ai_execution_score: executionScore,
+        ai_feedback: feedback,
+      });
+
       setMessage("");
     }
 
@@ -89,7 +122,7 @@ export default function TradeDetailsPage() {
               </h1>
 
               <p className="mt-3 text-white/50">
-                Full breakdown and AI-style review of this trade.
+                Full breakdown and saved AI-style review of this trade.
               </p>
             </div>
 
@@ -102,7 +135,11 @@ export default function TradeDetailsPage() {
                 </h2>
 
                 {trade.image_url ? (
-                  <a href={trade.image_url} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={trade.image_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <img
                       src={trade.image_url}
                       alt="Trade screenshot"
@@ -126,7 +163,10 @@ export default function TradeDetailsPage() {
                   <Detail label="Strategy" value={trade.strategy || "N/A"} />
                   <Detail label="Grade" value={trade.grade || "N/A"} />
                   <Detail label="Emotion" value={trade.emotion || "N/A"} />
-                  <Detail label="Risk Reward" value={String(trade.risk_reward || "N/A")} />
+                  <Detail
+                    label="Risk Reward"
+                    value={String(trade.risk_reward || "N/A")}
+                  />
                   <Detail label="Entry" value={String(trade.entry_price)} />
                   <Detail label="Exit" value={String(trade.exit_price)} />
                   <Detail
@@ -161,17 +201,16 @@ export default function TradeDetailsPage() {
 }
 
 function AICoachReview({ trade }: { trade: Trade }) {
-  const riskScore = calculateRiskScore(trade);
-  const psychologyScore = calculatePsychologyScore(trade);
-  const executionScore = calculateExecutionScore(trade);
-  const totalScore = Math.round((riskScore + psychologyScore + executionScore) / 3);
-
-  const feedback = getCoachFeedback(trade, totalScore);
+  const totalScore = trade.ai_score || 0;
+  const riskScore = trade.ai_risk_score || 0;
+  const psychologyScore = trade.ai_psychology_score || 0;
+  const executionScore = trade.ai_execution_score || 0;
+  const feedback = trade.ai_feedback || "No AI feedback saved yet.";
 
   return (
     <div className="mb-6 rounded-3xl border border-blue-500/20 bg-blue-500/10 p-6 shadow-2xl shadow-black/40">
       <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
-        AI Coach Review
+        Saved AI Coach Review
       </p>
 
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
