@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 
 type Trade = {
   id: string;
+  user_id: string;
   pair: string;
   session: string;
   entry_price: number;
@@ -17,20 +19,31 @@ type Trade = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [trades, setTrades] = useState<Trade[]>([]);
 
   useEffect(() => {
     async function loadTrades() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
       const { data } = await supabase
         .from("trades")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: true });
 
       setTrades(data || []);
     }
 
     loadTrades();
-  }, []);
+  }, [router]);
 
   const totalTrades = trades.length;
   const wins = trades.filter((trade) => trade.result === "Win");
@@ -88,13 +101,13 @@ export default function DashboardPage() {
         <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
-              Professional Trading Analytics
+              Private Trading Analytics
             </p>
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
               Performance Dashboard
             </h1>
             <p className="mt-3 text-white/50">
-              Track your wins, losses, sessions, pairs, and equity growth.
+              Your private wins, losses, sessions, pairs, and equity growth.
             </p>
           </div>
 
@@ -137,7 +150,7 @@ export default function DashboardPage() {
             title="AI Coach Note"
             value={
               totalTrades === 0
-                ? "Add more trades to unlock better insights."
+                ? "Add trades to unlock private insights."
                 : wins.length > losses.length
                 ? "Your performance is positive. Keep tracking rules and psychology."
                 : "Review your losing trades and reduce repeated mistakes."
@@ -162,7 +175,10 @@ export default function DashboardPage() {
                     value >= 0 ? "bg-green-500" : "bg-red-500"
                   }`}
                   style={{
-                    height: `${Math.max(8, (Math.abs(value) / maxEquity) * 100)}%`,
+                    height: `${Math.max(
+                      8,
+                      (Math.abs(value) / maxEquity) * 100
+                    )}%`,
                   }}
                   title={`Trade ${index + 1}: ${value}`}
                 />
