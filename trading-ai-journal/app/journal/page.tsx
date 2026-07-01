@@ -134,9 +134,10 @@ export default function JournalPage() {
     setImage(null);
     form.reset();
   } catch (err) {
-    alert("Unexpected error while saving trade.");
-    setMessage("Unexpected error while saving trade.");
-  } finally {
+  console.error(err);
+  alert("Unexpected error: " + String(err));
+  setMessage("Unexpected error: " + String(err));
+} finally {
     setSaving(false);
   }
 }
