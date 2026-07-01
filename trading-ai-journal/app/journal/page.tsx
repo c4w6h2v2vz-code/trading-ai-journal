@@ -115,7 +115,7 @@ if (image) {
       profit_loss: Number(formData.get("profit_loss") || 0),
       result: String(formData.get("result") || "Win"),
       notes: String(formData.get("notes") || ""),
-      
+      image_url: imageUrl,
     };
 
     const { data, error } = editingTrade
@@ -257,15 +257,15 @@ if (image) {
 
             <button
   type="submit"
-  onClick={() => alert("Button clicked")}
   disabled={saving}
   className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700 disabled:opacity-50"
 >
-              Save Trade
+              {saving ? "Saving..." : editingTrade ? "Update Trade" : "Save Trade"}
             </button>
 
             {editingTrade && (
               <button
+              
                 type="button"
                 onClick={() => setEditingTrade(null)}
                 className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold transition hover:bg-white/20"
