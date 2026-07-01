@@ -23,6 +23,11 @@ type Trade = {
   notes: string;
   image_url: string | null;
   created_at: string;
+  ai_score: number | null;
+  ai_risk_score: number | null;
+  ai_psychology_score: number | null;
+  ai_execution_score: number | null;
+  ai_feedback: string | null;
 };
 
 export default function JournalPage() {
@@ -71,94 +76,134 @@ export default function JournalPage() {
   }, []);
 
   async function saveTrade(event: React.FormEvent<HTMLFormElement>) {
-  event.preventDefault();
-  setSaving(true);
-  setMessage("");
+    event.preventDefault();
+    setSaving(true);
+    setMessage("");
 
-  try {
-    const user = await getCurrentUser();
-    if (!user) return;
+    try {
+      const user = await getCurrentUser();
+      if (!user) return;
 
-    const form = event.target as HTMLFormElement;
-const formData = new FormData(form);
-let imageUrl = editingTrade?.image_url || "";
+      const form = event.target as HTMLFormElement;
+      const formData = new FormData(form);
 
-if (image) {
-  const fileName = `${user.id}/${Date.now()}-${image.name}`;
+      let imageUrl = editingTrade?.image_url || "";
 
-  const { error: uploadError } = await supabase.storage
-    .from("trade-screenshots")
-    .upload(fileName, image);
+      if (image) {
+        const fileName = `${user.id}/${Date.now()}-${image.name}`;
 
-  if (uploadError) {
-    alert("Image upload error: " + uploadError.message);
-    setMessage("Image upload error: " + uploadError.message);
-    return;
-  }
+        const { error: uploadError } = await supabase.storage
+          .from("trade-screenshots")
+          .upload(fileName, image);
 
-  imageUrl = supabase.storage
-    .from("trade-screenshots")
-    .getPublicUrl(fileName).data.publicUrl;
-}
-    const tradeData = {
-      user_id: user.id,
-      pair: String(formData.get("pair") || ""),
-      session: String(formData.get("session") || ""),
-      strategy: String(formData.get("strategy") || ""),
-      direction: String(formData.get("direction") || ""),
-      grade: String(formData.get("grade") || ""),
-      emotion: String(formData.get("emotion") || ""),
-      mistake: String(formData.get("mistake") || ""),
-      risk_reward: Number(formData.get("risk_reward") || 0),
-      entry_price: Number(formData.get("entry_price") || 0),
-      exit_price: Number(formData.get("exit_price") || 0),
-      profit_loss: Number(formData.get("profit_loss") || 0),
-      result: String(formData.get("result") || "Win"),
-      notes: String(formData.get("notes") || ""),
-      image_url: imageUrl,
-    };
+        if (uploadError) {
+          alert("Image upload error: " + uploadError.message);
+          setMessage("Image upload error: " + uploadError.message);
+          return;
+        }
 
-    const { data, error } = editingTrade
-      ? await supabase
+        imageUrl = supabase.storage
+          .from("trade-screenshots")
+          .getPublicUrl(fileName).data.publicUrl;
+      }
+
+      const tradeData = {
+        user_id: user.id,
+        pair: String(formData.get("pair") || ""),
+        session: String(formData.get("session") || ""),
+        strategy: String(formData.get("strategy") || ""),
+        direction: String(formData.get("direction") || ""),
+        grade: String(formData.get("grade") || ""),
+        emotion: String(formData.get("emotion") || ""),
+        mistake: String(formData.get("mistake") || ""),
+        risk_reward: Number(formData.get("risk_reward") || 0),
+        entry_price: Number(formData.get("entry_price") || 0),
+        exit_price: Number(formData.get("exit_price") || 0),
+        profit_loss: Number(formData.get("profit_loss") || 0),
+        result: String(formData.get("result") || "Win"),
+        notes: String(formData.get("notes") || ""),
+        image_url: imageUrl,
+      };
+
+      const { data, error } = editingTrade
+        ? await supabase
+            .from("trades")
+            .update(tradeData)
+            .eq("id", editingTrade.id)
+            .eq("user_id", user.id)
+            .select()
+            .single()
+        : await supabase.from("trades").insert([tradeData]).select().single();
+
+      if (error) {
+        alert("Save error: " + error.message);
+        setMessage("Save error: " + error.message);
+        return;
+      }
+
+      let finalTrade = data as Trade;
+
+      try {
+        setMessage("Trade saved. Generating AI review...");
+
+        const aiResponse = await fetch("/api/ai-review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(finalTrade),
+        });
+
+        const aiData = await aiResponse.json();
+
+        if (!aiResponse.ok || aiData.error) {
+          throw new Error(aiData.details || aiData.error || "AI failed");
+        }
+
+        const { data: updatedTrade, error: updateError } = await supabase
           .from("trades")
-          .update(tradeData)
-          .eq("id", editingTrade.id)
+          .update({
+            ai_score: aiData.ai_score,
+            ai_risk_score: aiData.ai_risk_score,
+            ai_psychology_score: aiData.ai_psychology_score,
+            ai_execution_score: aiData.ai_execution_score,
+            ai_feedback: aiData.ai_feedback,
+          })
+          .eq("id", finalTrade.id)
           .eq("user_id", user.id)
-          .select()
-          .single()
-      : await supabase
-          .from("trades")
-          .insert([tradeData])
           .select()
           .single();
 
-    if (error) {
-      alert("Save error: " + error.message);
-      setMessage("Save error: " + error.message);
-      return;
-    }
+        if (!updateError && updatedTrade) {
+          finalTrade = updatedTrade as Trade;
+        }
+      } catch (aiError) {
+        console.error(aiError);
+        setMessage("Trade saved ✅ AI review failed, but trade is safe.");
+      }
 
-    if (editingTrade) {
-      setTrades((oldTrades) =>
-        oldTrades.map((trade) => (trade.id === data.id ? data : trade))
-      );
-      setMessage("Trade updated successfully ✅");
-    } else {
-      setTrades((oldTrades) => [data, ...oldTrades]);
-      setMessage("Trade saved successfully ✅");
-    }
+      if (editingTrade) {
+        setTrades((oldTrades) =>
+          oldTrades.map((trade) =>
+            trade.id === finalTrade.id ? finalTrade : trade
+          )
+        );
+        setMessage("Trade updated successfully ✅");
+      } else {
+        setTrades((oldTrades) => [finalTrade, ...oldTrades]);
+        setMessage("Trade saved with AI review ✅");
+      }
 
-    setEditingTrade(null);
-    setImage(null);
-    form.reset();
-  } catch (err) {
-  console.error(err);
-  alert("Unexpected error: " + String(err));
-  setMessage("Unexpected error: " + String(err));
-} finally {
-    setSaving(false);
+      setEditingTrade(null);
+      setImage(null);
+      form.reset();
+    } catch (err) {
+      console.error(err);
+      alert("Unexpected error: " + String(err));
+      setMessage("Unexpected error: " + String(err));
+    } finally {
+      setSaving(false);
+    }
   }
-}
+
   async function deleteTrade(id: string) {
     if (!confirm("Are you sure you want to delete this trade?")) return;
 
@@ -210,7 +255,7 @@ if (image) {
 
           <p className="mt-3 text-white/50">
             Track strategy, direction, emotion, mistakes, grade, risk/reward,
-            and screenshots.
+            screenshots, and AI review.
           </p>
         </div>
 
@@ -256,16 +301,15 @@ if (image) {
             />
 
             <button
-  type="submit"
-  disabled={saving}
-  className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700 disabled:opacity-50"
->
-              {saving ? "Saving..." : editingTrade ? "Update Trade" : "Save Trade"}
+              type="submit"
+              disabled={saving}
+              className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? "Saving + AI..." : editingTrade ? "Update Trade" : "Save Trade"}
             </button>
 
             {editingTrade && (
               <button
-              
                 type="button"
                 onClick={() => setEditingTrade(null)}
                 className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold transition hover:bg-white/20"
@@ -291,33 +335,21 @@ if (image) {
               className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
             />
 
-            <select
-              value={resultFilter}
-              onChange={(e) => setResultFilter(e.target.value)}
-              className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
-            >
+            <select value={resultFilter} onChange={(e) => setResultFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
               <option>All</option>
               <option>Win</option>
               <option>Loss</option>
               <option>Break Even</option>
             </select>
 
-            <select
-              value={strategyFilter}
-              onChange={(e) => setStrategyFilter(e.target.value)}
-              className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
-            >
+            <select value={strategyFilter} onChange={(e) => setStrategyFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
               <option>All</option>
               <option>SMC</option>
               <option>Breakout</option>
               <option>Scalping</option>
             </select>
 
-            <select
-              value={gradeFilter}
-              onChange={(e) => setGradeFilter(e.target.value)}
-              className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
-            >
+            <select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
               <option>All</option>
               <option>A+</option>
               <option>A</option>
@@ -334,10 +366,7 @@ if (image) {
           ) : (
             <div className="space-y-4">
               {filteredTrades.map((trade) => (
-                <div
-                  key={trade.id}
-                  className="grid gap-4 rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20 lg:grid-cols-[1fr_150px_220px]"
-                >
+                <div key={trade.id} className="grid gap-4 rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20 lg:grid-cols-[1fr_150px_220px]">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
                       <h3 className="text-xl font-bold">{trade.pair}</h3>
@@ -345,6 +374,7 @@ if (image) {
                       <Badge text={trade.strategy || "No strategy"} />
                       <Badge text={trade.grade || "No grade"} />
                       <Badge text={trade.result} />
+                      <Badge text={`AI ${trade.ai_score ?? "N/A"}`} />
                     </div>
 
                     <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
@@ -355,6 +385,12 @@ if (image) {
                       <p>R:R: <span className="text-white">{trade.risk_reward || "N/A"}</span></p>
                       <p>Emotion: <span className="text-white">{trade.emotion || "N/A"}</span></p>
                     </div>
+
+                    {trade.ai_feedback && (
+                      <p className="mt-4 rounded-2xl bg-blue-500/10 p-3 text-sm text-blue-300">
+                        AI: {trade.ai_feedback}
+                      </p>
+                    )}
 
                     {trade.mistake && (
                       <p className="mt-4 rounded-2xl bg-red-500/10 p-3 text-sm text-red-300">
@@ -372,11 +408,7 @@ if (image) {
                   <div>
                     {trade.image_url ? (
                       <a href={trade.image_url} target="_blank" rel="noopener noreferrer">
-                        <img
-                          src={trade.image_url}
-                          alt="Trade screenshot"
-                          className="h-28 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80"
-                        />
+                        <img src={trade.image_url} alt="Trade screenshot" className="h-28 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80" />
                       </a>
                     ) : (
                       <div className="flex h-28 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-sm text-white/30">
@@ -386,24 +418,15 @@ if (image) {
                   </div>
 
                   <div className="flex items-center gap-2 lg:justify-end">
-                    <button
-                      onClick={() => router.push(`/journal/trade/${trade.id}`)}
-                      className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
-                    >
+                    <button onClick={() => router.push(`/journal/trade/${trade.id}`)} className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">
                       View
                     </button>
 
-                    <button
-                      onClick={() => setEditingTrade(trade)}
-                      className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-400 hover:bg-yellow-500/20"
-                    >
+                    <button onClick={() => setEditingTrade(trade)} className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-400 hover:bg-yellow-500/20">
                       Edit
                     </button>
 
-                    <button
-                      onClick={() => deleteTrade(trade.id)}
-                      className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20"
-                    >
+                    <button onClick={() => deleteTrade(trade.id)} className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20">
                       Delete
                     </button>
                   </div>
@@ -417,40 +440,13 @@ if (image) {
   );
 }
 
-function Input({
-  name,
-  placeholder,
-  defaultValue,
-}: {
-  name: string;
-  placeholder: string;
-  defaultValue: string | number;
-}) {
-  return (
-    <input
-      name={name}
-      defaultValue={defaultValue}
-      className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-      placeholder={placeholder}
-    />
-  );
+function Input({ name, placeholder, defaultValue }: { name: string; placeholder: string; defaultValue: string | number }) {
+  return <input name={name} defaultValue={defaultValue} className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500" placeholder={placeholder} />;
 }
 
-function Select({
-  name,
-  defaultValue,
-  options,
-}: {
-  name: string;
-  defaultValue: string;
-  options: string[];
-}) {
+function Select({ name, defaultValue, options }: { name: string; defaultValue: string; options: string[] }) {
   return (
-    <select
-      name={name}
-      defaultValue={defaultValue}
-      className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-    >
+    <select name={name} defaultValue={defaultValue} className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500">
       {options.map((option) => (
         <option key={option}>{option}</option>
       ))}
@@ -459,9 +455,5 @@ function Select({
 }
 
 function Badge({ text }: { text: string }) {
-  return (
-    <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
-      {text}
-    </span>
-  );
+  return <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">{text}</span>;
 }
