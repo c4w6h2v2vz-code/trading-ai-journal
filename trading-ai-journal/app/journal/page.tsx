@@ -79,8 +79,8 @@ export default function JournalPage() {
     const user = await getCurrentUser();
     if (!user) return;
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
+    const form = event.target as HTMLFormElement;
+const formData = new FormData(form);
 
     const tradeData = {
       user_id: user.id,
