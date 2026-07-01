@@ -18,7 +18,11 @@ type Trade = {
   result: string;
   notes: string;
   image_url: string | null;
-};
+ai_score: number | null;
+ai_risk_score: number | null;
+ai_psychology_score: number | null;
+ai_execution_score: number | null;
+ai_feedback: string | null;};
 
 export default function TradeHistory({
   trades,
@@ -49,6 +53,7 @@ export default function TradeHistory({
               <Badge text={trade.strategy || "No strategy"} />
               <Badge text={trade.grade || "No grade"} />
               <Badge text={trade.result} />
+              
             </div>
 
             <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
