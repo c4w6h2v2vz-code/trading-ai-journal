@@ -237,10 +237,11 @@ export default function JournalPage() {
             />
 
             <button
-              type="submit"
-              disabled={saving}
-              className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700 disabled:opacity-50"
-            >
+  type="submit"
+  onClick={() => alert("Button clicked")}
+  disabled={saving}
+  className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700 disabled:opacity-50"
+>
               {saving ? "Saving..." : editingTrade ? "Update Trade" : "Save Trade"}
             </button>
 
