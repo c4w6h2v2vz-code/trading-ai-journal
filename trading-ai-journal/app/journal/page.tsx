@@ -81,7 +81,25 @@ export default function JournalPage() {
 
     const form = event.target as HTMLFormElement;
 const formData = new FormData(form);
+let imageUrl = editingTrade?.image_url || "";
 
+if (image) {
+  const fileName = `${user.id}/${Date.now()}-${image.name}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("trade-screenshots")
+    .upload(fileName, image);
+
+  if (uploadError) {
+    alert("Image upload error: " + uploadError.message);
+    setMessage("Image upload error: " + uploadError.message);
+    return;
+  }
+
+  imageUrl = supabase.storage
+    .from("trade-screenshots")
+    .getPublicUrl(fileName).data.publicUrl;
+}
     const tradeData = {
       user_id: user.id,
       pair: String(formData.get("pair") || ""),
@@ -97,7 +115,7 @@ const formData = new FormData(form);
       profit_loss: Number(formData.get("profit_loss") || 0),
       result: String(formData.get("result") || "Win"),
       notes: String(formData.get("notes") || ""),
-      image_url: editingTrade?.image_url || "",
+      
     };
 
     const { data, error } = editingTrade
