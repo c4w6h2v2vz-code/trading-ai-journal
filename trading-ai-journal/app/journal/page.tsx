@@ -242,7 +242,7 @@ export default function JournalPage() {
   disabled={saving}
   className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700 disabled:opacity-50"
 >
-              TEST BUTTON
+              Save Trade
             </button>
 
             {editingTrade && (
