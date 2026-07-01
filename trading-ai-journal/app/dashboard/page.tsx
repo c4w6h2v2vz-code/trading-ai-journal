@@ -336,6 +336,7 @@ export default function DashboardPage() {
                         {trade.profit_loss}
                       </p>
                       <p className="text-sm text-white/40">{trade.result}</p>
+<p className="text-sm text-blue-300">AI {trade.ai_score ?? "N/A"}</p>
                     </div>
                   </div>
 
