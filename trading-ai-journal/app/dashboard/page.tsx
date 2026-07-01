@@ -1,10 +1,11 @@
 "use client";
+
 import PerformanceBreakdown from "@/components/dashboard/PerformanceBreakdown";
 import AICoachSummary from "@/components/dashboard/AICoachSummary";
+import AnalyticsCards from "@/components/dashboard/AnalyticsCards";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-
   Area,
   AreaChart,
   Bar,
@@ -17,8 +18,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  
-} from "recharts";import AnalyticsCards from "@/components/dashboard/AnalyticsCards";
+} from "recharts";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 
@@ -33,6 +33,11 @@ type Trade = {
   result: string;
   notes: string;
   created_at: string;
+  ai_score: number | null;
+  ai_risk_score: number | null;
+  ai_psychology_score: number | null;
+  ai_execution_score: number | null;
+  ai_feedback: string | null;
 };
 
 export default function DashboardPage() {
@@ -123,6 +128,14 @@ export default function DashboardPage() {
 
   const recentTrades = [...trades].reverse().slice(0, 6);
 
+  const averageAiScore = getAverageScore(trades, "ai_score");
+  const averageRiskScore = getAverageScore(trades, "ai_risk_score");
+  const averagePsychologyScore = getAverageScore(
+    trades,
+    "ai_psychology_score"
+  );
+  const averageExecutionScore = getAverageScore(trades, "ai_execution_score");
+
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-6 py-8">
@@ -171,13 +184,20 @@ export default function DashboardPage() {
           <StatCard title="Average Loss" value={averageLoss} />
         </div>
 
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Average AI Score" value={averageAiScore} highlight="blue" />
+          <StatCard title="Average Risk Score" value={averageRiskScore} />
+          <StatCard title="Average Psychology Score" value={averagePsychologyScore} />
+          <StatCard title="Average Execution Score" value={averageExecutionScore} />
+        </div>
+
         <div className="mb-8 grid gap-4 lg:grid-cols-3">
-          <InfoCard title="Best Pair" value={bestPair} /><AnalyticsCards trades={trades} />
+          <InfoCard title="Best Pair" value={bestPair} />
+          <AnalyticsCards trades={trades} />
           <AICoachSummary trades={trades} />
           <PerformanceBreakdown trades={trades} />
           <InfoCard title="Best Session" value={bestSession} />
           <InfoCard
-          
             title="AI Coach Note"
             value={
               totalTrades === 0
@@ -359,6 +379,25 @@ function getDailyData(trades: Trade[]) {
     date,
     profit,
   }));
+}
+
+function getAverageScore(
+  trades: Trade[],
+  key:
+    | "ai_score"
+    | "ai_risk_score"
+    | "ai_psychology_score"
+    | "ai_execution_score"
+) {
+  const scores = trades
+    .map((trade) => trade[key])
+    .filter((score): score is number => score !== null && score !== undefined);
+
+  if (scores.length === 0) return "0";
+
+  const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+
+  return average.toFixed(1);
 }
 
 function StatCard({
