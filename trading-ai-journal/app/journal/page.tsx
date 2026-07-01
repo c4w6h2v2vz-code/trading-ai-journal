@@ -71,89 +71,75 @@ export default function JournalPage() {
   }, []);
 
   async function saveTrade(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setMessage("");
+  event.preventDefault();
+  setSaving(true);
+  setMessage("");
 
-    try {
-      const user = await getCurrentUser();
-      if (!user) return;
+  try {
+    const user = await getCurrentUser();
+    if (!user) return;
 
-      const form = event.currentTarget;
-      const formData = new FormData(form);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
 
-      let imageUrl = editingTrade?.image_url || "";
+    const tradeData = {
+      user_id: user.id,
+      pair: String(formData.get("pair") || ""),
+      session: String(formData.get("session") || ""),
+      strategy: String(formData.get("strategy") || ""),
+      direction: String(formData.get("direction") || ""),
+      grade: String(formData.get("grade") || ""),
+      emotion: String(formData.get("emotion") || ""),
+      mistake: String(formData.get("mistake") || ""),
+      risk_reward: Number(formData.get("risk_reward") || 0),
+      entry_price: Number(formData.get("entry_price") || 0),
+      exit_price: Number(formData.get("exit_price") || 0),
+      profit_loss: Number(formData.get("profit_loss") || 0),
+      result: String(formData.get("result") || "Win"),
+      notes: String(formData.get("notes") || ""),
+      image_url: editingTrade?.image_url || "",
+    };
 
-      if (image) {
-        const fileName = `${user.id}/${Date.now()}-${image.name}`;
+    const { data, error } = editingTrade
+      ? await supabase
+          .from("trades")
+          .update(tradeData)
+          .eq("id", editingTrade.id)
+          .eq("user_id", user.id)
+          .select()
+          .single()
+      : await supabase
+          .from("trades")
+          .insert([tradeData])
+          .select()
+          .single();
 
-        const { error: uploadError } = await supabase.storage
-          .from("trade-screenshots")
-          .upload(fileName, image);
-
-        if (uploadError) {
-          alert("Image upload error: " + uploadError.message);
-          setMessage("Image upload error: " + uploadError.message);
-          return;
-        }
-
-        imageUrl = supabase.storage
-          .from("trade-screenshots")
-          .getPublicUrl(fileName).data.publicUrl;
-      }
-
-      const tradeData = {
-        user_id: user.id,
-        pair: String(formData.get("pair") || ""),
-        session: String(formData.get("session") || ""),
-        strategy: String(formData.get("strategy") || ""),
-        direction: String(formData.get("direction") || ""),
-        grade: String(formData.get("grade") || ""),
-        emotion: String(formData.get("emotion") || ""),
-        mistake: String(formData.get("mistake") || ""),
-        risk_reward: Number(formData.get("risk_reward") || 0),
-        entry_price: Number(formData.get("entry_price") || 0),
-        exit_price: Number(formData.get("exit_price") || 0),
-        profit_loss: Number(formData.get("profit_loss") || 0),
-        result: String(formData.get("result") || "Win"),
-        notes: String(formData.get("notes") || ""),
-        image_url: imageUrl,
-      };
-
-      const { data, error } = editingTrade
-        ? await supabase
-            .from("trades")
-            .update(tradeData)
-            .eq("id", editingTrade.id)
-            .eq("user_id", user.id)
-            .select()
-            .single()
-        : await supabase.from("trades").insert([tradeData]).select().single();
-
-      if (error) {
-        alert("Save error: " + error.message);
-        setMessage("Save error: " + error.message);
-        return;
-      }
-
-      if (editingTrade) {
-        setTrades((oldTrades) =>
-          oldTrades.map((trade) => (trade.id === data.id ? data : trade))
-        );
-        setMessage("Trade updated successfully ✅");
-      } else {
-        setTrades((oldTrades) => [data, ...oldTrades]);
-        setMessage("Trade saved successfully ✅");
-      }
-
-      setEditingTrade(null);
-      setImage(null);
-      form.reset();
-    } finally {
-      setSaving(false);
+    if (error) {
+      alert("Save error: " + error.message);
+      setMessage("Save error: " + error.message);
+      return;
     }
-  }
 
+    if (editingTrade) {
+      setTrades((oldTrades) =>
+        oldTrades.map((trade) => (trade.id === data.id ? data : trade))
+      );
+      setMessage("Trade updated successfully ✅");
+    } else {
+      setTrades((oldTrades) => [data, ...oldTrades]);
+      setMessage("Trade saved successfully ✅");
+    }
+
+    setEditingTrade(null);
+    setImage(null);
+    form.reset();
+  } catch (err) {
+    alert("Unexpected error while saving trade.");
+    setMessage("Unexpected error while saving trade.");
+  } finally {
+    setSaving(false);
+  }
+}
   async function deleteTrade(id: string) {
     if (!confirm("Are you sure you want to delete this trade?")) return;
 
