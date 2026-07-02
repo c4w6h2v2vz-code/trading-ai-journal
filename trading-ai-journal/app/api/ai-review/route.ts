@@ -42,7 +42,8 @@ Grade: ${trade.grade}
 Emotion: ${trade.emotion}
 Mistake: ${trade.mistake}
 Notes: ${trade.notes}
-
+Trading Rules:
+${trade.trading_rules || "No personal trading rules found."}
 Return only valid JSON:
 {
   "ai_score": 85,
