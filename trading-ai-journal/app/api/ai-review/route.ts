@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const trade = await request.json();
-
+    const { trade, history } = await request.json();
+const historyText =
+  history && history.length > 0
+    ? history
+        .map(
+          (oldTrade: any, index: number) =>
+            `${index + 1}. ${oldTrade.pair} ${oldTrade.direction} | Result: ${oldTrade.result} | P/L: ${oldTrade.profit_loss} | Emotion: ${oldTrade.emotion} | Mistake: ${oldTrade.mistake} | AI Score: ${oldTrade.ai_score}`
+        )
+        .join("\n")
+    : "No previous trade history provided.";
     const rulesText =
       trade.trading_rules && trade.trading_rules.length > 0
         ? trade.trading_rules
@@ -35,7 +43,8 @@ Review this trade using the trader's personal rules.
 
 Personal Trading Rules:
 ${rulesText}
-
+Recent Trade History:
+${historyText}
 Trade:
 Pair: ${trade.pair}
 Direction: ${trade.direction}
@@ -48,6 +57,14 @@ Grade: ${trade.grade}
 Emotion: ${trade.emotion}
 Mistake: ${trade.mistake}
 Notes: ${trade.notes}
+Previous Mistakes:
+${historyText}
+
+Instructions:
+- Check if the trader repeated old mistakes.
+- Reward consistency.
+- Penalize repeated mistakes.
+- Mention any repeated behavior in ai_feedback.
 Trading Rules:
 ${trade.trading_rules || "No personal trading rules found."}
 If personal trading rules are provided:
