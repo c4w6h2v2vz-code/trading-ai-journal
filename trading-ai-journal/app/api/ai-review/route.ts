@@ -44,6 +44,12 @@ Mistake: ${trade.mistake}
 Notes: ${trade.notes}
 Trading Rules:
 ${trade.trading_rules || "No personal trading rules found."}
+If personal trading rules are provided:
+
+- Check whether the trade followed them.
+- Mention any broken rule in the feedback.
+- Praise rules that were followed.
+- Keep feedback under 3 sentences.
 Return only valid JSON:
 {
   "ai_score": 85,
