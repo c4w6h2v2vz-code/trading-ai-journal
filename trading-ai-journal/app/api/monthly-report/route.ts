@@ -4,6 +4,19 @@ export async function POST(request: Request) {
   try {
     const { trades } = await request.json();
 
+    if (!trades || trades.length === 0) {
+      return NextResponse.json({
+        overall_grade: "N/A",
+        summary: "No trades found yet.",
+        strengths: [],
+        weaknesses: [],
+        best_pair: "N/A",
+        worst_pair: "N/A",
+        main_mistake: "N/A",
+        coach_advice: "Add trades first to generate a report.",
+      });
+    }
+
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -13,14 +26,13 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: "gpt-4.1-mini",
         input: `
-You are an elite trading performance coach.
+Return ONLY valid JSON.
 
-Create a monthly trading report from these trades.
+Create a monthly trading report from these trades:
 
-Trades:
 ${JSON.stringify(trades, null, 2)}
 
-Return ONLY raw valid JSON. No markdown. No explanation. No empty response.
+JSON format:
 {
   "overall_grade": "B+",
   "summary": "Short monthly summary.",
@@ -37,21 +49,21 @@ Return ONLY raw valid JSON. No markdown. No explanation. No empty response.
 
     const data = await response.json();
 
-    const text = data.output_text || data.output?.[0]?.content?.[0]?.text || "";
+    if (!response.ok) {
+      throw new Error(data.error?.message || "OpenAI request failed");
+    }
+
+    const text =
+      data.output_text ||
+      data.output?.[0]?.content?.[0]?.text ||
+      "";
+
+    if (!text) {
+      throw new Error(JSON.stringify(data));
+    }
+
     const cleaned = text.replace(/```json|```/g, "").trim();
-    if (!cleaned) {
-  throw new Error("AI returned empty response");
-}
-
-const jsonStart = cleaned.indexOf("{");
-const jsonEnd = cleaned.lastIndexOf("}");
-
-if (jsonStart === -1 || jsonEnd === -1) {
-  throw new Error("AI did not return valid JSON: " + cleaned);
-}
-
-const jsonText = cleaned.slice(jsonStart, jsonEnd + 1);
-const parsed = JSON.parse(jsonText);
+    const parsed = JSON.parse(cleaned);
 
     return NextResponse.json(parsed);
   } catch (error) {
