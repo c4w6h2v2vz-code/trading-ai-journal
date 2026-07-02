@@ -144,12 +144,27 @@ export default function JournalPage() {
       let finalTrade = data as Trade;
 
       try {
-        setMessage("Trade saved. Generating AI review...");
+        setMessage("Trade saved. Loading trading rules...");
+
+        const { data: tradingRules, error: rulesError } = await supabase
+          .from("trading_rules")
+          .select("title, description")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: true });
+
+        if (rulesError) {
+          console.error(rulesError);
+        }
+
+        setMessage("Trade saved. Generating AI review with your rules...");
 
         const aiResponse = await fetch("/api/ai-review", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(finalTrade),
+          body: JSON.stringify({
+            ...finalTrade,
+            trading_rules: tradingRules || [],
+          }),
         });
 
         const aiData = await aiResponse.json();
