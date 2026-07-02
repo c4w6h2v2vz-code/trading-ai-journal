@@ -39,7 +39,19 @@ Return only valid JSON:
 
     const text = data.output_text || data.output?.[0]?.content?.[0]?.text || "";
     const cleaned = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    if (!cleaned) {
+  throw new Error("AI returned empty response");
+}
+
+const jsonStart = cleaned.indexOf("{");
+const jsonEnd = cleaned.lastIndexOf("}");
+
+if (jsonStart === -1 || jsonEnd === -1) {
+  throw new Error("AI did not return valid JSON: " + cleaned);
+}
+
+const jsonText = cleaned.slice(jsonStart, jsonEnd + 1);
+const parsed = JSON.parse(jsonText);
 
     return NextResponse.json(parsed);
   } catch (error) {
