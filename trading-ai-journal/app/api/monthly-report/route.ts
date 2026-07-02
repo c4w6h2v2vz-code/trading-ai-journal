@@ -11,7 +11,7 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-5.5",
+        model: "gpt-4.1-mini",
         input: `
 You are an elite trading performance coach.
 
@@ -20,7 +20,7 @@ Create a monthly trading report from these trades.
 Trades:
 ${JSON.stringify(trades, null, 2)}
 
-Return only valid JSON:
+Return ONLY raw valid JSON. No markdown. No explanation. No empty response.
 {
   "overall_grade": "B+",
   "summary": "Short monthly summary.",
