@@ -4,6 +4,16 @@ export async function POST(request: Request) {
   try {
     const trade = await request.json();
 
+    const rulesText =
+      trade.trading_rules && trade.trading_rules.length > 0
+        ? trade.trading_rules
+            .map(
+              (rule: { title: string; description: string }, index: number) =>
+                `${index + 1}. ${rule.title}: ${rule.description}`
+            )
+            .join("\n")
+        : "No personal trading rules saved yet.";
+
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -15,7 +25,10 @@ export async function POST(request: Request) {
         input: `
 You are a professional trading coach.
 
-Review this trade and return only JSON.
+Review this trade using the trader's personal rules.
+
+Personal Trading Rules:
+${rulesText}
 
 Trade:
 Pair: ${trade.pair}
@@ -30,13 +43,13 @@ Emotion: ${trade.emotion}
 Mistake: ${trade.mistake}
 Notes: ${trade.notes}
 
-Return JSON exactly like this:
+Return only valid JSON:
 {
   "ai_score": 85,
   "ai_risk_score": 80,
   "ai_psychology_score": 90,
   "ai_execution_score": 85,
-  "ai_feedback": "Short clear feedback here."
+  "ai_feedback": "Mention which personal rules were followed or broken, then give short improvement advice."
 }
         `,
       }),
