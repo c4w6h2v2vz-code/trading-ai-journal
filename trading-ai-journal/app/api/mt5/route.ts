@@ -54,12 +54,16 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, data });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: String(error) },
-      { status: 500 }
-    );
-  }
+  } catch (error: any) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: error?.message || String(error),
+      details: error,
+    },
+    { status: 500 }
+  );
+}
 }
 
 export async function GET() {
