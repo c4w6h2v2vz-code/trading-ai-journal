@@ -20,7 +20,7 @@ export default function MT5Page() {
 
   async function loadMT5Data() {
     try {
-      const response = await fetch("/api/mt5", {
+      const response = await fetch("/api/mt5?t=" + Date.now(), {
         cache: "no-store",
       });
 
