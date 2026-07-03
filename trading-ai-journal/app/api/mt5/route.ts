@@ -19,28 +19,45 @@ export async function POST(request: Request) {
 
     const data = await request.json();
 
-    const { error } = await supabase.from("mt5_connection").insert({
+    // Save MT5 connection
+    await supabase.from("mt5_connection").insert({
       account: data.account,
       server: data.server,
       balance: data.balance,
       equity: data.equity,
     });
 
-    if (error) {
-      throw error;
+    // Save completed trade (only if a ticket exists)
+    if (data.ticket) {
+      const { error } = await supabase.from("mt5_trades").upsert({
+        ticket: String(data.ticket),
+        account: data.account,
+        server: data.server,
+        symbol: data.symbol,
+        trade_type: data.type,
+        lot_size: data.lotSize,
+        entry_price: data.entryPrice,
+        exit_price: data.exitPrice,
+        stop_loss: data.stopLoss,
+        take_profit: data.takeProfit,
+        profit: data.profit,
+        opened_at: data.openedAt,
+        closed_at: data.closedAt,
+      });
+
+      if (error) throw error;
     }
 
     return NextResponse.json({
       success: true,
-      message: "MT5 data saved successfully",
       data,
     });
+
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
-        error: "MT5 data import failed",
-        details: String(error),
+        error: String(error),
       },
       { status: 500 }
     );
@@ -48,30 +65,16 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from("mt5_connection")
     .select("*")
     .order("received_at", { ascending: false })
     .limit(1)
     .single();
 
-  if (error || !data) {
-    return NextResponse.json({
-      success: true,
-      connected: false,
-      data: null,
-    });
-  }
-
   return NextResponse.json({
     success: true,
-    connected: true,
-    data: {
-      account: data.account,
-      server: data.server,
-      balance: data.balance,
-      equity: data.equity,
-      receivedAt: data.received_at,
-    },
+    connected: !!data,
+    data,
   });
 }
