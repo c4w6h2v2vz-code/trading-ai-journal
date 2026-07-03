@@ -1,41 +1,51 @@
 "use client";
 
 import AppShell from "@/components/AppShell";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+type MT5Data = {
+  source?: string;
+  event?: string;
+  account?: string;
+  server?: string;
+  balance?: number;
+  equity?: number;
+  receivedAt?: string;
+};
 
 export default function MT5Page() {
-  const [message, setMessage] = useState("");
+  const [mt5Data, setMt5Data] = useState<MT5Data | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [message, setMessage] = useState("Loading MT5 connection...");
 
-  async function sendTestTrade() {
-    setMessage("Sending test trade...");
+  async function loadMT5Data() {
+    try {
+      const response = await fetch("/api/mt5", {
+        cache: "no-store",
+      });
 
-    const response = await fetch("/api/mt5", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ticket: 123456,
-        symbol: "GBPUSD",
-        type: "BUY",
-        lotSize: 1.0,
-        entryPrice: 1.2700,
-        exitPrice: 1.2750,
-        profit: 500,
-        riskPercent: 1,
-        openedAt: "2026-07-03 09:00",
-        closedAt: "2026-07-03 11:30",
-      }),
-    });
+      const result = await response.json();
 
-    const data = await response.json();
+      setConnected(result.connected);
+      setMt5Data(result.data);
 
-    if (data.success) {
-      setMessage("✅ Test trade sent successfully");
-    } else {
-      setMessage("❌ Test trade failed");
+      if (result.connected) {
+        setMessage("✅ MT5 connected successfully");
+      } else {
+        setMessage("Waiting for MT5 connection");
+      }
+    } catch {
+      setMessage("❌ Could not load MT5 data");
     }
   }
+
+  useEffect(() => {
+    loadMT5Data();
+
+    const interval = setInterval(loadMT5Data, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <AppShell>
@@ -49,59 +59,67 @@ export default function MT5Page() {
         </h1>
 
         <p className="mt-3 text-white/50">
-          Prepare your journal to receive trades automatically from MT5.
+          Your FTMO MT5 account is connected to your AI Trading Journal.
         </p>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-3">
           <Card
             title="1. MT5 Account"
-            text="Later you will connect your MT5 account or export your trade history."
+            text="Your FTMO account sends data directly to your journal."
           />
 
           <Card
             title="2. Auto Import"
-            text="Trades will automatically appear inside your trading journal."
+            text="Next we will send real trades automatically."
           />
 
           <Card
             title="3. AI Analysis"
-            text="Every completed trade will be reviewed by your personal AI coach."
+            text="After each completed trade, AI will review your execution."
           />
         </div>
 
         <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="text-2xl font-semibold">MT5 Account Dashboard</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-2xl font-semibold">MT5 Account Dashboard</h2>
+
+            <button
+              onClick={loadMT5Data}
+              className="rounded-2xl bg-blue-500 px-4 py-2 font-semibold text-white hover:bg-blue-400"
+            >
+              Refresh
+            </button>
+          </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <AccountCard title="Broker" value="Not connected" />
-            <AccountCard title="Server" value="Not connected" />
-            <AccountCard title="Balance" value="$0.00" />
-            <AccountCard title="Equity" value="$0.00" />
+            <AccountCard title="Broker" value="FTMO" />
+            <AccountCard title="Account" value={mt5Data?.account || "Not connected"} />
+            <AccountCard title="Server" value={mt5Data?.server || "Not connected"} />
+            <AccountCard
+              title="Balance"
+              value={`$${Number(mt5Data?.balance || 0).toLocaleString()}`}
+            />
+            <AccountCard
+              title="Equity"
+              value={`$${Number(mt5Data?.equity || 0).toLocaleString()}`}
+            />
             <AccountCard title="Today's P/L" value="$0.00" />
             <AccountCard title="Open Trades" value="0" />
-            <AccountCard title="Daily Drawdown" value="0%" />
-            <AccountCard title="Status" value="Waiting for connection" />
+            <AccountCard
+              title="Status"
+              value={connected ? "Connected" : "Waiting for connection"}
+            />
           </div>
         </div>
 
         <div className="mt-8 rounded-3xl border border-blue-500/20 bg-blue-500/10 p-6">
-          <h2 className="text-2xl font-semibold">MT5 API Test</h2>
+          <h2 className="text-2xl font-semibold">MT5 Connection Status</h2>
 
-          <p className="mt-3 text-white/60">
-            Use this button to test if your app can receive trade data like MT5
-            will send later.
-          </p>
+          <p className="mt-3 text-white/70">{message}</p>
 
-          <button
-            onClick={sendTestTrade}
-            className="mt-5 rounded-2xl bg-blue-500 px-5 py-3 font-semibold text-white hover:bg-blue-400"
-          >
-            Send Test Trade
-          </button>
-
-          {message && (
-            <p className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4 text-white">
-              {message}
+          {mt5Data?.receivedAt && (
+            <p className="mt-3 text-sm text-white/40">
+              Last update: {new Date(mt5Data.receivedAt).toLocaleString()}
             </p>
           )}
         </div>
