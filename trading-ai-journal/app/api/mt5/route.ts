@@ -34,22 +34,24 @@ export async function POST(request: Request) {
     });
 
     if (data.ticket) {
-      const { error } = await supabase.from("mt5_trades").upsert({
-        ticket: String(data.ticket),
-        account: data.account,
-        server: data.server,
-        symbol: data.symbol,
-        trade_type: data.type,
-        lot_size: data.lotSize,
-        entry_price: data.entryPrice,
-        exit_price: data.exitPrice,
-        stop_loss: data.stopLoss,
-        take_profit: data.takeProfit,
-        profit: data.profit,
-        opened_at: data.openedAt,
-        closed_at: data.closedAt,
-      });
-
+      const { error } = await supabase.from("mt5_trades").upsert(
+  {
+    ticket: String(data.ticket),
+    account: data.account,
+    server: data.server,
+    symbol: data.symbol,
+    trade_type: data.type,
+    lot_size: data.lotSize,
+    entry_price: data.entryPrice,
+    exit_price: data.exitPrice,
+    stop_loss: data.stopLoss,
+    take_profit: data.takeProfit,
+    profit: data.profit,
+    opened_at: data.openedAt,
+    closed_at: data.closedAt,
+  },
+  { onConflict: "ticket" }
+);
       if (error) throw error;
     }
 
