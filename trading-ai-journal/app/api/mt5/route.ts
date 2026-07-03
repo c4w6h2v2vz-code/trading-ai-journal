@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error("Missing Supabase environment variables");
+  }
+
+  return createClient(url, key);
+}
 
 export async function POST(request: Request) {
   try {
@@ -17,9 +23,9 @@ export async function POST(request: Request) {
       );
     }
 
+    const supabase = getSupabase();
     const data = await request.json();
 
-    // Save MT5 connection
     await supabase.from("mt5_connection").insert({
       account: data.account,
       server: data.server,
@@ -27,7 +33,6 @@ export async function POST(request: Request) {
       equity: data.equity,
     });
 
-    // Save completed trade (only if a ticket exists)
     if (data.ticket) {
       const { error } = await supabase.from("mt5_trades").upsert({
         ticket: String(data.ticket),
@@ -48,33 +53,36 @@ export async function POST(request: Request) {
       if (error) throw error;
     }
 
-    return NextResponse.json({
-      success: true,
-      data,
-    });
-
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json(
-      {
-        success: false,
-        error: String(error),
-      },
+      { success: false, error: String(error) },
       { status: 500 }
     );
   }
 }
 
 export async function GET() {
-  const { data } = await supabase
-    .from("mt5_connection")
-    .select("*")
-    .order("received_at", { ascending: false })
-    .limit(1)
-    .single();
+  try {
+    const supabase = getSupabase();
 
-  return NextResponse.json({
-    success: true,
-    connected: !!data,
-    data,
-  });
+    const { data } = await supabase
+      .from("mt5_connection")
+      .select("*")
+      .order("received_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    return NextResponse.json({
+      success: true,
+      connected: !!data,
+      data,
+    });
+  } catch {
+    return NextResponse.json({
+      success: true,
+      connected: false,
+      data: null,
+    });
+  }
 }
