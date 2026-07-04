@@ -31,7 +31,7 @@ export default function MT5TradeDetailPage() {
   const params = useParams();
   const [trade, setTrade] = useState<MT5Trade | null>(null);
   const [loading, setLoading] = useState(true);
-
+const [errorMsg, setErrorMsg] = useState("");
   useEffect(() => {
     async function loadTrade() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -48,7 +48,9 @@ export default function MT5TradeDetailPage() {
         .single();
 
       if (error || !data) {
-        router.push("/journal");
+        setLoading(false);
+        setTrade(null);
+        console.error("Error:", error?.message);
         return;
       }
 
@@ -69,7 +71,14 @@ export default function MT5TradeDetailPage() {
     );
   }
 
-  if (!trade) return null;
+  if (!trade) return (
+    <AppShell>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <p className="text-red-400">Could not load trade.</p>
+        <button onClick={() => router.push("/journal")} className="text-white/40 hover:text-white">← Back to Journal</button>
+      </div>
+    </AppShell>
+  );
 
   return (
     <AppShell>
