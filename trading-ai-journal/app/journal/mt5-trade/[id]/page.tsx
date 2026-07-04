@@ -34,10 +34,17 @@ export default function MT5TradeDetailPage() {
 
   useEffect(() => {
     async function loadTrade() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
       const { data, error } = await supabase
         .from("mt5_trades")
         .select("*")
         .eq("id", params.id)
+        .eq("user_id", user.id)
         .single();
 
       if (error || !data) {
