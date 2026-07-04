@@ -43,7 +43,7 @@ export default function MT5TradeDetailPage() {
       const { data, error } = await supabase
         .from("mt5_trades")
         .select("*")
-        .eq("id", params.id)
+        .eq("id", Number(params.id))
         .eq("user_id", user.id)
         .single();
 
