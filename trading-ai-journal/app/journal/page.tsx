@@ -576,7 +576,7 @@ async function reviewMt5WithAI(trade: MT5Trade) {
                   </div>
 
                   <div className="flex items-center gap-2 lg:justify-end">
-                    <button onClick={() => router.push(`/journal/trade/${trade.id}`)} className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">
+                    <button onClick={() => router.push(`/journal/mt5-trade/${trade.id}`)} className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">
                       View
                     </button>
 
