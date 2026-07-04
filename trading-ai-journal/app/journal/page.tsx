@@ -340,6 +340,14 @@ async function loadMt5Trades() {
             <p>Account: <span className="text-white">{trade.account}</span></p>
             <p>Server: <span className="text-white">{trade.server}</span></p>
             <p>Closed: <span className="text-white">{trade.close_time}</span></p>
+            <button
+  onClick={() => {
+    setMessage("Next step: we will convert this MT5 trade into a full AI journal trade.");
+  }}
+  className="mt-4 rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
+>
+  Review with AI
+</button>
           </div>
         </div>
       ))}
