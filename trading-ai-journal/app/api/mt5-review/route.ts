@@ -66,8 +66,9 @@ Return this exact JSON:
     }
 
     const text = data.choices?.[0]?.message?.content || "";
-    const cleaned = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+if (!jsonMatch) throw new Error("No JSON found in AI response");
+const parsed = JSON.parse(jsonMatch[0]);
 
     const { error } = await supabase
       .from("mt5_trades")
