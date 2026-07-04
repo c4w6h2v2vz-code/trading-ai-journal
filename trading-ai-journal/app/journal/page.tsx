@@ -264,7 +264,31 @@ async function loadMt5Trades() {
       setMessage("Trade deleted successfully ✅");
     }
   }
+function fillFormFromMt5(trade: MT5Trade) {
+  const setValue = (name: string, value: string | number) => {
+    const input = document.querySelector(
+      `[name="${name}"]`
+    ) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
 
+    if (input) input.value = String(value);
+  };
+
+  setValue("pair", trade.symbol);
+  setValue("direction", trade.trade_type === "SELL" ? "Sell" : "Buy");
+  setValue("entry_price", trade.entry_price);
+  setValue("exit_price", trade.exit_price);
+  setValue("profit_loss", trade.profit);
+  setValue("strategy", "MT5 Import");
+  setValue("session", "");
+  setValue("risk_reward", 0);
+  setValue("result", trade.profit > 0 ? "Win" : trade.profit < 0 ? "Loss" : "Break Even");
+
+  setMessage("MT5 trade loaded into the form ✅ Add emotion, mistake, notes, then save.");
+
+  document.getElementById("manual-trade-form")?.scrollIntoView({
+    behavior: "smooth",
+  });
+}
   const filteredTrades = trades.filter((trade) => {
     const matchesPair =
       pairFilter === "" ||
@@ -305,7 +329,10 @@ async function loadMt5Trades() {
             {message}
           </div>
         )}
-<div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
+<div
+  id="manual-trade-form"
+  className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40"
+>
   <h2 className="text-2xl font-semibold">MT5 Imported Trades</h2>
 
   <p className="mb-6 text-sm text-white/40">
@@ -341,9 +368,7 @@ async function loadMt5Trades() {
             <p>Server: <span className="text-white">{trade.server}</span></p>
             <p>Closed: <span className="text-white">{trade.close_time}</span></p>
             <button
-  onClick={() => {
-    setMessage("Next step: we will convert this MT5 trade into a full AI journal trade.");
-  }}
+  onClick={() => fillFormFromMt5(trade)}
   className="mt-4 rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
 >
   Review with AI
