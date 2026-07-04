@@ -87,6 +87,9 @@ Return only valid JSON:
 
     const data = await response.json();
 
+    console.log("OpenAI Status:", response.status);
+console.log("OpenAI Response:");
+console.log(JSON.stringify(data, null, 2));
     const text =
       data.output_text ||
       data.output?.[0]?.content?.[0]?.text ||
