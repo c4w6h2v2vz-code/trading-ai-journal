@@ -66,6 +66,8 @@ Return this exact JSON:
     }
 
     const text = data.choices?.[0]?.message?.content || "";
+console.log("AI RAW RESPONSE:", text);
+console.log("FULL DATA:", JSON.stringify(data));
     const jsonMatch = text.match(/\{[\s\S]*\}/);
 if (!jsonMatch) throw new Error("No JSON found in AI response");
 const parsed = JSON.parse(jsonMatch[0]);
