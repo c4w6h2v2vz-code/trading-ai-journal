@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 
-type Trade = {
+type Trade = { 
   id: string;
   user_id: string;
   pair: string;
@@ -29,12 +29,26 @@ type Trade = {
   ai_execution_score: number | null;
   ai_feedback: string | null;
 };
-
+type MT5Trade = {
+  id: number;
+  ticket: number;
+  account: string;
+  server: string;
+  symbol: string;
+  trade_type: string;
+  lot_size: number;
+  entry_price: number;
+  exit_price: number;
+  profit: number;
+  open_time: string;
+  close_time: string;
+};
 export default function JournalPage() {
   const router = useRouter();
 
   const [message, setMessage] = useState("");
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [mt5Trades, setMt5Trades] = useState<MT5Trade[]>([]);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [image, setImage] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -70,10 +84,22 @@ export default function JournalPage() {
     if (error) setMessage("Error loading trades: " + error.message);
     else setTrades(data || []);
   }
+async function loadMt5Trades() {
+  const { data, error } = await supabase
+    .from("mt5_trades")
+    .select("*")
+    .order("created_at", { ascending: false });
 
+  if (error) {
+    setMessage("Error loading MT5 trades: " + error.message);
+  } else {
+    setMt5Trades(data || []);
+  }
+}
   useEffect(() => {
-    loadTrades();
-  }, []);
+  loadTrades();
+  loadMt5Trades();
+}, []);
 
   async function saveTrade(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -279,7 +305,47 @@ export default function JournalPage() {
             {message}
           </div>
         )}
+<div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
+  <h2 className="text-2xl font-semibold">MT5 Imported Trades</h2>
 
+  <p className="mb-6 text-sm text-white/40">
+    Trades automatically imported from your FTMO MT5 account.
+  </p>
+
+  {mt5Trades.length === 0 ? (
+    <p className="text-white/40">No MT5 trades imported yet.</p>
+  ) : (
+    <div className="space-y-4">
+      {mt5Trades.map((trade) => (
+        <div
+          key={trade.id}
+          className="rounded-3xl border border-white/10 bg-black/40 p-4"
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-xl font-bold">{trade.symbol}</h3>
+            <Badge text={trade.trade_type || "N/A"} />
+            <Badge text={`Ticket ${trade.ticket}`} />
+            <Badge text={`Lot ${trade.lot_size}`} />
+          </div>
+
+          <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
+            <p>Entry: <span className="text-white">{trade.entry_price}</span></p>
+            <p>Exit: <span className="text-white">{trade.exit_price}</span></p>
+            <p>
+              P/L:{" "}
+              <span className={trade.profit >= 0 ? "text-green-400" : "text-red-400"}>
+                {trade.profit}
+              </span>
+            </p>
+            <p>Account: <span className="text-white">{trade.account}</span></p>
+            <p>Server: <span className="text-white">{trade.server}</span></p>
+            <p>Closed: <span className="text-white">{trade.close_time}</span></p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
         <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
           <h2 className="mb-2 text-2xl font-semibold">
             {editingTrade ? "Edit Trade" : "Add New Trade"}
