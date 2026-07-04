@@ -42,6 +42,12 @@ type MT5Trade = {
   profit: number;
   open_time: string;
   close_time: string;
+  ai_score: number | null;
+ai_risk_score: number | null;
+ai_psychology_score: number | null;
+ai_execution_score: number | null;
+ai_feedback: string | null;
+reviewed_at: string | null;
 };
 export default function JournalPage() {
   const router = useRouter();
@@ -353,6 +359,9 @@ function fillFormFromMt5(trade: MT5Trade) {
             <Badge text={trade.trade_type || "N/A"} />
             <Badge text={`Ticket ${trade.ticket}`} />
             <Badge text={`Lot ${trade.lot_size}`} />
+            {trade.ai_score !== null && (
+  <Badge text={`AI ${trade.ai_score}`} />
+)}
           </div>
 
           <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
@@ -367,12 +376,26 @@ function fillFormFromMt5(trade: MT5Trade) {
             <p>Account: <span className="text-white">{trade.account}</span></p>
             <p>Server: <span className="text-white">{trade.server}</span></p>
             <p>Closed: <span className="text-white">{trade.close_time}</span></p>
-            <button
-  onClick={() => fillFormFromMt5(trade)}
-  className="mt-4 rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
->
-  Review with AI
-</button>
+            {trade.ai_feedback && (
+  <p className="mt-4 rounded-2xl bg-blue-500/10 p-3 text-sm text-blue-300">
+    AI: {trade.ai_feedback}
+  </p>
+)}
+            {trade.ai_score ? (
+  <button
+    onClick={() => router.push(`/journal/trade/${trade.id}`)}
+    className="mt-4 rounded-xl bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 hover:bg-green-500/20"
+  >
+    AI Reviewed ✅
+  </button>
+) : (
+  <button
+    onClick={() => fillFormFromMt5(trade)}
+    className="mt-4 rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
+  >
+    Review with AI
+  </button>
+)}
           </div>
         </div>
       ))}
