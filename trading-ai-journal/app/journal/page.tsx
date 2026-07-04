@@ -91,9 +91,13 @@ export default function JournalPage() {
     else setTrades(data || []);
   }
 async function loadMt5Trades() {
+  const user = await getCurrentUser();
+  if (!user) return;
+
   const { data, error } = await supabase
     .from("mt5_trades")
     .select("*")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -270,7 +274,24 @@ async function loadMt5Trades() {
       setMessage("Trade deleted successfully ✅");
     }
   }
-function fillFormFromMt5(trade: MT5Trade) {
+async function reviewMt5WithAI(trade: MT5Trade) {
+  setMessage("Sending to AI review...");
+  try {
+    const response = await fetch("/api/mt5-ai-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trade }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "AI review failed");
+    setMessage("AI review complete ✅");
+    loadMt5Trades();
+  } catch (err) {
+    setMessage("AI review error: " + String(err));
+  }
+}
+  function fillFormFromMt5(trade: MT5Trade) {
+ 
   const setValue = (name: string, value: string | number) => {
     const input = document.querySelector(
       `[name="${name}"]`
@@ -390,7 +411,7 @@ function fillFormFromMt5(trade: MT5Trade) {
   </button>
 ) : (
   <button
-    onClick={() => fillFormFromMt5(trade)}
+    onClick={() => reviewMt5WithAI(trade)}
     className="mt-4 rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
   >
     Review with AI

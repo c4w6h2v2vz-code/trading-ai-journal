@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function POST(request: Request) {
   try {
@@ -16,18 +16,21 @@ export async function POST(request: Request) {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const { trade } = await request.json();
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-5.5",
-        input: `
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: `
 You are an elite trading coach. Review this MT5 trade.
 
-Return only valid JSON.
+Return only valid JSON with no extra text.
 
 Trade:
 Symbol: ${trade.symbol}
@@ -39,7 +42,7 @@ Profit/Loss: ${trade.profit}
 Account: ${trade.account}
 Server: ${trade.server}
 
-Return JSON:
+Return this exact JSON:
 {
   "ai_score": 85,
   "ai_risk_score": 80,
@@ -47,7 +50,9 @@ Return JSON:
   "ai_execution_score": 90,
   "ai_feedback": "Short useful coaching feedback under 3 sentences."
 }
-        `,
+            `,
+          },
+        ],
       }),
     });
 
@@ -60,11 +65,7 @@ Return JSON:
       );
     }
 
-    const text =
-      data.output_text ||
-      data.output?.[0]?.content?.[0]?.text ||
-      "";
-
+    const text = data.choices?.[0]?.message?.content || "";
     const cleaned = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleaned);
 
