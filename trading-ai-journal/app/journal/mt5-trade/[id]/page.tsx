@@ -31,30 +31,20 @@ export default function MT5TradeDetailPage() {
   const params = useParams();
   const [trade, setTrade] = useState<MT5Trade | null>(null);
   const [loading, setLoading] = useState(true);
-const [errorMsg, setErrorMsg] = useState("");
+
   useEffect(() => {
     async function loadTrade() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
       const { data, error } = await supabase
         .from("mt5_trades")
         .select("*")
         .eq("id", Number(params.id))
-        .eq("user_id", user.id)
         .single();
 
-      if (error || !data) {
-        setLoading(false);
-        setTrade(null);
-        console.error("Error:", error?.message);
-        return;
+      if (error) {
+        console.error("Supabase error:", error.message, error.details, error.hint);
       }
 
-      setTrade(data);
+      setTrade(data || null);
       setLoading(false);
     }
 
@@ -71,14 +61,21 @@ const [errorMsg, setErrorMsg] = useState("");
     );
   }
 
-  if (!trade) return (
-    <AppShell>
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <p className="text-red-400">Could not load trade.</p>
-        <button onClick={() => router.push("/journal")} className="text-white/40 hover:text-white">← Back to Journal</button>
-      </div>
-    </AppShell>
-  );
+  if (!trade) {
+    return (
+      <AppShell>
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+          <p className="text-red-400">Could not load trade.</p>
+          <button
+            onClick={() => router.push("/journal")}
+            className="text-white/40 hover:text-white"
+          >
+            ← Back to Journal
+          </button>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
@@ -97,7 +94,6 @@ const [errorMsg, setErrorMsg] = useState("");
           <Badge text={`Lot ${trade.lot_size}`} />
         </div>
 
-        {/* AI Scores */}
         {trade.ai_score !== null && (
           <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <ScoreCard label="AI Score" value={trade.ai_score} color="blue" />
@@ -107,7 +103,6 @@ const [errorMsg, setErrorMsg] = useState("");
           </div>
         )}
 
-        {/* AI Feedback */}
         {trade.ai_feedback && (
           <div className="mb-6 rounded-3xl border border-blue-500/20 bg-blue-500/10 p-6">
             <p className="mb-2 text-sm font-semibold text-blue-400">AI Coach Feedback</p>
@@ -115,7 +110,6 @@ const [errorMsg, setErrorMsg] = useState("");
           </div>
         )}
 
-        {/* Trade Details */}
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="mb-4 text-xl font-semibold">Trade Details</h2>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -140,22 +134,13 @@ const [errorMsg, setErrorMsg] = useState("");
   );
 }
 
-function ScoreCard({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number | null;
-  color: string;
-}) {
+function ScoreCard({ label, value, color }: { label: string; value: number | null; color: string }) {
   const colors: Record<string, string> = {
     blue: "text-blue-400 border-blue-500/20 bg-blue-500/10",
     green: "text-green-400 border-green-500/20 bg-green-500/10",
     yellow: "text-yellow-400 border-yellow-500/20 bg-yellow-500/10",
     purple: "text-purple-400 border-purple-500/20 bg-purple-500/10",
   };
-
   return (
     <div className={`rounded-3xl border p-4 ${colors[color]}`}>
       <p className="text-sm opacity-70">{label}</p>
@@ -164,15 +149,7 @@ function ScoreCard({
   );
 }
 
-function Detail({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color?: string;
-}) {
+function Detail({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
       <p className="text-sm text-white/40">{label}</p>
@@ -182,9 +159,5 @@ function Detail({
 }
 
 function Badge({ text }: { text: string }) {
-  return (
-    <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
-      {text}
-    </span>
-  );
+  return <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">{text}</span>;
 }
