@@ -162,24 +162,23 @@ export default function PsychologyPage() {
         })),
       };
 
-      const response = await fetch("/api/ai-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pair: "PSYCHOLOGY_REPORT",
-          notes: `Generate a personal trading psychology coaching report for this trader. Be specific, honest, and actionable. Data: ${JSON.stringify(summary)}`,
-          trading_rules: [],
-          result: "N/A",
-          profit_loss: 0,
-          entry_price: 0,
-          exit_price: 0,
-        }),
-      });
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
+  },
+  body: JSON.stringify({
+    model: "gpt-4o",
+    messages: [{
+      role: "user",
+      content: `You are an elite trading coach. Analyze this trader's psychology and give specific, honest, actionable coaching advice in 3-4 paragraphs. Data: ${JSON.stringify(summary)}`,
+    }],
+  }),
+});
 
-      const data = await response.json();
-      setAiReport(data.ai_feedback || "Could not generate report.");
-    } catch {
-      setAiReport("Failed to generate AI report.");
+const data = await response.json();
+setAiReport(data.choices?.[0]?.message?.content || "Could not generate report.");
     } finally {
       setAiLoading(false);
     }
