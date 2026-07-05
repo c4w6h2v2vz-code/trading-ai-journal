@@ -21,6 +21,7 @@ const allLinks = [
   { name: "Analytics", href: "/analytics" },
   { name: "Goals", href: "/goals" },
   { name: "Profile", href: "/profile" },
+  { name: "Reports", href: "/reports" },
   { name: "Settings", href: "/settings" },
 ];
 
