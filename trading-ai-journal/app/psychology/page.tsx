@@ -163,13 +163,15 @@ export default function PsychologyPage() {
       };
 
       const response = await fetch("/api/ai-coach", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(summary),
-});
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(summary),
+      });
 
-const data = await response.json();
-setAiReport(data.report || "Could not generate report.");
+      const data = await response.json();
+      setAiReport(data.report || "Could not generate report.");
+    } catch (err) {
+      setAiReport("Error: " + String(err));
     } finally {
       setAiLoading(false);
     }
