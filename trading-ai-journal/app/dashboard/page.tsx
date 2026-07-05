@@ -135,7 +135,23 @@ export default function DashboardPage() {
     "ai_psychology_score"
   );
   const averageExecutionScore = getAverageScore(trades, "ai_execution_score");
+const grossWins = wins.reduce((sum, t) => sum + Number(t.profit_loss), 0);
+  const grossLosses = Math.abs(losses.reduce((sum, t) => sum + Number(t.profit_loss), 0));
+  const profitFactor = grossLosses > 0 ? (grossWins / grossLosses).toFixed(2) : "∞";
+  const expectancy = totalTrades > 0
+    ? ((wins.length / totalTrades) * Number(averageWin) + (losses.length / totalTrades) * Number(averageLoss)).toFixed(2)
+    : "0";
 
+  let streak = 0;
+  let streakType = "";
+  const reversedTrades = [...trades].reverse();
+  if (reversedTrades.length > 0) {
+    streakType = reversedTrades[0].result;
+    for (const t of reversedTrades) {
+      if (t.result === streakType) streak++;
+      else break;
+    }
+  }
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-6 py-8">
@@ -185,10 +201,10 @@ export default function DashboardPage() {
         </div>
 
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Average AI Score" value={averageAiScore} highlight="blue" />
-          <StatCard title="Average Risk Score" value={averageRiskScore} />
-          <StatCard title="Average Psychology Score" value={averagePsychologyScore} />
-          <StatCard title="Average Execution Score" value={averageExecutionScore} />
+          <StatCard title="Profit Factor" value={String(profitFactor)} highlight="blue" />
+          <StatCard title="Expectancy" value={`$${expectancy}`} highlight="green" />
+          <StatCard title="Current Streak" value={streak > 0 ? `${streak} ${streakType}s` : "N/A"} highlight={streakType === "Win" ? "green" : "red"} />
+          <StatCard title="Avg AI Score" value={averageAiScore} highlight="blue" />
         </div>
 
         <div className="mb-8 grid gap-4 lg:grid-cols-3">
