@@ -417,7 +417,7 @@ async function reviewMt5WithAI(trade: MT5Trade) {
 )}
             {trade.ai_score ? (
   <button
-    onClick={() => router.push(`/journal/trade/${trade.id}`)}
+    onClick={() => router.push(`/journal/mt5-trade/${trade.id}`)}
     className="mt-4 rounded-xl bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 hover:bg-green-500/20"
   >
     AI Reviewed ✅
