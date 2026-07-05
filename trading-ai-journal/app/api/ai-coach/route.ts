@@ -20,9 +20,18 @@ export async function POST(request: Request) {
     });
 
     const data = await response.json();
+    
+    console.log("OpenAI status:", response.status);
+    console.log("OpenAI response:", JSON.stringify(data));
+
+    if (!response.ok) {
+      return NextResponse.json({ report: `OpenAI error: ${data.error?.message || "Unknown error"}` });
+    }
+
     const text = data.choices?.[0]?.message?.content || "Could not generate report.";
     return NextResponse.json({ report: text });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    console.error("AI coach error:", error);
+    return NextResponse.json({ report: "Error: " + String(error) });
   }
 }
