@@ -194,12 +194,25 @@ async function loadMt5Trades() {
 
         setMessage("Trade saved. Generating AI review with your rules...");
 
+        let imageBase64 = null;
+        if (image) {
+          const reader = new FileReader();
+          imageBase64 = await new Promise<string>((resolve) => {
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result.split(",")[1]);
+            };
+            reader.readAsDataURL(image);
+          });
+        }
+
         const aiResponse = await fetch("/api/ai-review", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...finalTrade,
-            trading_rules: tradingRules || [],
+            trade: { ...finalTrade, trading_rules: tradingRules || [] },
+            history: trades.slice(0, 10),
+            imageBase64,
           }),
         });
 
@@ -576,7 +589,7 @@ async function reviewMt5WithAI(trade: MT5Trade) {
                   </div>
 
                   <div className="flex items-center gap-2 lg:justify-end">
-                    <button onClick={() => router.push(`/journal/mt5-trade/${trade.id}`)} className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">
+                    <button onClick={() => router.push(`/journal/trade/${trade.id}`)} className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">
                       View
                     </button>
 
