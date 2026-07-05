@@ -162,23 +162,14 @@ export default function PsychologyPage() {
         })),
       };
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const response = await fetch("/api/ai-coach", {
   method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
-  },
-  body: JSON.stringify({
-    model: "gpt-4o",
-    messages: [{
-      role: "user",
-      content: `You are an elite trading coach. Analyze this trader's psychology and give specific, honest, actionable coaching advice in 3-4 paragraphs. Data: ${JSON.stringify(summary)}`,
-    }],
-  }),
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(summary),
 });
 
 const data = await response.json();
-setAiReport(data.choices?.[0]?.message?.content || "Could not generate report.");
+setAiReport(data.report || "Could not generate report.");
     } finally {
       setAiLoading(false);
     }
