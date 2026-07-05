@@ -2,50 +2,33 @@ import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const { trade, history } = await request.json();
-const historyText =
-  history && history.length > 0
-    ? history
-        .map(
-          (oldTrade: any, index: number) =>
-            `${index + 1}. ${oldTrade.pair} ${oldTrade.direction} | Result: ${oldTrade.result} | P/L: ${oldTrade.profit_loss} | Emotion: ${oldTrade.emotion} | Mistake: ${oldTrade.mistake} | AI Score: ${oldTrade.ai_score}`
-        )
-        .join("\n")
-    : "No previous trade history provided.";
+    const body = await request.json();
+    const { trade, history, imageBase64 } = body;
+
+    const historyText =
+      history && history.length > 0
+        ? history.map((t: any, i: number) =>
+            `${i + 1}. ${t.pair} ${t.direction} | Result: ${t.result} | P/L: ${t.profit_loss} | Emotion: ${t.emotion} | Mistake: ${t.mistake}`
+          ).join("\n")
+        : "No previous trade history.";
+
     const rulesText =
       trade.trading_rules && trade.trading_rules.length > 0
-        ? trade.trading_rules
-            .map(
-              (rule: { title: string; description: string }, index: number) =>
-                `${index + 1}. ${rule.title}: ${rule.description}`
-            )
-            .join("\n")
-        : "No personal trading rules saved yet.";
+        ? trade.trading_rules.map((r: any, i: number) =>
+            `${i + 1}. ${r.title}: ${r.description}`
+          ).join("\n")
+        : "No personal trading rules saved.";
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-5.5",
-        input: `
-You are an elite institutional trading coach.
-
-Your job is to coach this specific trader over months, not just review one trade.
-
-Look for repeated mistakes, improvements, consistency, psychology, execution quality, and whether the trader follows his own trading system.
-
-Always be constructive and specific.
-
-Review this trade using the trader's personal rules.
+    const textPrompt = `
+You are an elite institutional trading coach reviewing a trader's performance.
 
 Personal Trading Rules:
 ${rulesText}
+
 Recent Trade History:
 ${historyText}
-Trade:
+
+Current Trade:
 Pair: ${trade.pair}
 Direction: ${trade.direction}
 Session: ${trade.session}
@@ -57,65 +40,79 @@ Grade: ${trade.grade}
 Emotion: ${trade.emotion}
 Mistake: ${trade.mistake}
 Notes: ${trade.notes}
-Previous Mistakes:
-${historyText}
 
 Instructions:
-- Check if the trader repeated old mistakes.
-- Reward consistency.
-- Penalize repeated mistakes.
-- Mention any repeated behavior in ai_feedback.
-Trading Rules:
-${trade.trading_rules || "No personal trading rules found."}
-If personal trading rules are provided:
+- Check if trader repeated old mistakes
+- Check if personal rules were followed
+- Reward consistency, penalize repeated mistakes
+- Keep ai_feedback under 3 sentences
+${imageBase64 ? "- A chart screenshot is attached. Analyze the entry quality, market structure, and execution." : ""}
 
-- Check whether the trade followed them.
-- Mention any broken rule in the feedback.
-- Praise rules that were followed.
-- Keep feedback under 3 sentences.
 Return only valid JSON:
 {
   "ai_score": 85,
   "ai_risk_score": 80,
   "ai_psychology_score": 90,
   "ai_execution_score": 85,
-  "ai_feedback": "Mention which personal rules were followed or broken, then give short improvement advice."
+  "ai_feedback": "Specific coaching feedback here."
 }
-        `,
+    `;
+
+    const messages: any[] = [];
+
+    if (imageBase64) {
+      messages.push({
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${imageBase64}`,
+            },
+          },
+          {
+            type: "text",
+            text: textPrompt,
+          },
+        ],
+      });
+    } else {
+      messages.push({
+        role: "user",
+        content: textPrompt,
+      });
+    }
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages,
       }),
     });
 
     const data = await response.json();
 
-console.log("OpenAI Status:", response.status);
-console.log("OpenAI Response:");
-console.log(JSON.stringify(data, null, 2));
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: "OpenAI request failed", details: data },
+        { status: response.status }
+      );
+    }
 
-if (!response.ok) {
-  return NextResponse.json(
-    {
-      error: "OpenAI request failed",
-      details: data,
-    },
-    { status: response.status }
-  );
-}
-
-const text =
-  data.output_text ||
-  data.output?.[0]?.content?.[0]?.text ||
-  "";
-
-    const cleaned = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    const text = data.choices?.[0]?.message?.content || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON in AI response");
+    const parsed = JSON.parse(jsonMatch[0]);
 
     return NextResponse.json(parsed);
   } catch (error) {
     return NextResponse.json(
-      {
-        error: "AI review failed",
-        details: String(error),
-      },
+      { error: "AI review failed", details: String(error) },
       { status: 500 }
     );
   }
