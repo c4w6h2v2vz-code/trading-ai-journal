@@ -2,29 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
+import { supabase } from "@/lib/supabase";
 
 export default function SettingsPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
+    async function getUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
       setEmail(user.email || "");
     }
-
-    loadUser();
-  }, [router]);
+    getUser();
+  }, []);
 
   async function logout() {
     await supabase.auth.signOut();
@@ -33,54 +26,46 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mx-auto max-w-2xl px-6 py-8">
         <div className="mb-10">
-          <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
-            Account Settings
-          </p>
-
-          <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
+          <p className="mb-3 w-fit rounded-full border border-white/10 bg-white/5 px-4 py-1 text-sm text-white/40">
             Settings
-          </h1>
-
-          <p className="mt-3 text-white/50">
-            Manage your account and trading journal preferences.
           </p>
+          <h1 className="text-4xl font-bold">Account Settings</h1>
+          <p className="mt-3 text-white/50">Manage your account and preferences.</p>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-          <h2 className="text-2xl font-semibold">Profile</h2>
-          <p className="mt-2 text-sm text-white/40">Your logged-in account.</p>
+        {message && (
+          <div className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 px-5 py-4 text-green-300">
+            {message}
+          </div>
+        )}
 
-          <div className="mt-6 rounded-2xl border border-white/10 bg-black/40 p-5">
-            <p className="text-sm text-white/40">Email</p>
-            <p className="mt-2 text-lg font-semibold">{email || "Loading..."}</p>
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+            <h2 className="mb-4 text-lg font-semibold">Account</h2>
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p className="text-sm text-white/40">Email</p>
+              <p className="mt-1 font-semibold">{email}</p>
+            </div>
           </div>
 
-          <button
-            onClick={logout}
-            className="mt-6 rounded-2xl bg-red-500/10 px-5 py-3 font-semibold text-red-400 hover:bg-red-500/20"
-          >
-            Logout
-          </button>
-        </div>
-
-        <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-          <h2 className="text-2xl font-semibold">Preferences</h2>
-          <p className="mt-2 text-sm text-white/40">
-            More options will be added here later.
-          </p>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
-              <p className="text-sm text-white/40">Theme</p>
-              <p className="mt-2 font-semibold">Dark Mode</p>
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+            <h2 className="mb-4 text-lg font-semibold">Plan</h2>
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
+              <p className="text-sm text-blue-400 font-semibold">Free Plan</p>
+              <p className="mt-1 text-sm text-white/40">Upgrade to Pro for unlimited AI reviews and advanced features.</p>
             </div>
+          </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
-              <p className="text-sm text-white/40">Currency</p>
-              <p className="mt-2 font-semibold">USD</p>
-            </div>
+          <div className="rounded-3xl border border-red-500/10 bg-red-500/5 p-6">
+            <h2 className="mb-4 text-lg font-semibold text-red-400">Danger Zone</h2>
+            <button
+              onClick={logout}
+              className="rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-3 text-sm font-semibold text-red-400 transition hover:bg-red-500/20"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </div>
