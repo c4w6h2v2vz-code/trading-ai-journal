@@ -27,8 +27,8 @@ export default function PricingPage() {
 
     try {
       const priceId = plan === "pro"
-        ? "price_1Tq42NRn5RJmd0sKE0HfKhuq"
-        : "price_1Tq41DRn5RJmd0sKmiaDrWmr";
+        ? "price_1Tq9yUDK6vNJBERV7DuR6zuq"
+        : "price_1Tq9ywDK6vNJBERVldSLdb2H";
 
       const response = await fetch("/api/create-checkout", {
         method: "POST",
