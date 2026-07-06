@@ -13,9 +13,9 @@ const links = [
 ];
 
 const allLinks = [
-  { name: "Risk Manager", href: "/risk-manager" },
   { name: "Dashboard", href: "/dashboard" },
   { name: "Journal", href: "/journal" },
+  { name: "Risk Manager", href: "/risk-manager" },
   { name: "Calendar", href: "/calendar" },
   { name: "Psychology", href: "/psychology" },
   { name: "Analytics", href: "/analytics" },
