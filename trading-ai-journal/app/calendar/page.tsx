@@ -29,13 +29,28 @@ export default function CalendarPage() {
         return;
       }
 
-      const { data } = await supabase
+      const { data: manualTrades } = await supabase
         .from("trades")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: true });
 
-      setTrades(data || []);
+      const { data: mt5Data } = await supabase
+        .from("mt5_trades")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true });
+
+      const mt5Mapped = (mt5Data || []).map((t) => ({
+        id: String(t.id),
+        pair: t.symbol,
+        session: "MT5",
+        profit_loss: t.profit,
+        result: t.profit > 0 ? "Win" : t.profit < 0 ? "Loss" : "Break Even",
+        created_at: t.open_time || new Date().toISOString(),
+      }));
+
+      setTrades([...(manualTrades || []), ...mt5Mapped]);
     }
 
     loadTrades();
