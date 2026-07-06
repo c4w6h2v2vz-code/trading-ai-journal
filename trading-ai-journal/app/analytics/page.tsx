@@ -34,13 +34,46 @@ export default function AnalyticsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      const { data } = await supabase
+      const { data: manualTrades } = await supabase
         .from("trades")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      setTrades(data || []);
+      const { data: mt5Data } = await supabase
+        .from("mt5_trades")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      const mt5Mapped = (mt5Data || []).map((t) => ({
+        id: String(t.id),
+        user_id: user.id,
+        pair: t.symbol,
+        session: "MT5",
+        strategy: "MT5 Import",
+        direction: t.trade_type === "SELL" ? "Sell" : "Buy",
+        grade: null,
+        emotion: null,
+        mistake: null,
+        risk_reward: null,
+        entry_price: t.entry_price,
+        exit_price: t.exit_price,
+        profit_loss: t.profit,
+        result: t.profit > 0 ? "Win" : t.profit < 0 ? "Loss" : "Break Even",
+        notes: "",
+        image_url: null,
+        created_at: t.open_time || new Date().toISOString(),
+        ai_score: t.ai_score,
+        ai_risk_score: t.ai_risk_score,
+        ai_psychology_score: t.ai_psychology_score,
+        ai_execution_score: t.ai_execution_score,
+        ai_feedback: t.ai_feedback,
+      }));
+
+      const allTrades = [...(manualTrades || []), ...mt5Mapped];
+      setTrades(allTrades);
+      setLoading(false);
       setLoading(false);
     }
     load();
