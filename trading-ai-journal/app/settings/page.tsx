@@ -9,12 +9,20 @@ export default function SettingsPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [plan, setPlan] = useState("free");
 
   useEffect(() => {
     async function getUser() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
       setEmail(user.email || "");
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+      setPlan(profile?.plan || "free");
     }
     getUser();
   }, []);
@@ -52,9 +60,28 @@ export default function SettingsPage() {
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
             <h2 className="mb-4 text-lg font-semibold">Plan</h2>
-            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
-              <p className="text-sm text-blue-400 font-semibold">Free Plan</p>
-              <p className="mt-1 text-sm text-white/40">Upgrade to Pro for unlimited AI reviews and advanced features.</p>
+            <div className={`rounded-2xl border p-4 ${
+              plan === "pro" ? "border-blue-500/20 bg-blue-500/10" :
+              plan === "elite" ? "border-purple-500/20 bg-purple-500/10" :
+              "border-white/10 bg-white/5"
+            }`}>
+              <p className={`text-sm font-semibold ${
+                plan === "pro" ? "text-blue-400" :
+                plan === "elite" ? "text-purple-400" :
+                "text-white/60"
+              }`}>
+                {plan === "pro" ? "Pro Plan ✅" : plan === "elite" ? "Elite Plan ✅" : "Free Plan"}
+              </p>
+              <p className="mt-1 text-sm text-white/40">
+                {plan === "pro" ? "You have full access to all Pro features." :
+                 plan === "elite" ? "You have full access to all Elite features." :
+                 "Upgrade to Pro for unlimited AI reviews and advanced features."}
+              </p>
+              {plan === "free" && (
+                <a href="/pricing" className="mt-3 inline-block rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-700">
+                  Upgrade Now
+                </a>
+              )}
             </div>
           </div>
 
