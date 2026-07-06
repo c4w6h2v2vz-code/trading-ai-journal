@@ -27,8 +27,8 @@ export default function PricingPage() {
 
     try {
       const priceId = plan === "pro"
-        ? process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID
-        : process.env.NEXT_PUBLIC_STRIPE_ELITE_PRICE_ID;
+        ? "price_1Tq42NRn5RJmd0sKE0HfKhuq"
+        : "price_1Tq41DRn5RJmd0sKmiaDrWmr";
 
       const response = await fetch("/api/create-checkout", {
         method: "POST",
