@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     const { priceId, userId, email } = await request.json();
-
+console.log("Key exists:", !!process.env.STRIPE_SECRET_KEY);
+    console.log("Key starts with:", process.env.STRIPE_SECRET_KEY?.substring(0, 10));
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
       apiVersion: "2026-06-24.dahlia",
