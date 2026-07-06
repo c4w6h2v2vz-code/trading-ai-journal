@@ -34,12 +34,24 @@ export default function GoalsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      const { data } = await supabase
+      const { data: manualTrades } = await supabase
         .from("trades")
         .select("profit_loss, result, created_at")
         .eq("user_id", user.id);
 
-      setTrades(data || []);
+      const { data: mt5Data } = await supabase
+        .from("mt5_trades")
+        .select("profit, open_time")
+        .eq("user_id", user.id);
+
+      const mt5Mapped = (mt5Data || []).map((t) => ({
+        profit_loss: t.profit,
+        result: t.profit > 0 ? "Win" : t.profit < 0 ? "Loss" : "Break Even",
+        created_at: t.open_time || new Date().toISOString(),
+      }));
+
+      setTrades([...(manualTrades || []), ...mt5Mapped]);
+      setLoading(false);
       setLoading(false);
     }
 
