@@ -45,7 +45,7 @@ export default function PricingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert("Error creating checkout: " + data.error);
+        alert("Error: " + JSON.stringify(data));
       }
     } catch (err) {
       alert("Error: " + String(err));
