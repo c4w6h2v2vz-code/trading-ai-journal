@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2026-06-24.dahlia",
 });
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     });
 console.log("Checkout session created:", session.id, session.url);
     return NextResponse.json({ url: session.url });
-    return NextResponse.json({ url: session.url });
+    
   } catch (error) {
     console.error("Stripe error:", error);
     return NextResponse.json(
