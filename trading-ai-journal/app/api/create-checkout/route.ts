@@ -25,11 +25,13 @@ export async function POST(request: Request) {
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?upgraded=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
     });
-
+console.log("Checkout session created:", session.id, session.url);
+    return NextResponse.json({ url: session.url });
     return NextResponse.json({ url: session.url });
   } catch (error) {
+    console.error("Stripe error:", error);
     return NextResponse.json(
-      { error: String(error) },
+      { error: String(error), details: JSON.stringify(error) },
       { status: 500 }
     );
   }
