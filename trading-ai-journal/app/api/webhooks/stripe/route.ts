@@ -2,15 +2,16 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2026-06-24.dahlia",
-});
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(request: Request) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+    apiVersion: "2026-06-24.dahlia",
+  });
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   const body = await request.text();
   const signature = request.headers.get("stripe-signature")!;
 
@@ -27,14 +28,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  // When someone completes checkout
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.userId;
     const customerId = session.customer as string;
     const subscriptionId = session.subscription as string;
 
-    // Figure out which plan they bought
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const priceId = subscription.items.data[0].price.id;
 
@@ -54,10 +53,8 @@ export async function POST(request: Request) {
     }
   }
 
-  // When a subscription is cancelled or ends
   if (event.type === "customer.subscription.deleted") {
     const subscription = event.data.object as Stripe.Subscription;
-
     await supabase
       .from("profiles")
       .update({ plan: "free" })
