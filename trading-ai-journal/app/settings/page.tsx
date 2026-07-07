@@ -10,7 +10,8 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [plan, setPlan] = useState("free");
-
+const [notifEnabled, setNotifEnabled] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
   useEffect(() => {
     async function getUser() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -26,7 +27,39 @@ export default function SettingsPage() {
     }
     getUser();
   }, []);
+async function enableNotifications() {
+    setNotifLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      const permission = await Notification.requestPermission();
+      
+      if (permission !== 'granted') {
+        alert('Please allow notifications to receive alerts.');
+        return;
+      }
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      });
+
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription, userId: user.id }),
+      });
+
+      setNotifEnabled(true);
+      setMessage('Notifications enabled ✅');
+    } catch (err) {
+      setMessage('Error: ' + String(err));
+    } finally {
+      setNotifLoading(false);
+    }
+  }
   async function logout() {
     await supabase.auth.signOut();
     router.push("/login");
@@ -86,6 +119,19 @@ export default function SettingsPage() {
           </div>
 
           <div className="rounded-3xl border border-red-500/10 bg-red-500/5 p-6">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+            <h2 className="mb-4 text-lg font-semibold">Notifications</h2>
+            <p className="text-sm text-white/40 mb-4">
+              Get instant alerts when your daily loss limit is hit or profit target reached.
+            </p>
+            <button
+              onClick={enableNotifications}
+              disabled={notifLoading || notifEnabled}
+              className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              {notifLoading ? "Enabling..." : notifEnabled ? "Notifications Enabled ✅" : "Enable Push Notifications"}
+            </button>
+          </div>
             <h2 className="mb-4 text-lg font-semibold text-red-400">Danger Zone</h2>
             <button
               onClick={logout}
