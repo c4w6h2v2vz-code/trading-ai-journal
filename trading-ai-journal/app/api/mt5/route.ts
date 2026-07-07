@@ -1,94 +1,90 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-  if (!url || !key) {
-    throw new Error("Missing Supabase environment variables");
-  }
-
-  return createClient(url, key);
-}
+const SECRET_KEY = "jama-ftmo-mt5-2026";
 
 export async function POST(request: Request) {
   try {
-    const secret = request.headers.get("x-mt5-secret");
-
-    if (secret !== process.env.MT5_SECRET_KEY) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized MT5 request" },
-        { status: 401 }
-      );
+    const secretKey = request.headers.get("x-mt5-secret");
+    if (secretKey !== SECRET_KEY) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getSupabase();
-    const data = await request.json();
+    const body = await request.json();
 
-    await supabase.from("mt5_connection").insert({
-      account: data.account,
-      server: data.server,
-      balance: data.balance,
-      equity: data.equity,
-    });
+    if (body.event === "closed_trade") {
+      // Find user by account number
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("mt5_account", body.account)
+        .single();
 
-    if (data.ticket) {
-      const { error } = await supabase.from("mt5_trades").upsert(
-  {
-    ticket: String(data.ticket),
-    account: data.account,
-    server: data.server,
-    symbol: data.symbol,
-    trade_type: data.type,
-    lot_size: data.lotSize,
-    entry_price: data.entryPrice,
-    exit_price: data.exitPrice,
-    stop_loss: data.stopLoss,
-    take_profit: data.takeProfit,
-    profit: data.profit,
-    opened_at: data.openedAt,
-    closed_at: data.closedAt,
-  },
-  { onConflict: "ticket" }
-);
-      if (error) throw error;
+      // If no profile found by account, use the first user (for single user setup)
+      let userId = profile?.id;
+      if (!userId) {
+        const { data: users } = await supabase
+          .from("profiles")
+          .select("id")
+          .limit(1)
+          .single();
+        userId = users?.id;
+      }
+
+      if (!userId) {
+        return NextResponse.json({ error: "No user found" }, { status: 404 });
+      }
+
+      // Check if trade already exists
+      const { data: existing } = await supabase
+        .from("mt5_trades")
+        .select("id")
+        .eq("ticket", body.ticket)
+        .single();
+
+      if (existing) {
+        return NextResponse.json({ success: true, message: "Trade already exists" });
+      }
+
+      // Insert new trade with user_id
+      const { data, error } = await supabase
+        .from("mt5_trades")
+        .insert([{
+          user_id: userId,
+          ticket: body.ticket,
+          account: body.account,
+          server: body.server,
+          symbol: body.symbol,
+          trade_type: body.type,
+          lot_size: body.lotSize,
+          entry_price: body.entryPrice,
+          exit_price: body.exitPrice,
+          profit: body.profit,
+          open_time: body.openedAt,
+          close_time: body.closedAt,
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, data });
     }
 
-    return NextResponse.json({ success: true, data });
-  } catch (error: any) {
-  return NextResponse.json(
-    {
-      success: false,
-      error: error?.message || String(error),
-      details: error,
-    },
-    { status: 500 }
-  );
-}
-}
+    if (body.event === "loss_limit" || body.event === "profit_target") {
+      console.log("Risk Guardian alert:", body.event, body.lossPercent, "%");
+      return NextResponse.json({ success: true, message: "Alert received" });
+    }
 
-export async function GET() {
-  try {
-    const supabase = getSupabase();
-
-    const { data } = await supabase
-      .from("mt5_connection")
-      .select("*")
-      .order("received_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    return NextResponse.json({
-      success: true,
-      connected: !!data,
-      data,
-    });
-  } catch {
-    return NextResponse.json({
-      success: true,
-      connected: false,
-      data: null,
-    });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
