@@ -29,7 +29,10 @@ const [notifEnabled, setNotifEnabled] = useState(false);
   }, []);
 async function enableNotifications() {
     setNotifLoading(true);
-    try {
+    try {if (typeof window === 'undefined' || !('Notification' in window)) {
+        setMessage('Push notifications not supported on this device.');
+        return;
+      }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
