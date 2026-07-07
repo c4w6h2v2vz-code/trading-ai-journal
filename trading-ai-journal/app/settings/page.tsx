@@ -30,6 +30,11 @@ const [notifEnabled, setNotifEnabled] = useState(false);
 async function enableNotifications() {
     setNotifLoading(true);
     try {if (typeof window === 'undefined' || !('Notification' in window)) {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        setMessage('Push notifications not supported on this device.');
+        setNotifLoading(false);
+        return;
+      }
         setMessage('Push notifications not supported on this device.');
         return;
       }
