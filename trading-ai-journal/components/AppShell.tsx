@@ -15,6 +15,7 @@ const links = [
 const allLinks = [
   { name: "Dashboard", href: "/dashboard" },
   { name: "Journal", href: "/journal" },
+  { name: "Daily Journal", href: "/daily-journal" },
   { name: "Risk Manager", href: "/risk-manager" },
   { name: "Calendar", href: "/calendar" },
   { name: "Psychology", href: "/psychology" },
