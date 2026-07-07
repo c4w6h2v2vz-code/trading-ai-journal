@@ -223,8 +223,16 @@ export default function PsychologyPage() {
 
   if (loading) return (
     <AppShell>
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-white/40">Loading psychology data...</p>
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <div className="mb-10">
+          <div className="h-4 w-32 rounded-full bg-white/10 animate-pulse mb-4" />
+          <div className="h-10 w-64 rounded-2xl bg-white/10 animate-pulse mb-3" />
+        </div>
+        <div className="space-y-4">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-24 animate-pulse" />
+          ))}
+        </div>
       </div>
     </AppShell>
   );
