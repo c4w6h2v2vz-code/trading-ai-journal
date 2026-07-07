@@ -17,6 +17,7 @@ const allLinks = [
   { name: "Trade Journal", href: "/journal" },
   { name: "Daily Journal", href: "/daily-journal" },
   { name: "Risk Manager", href: "/risk-manager" },
+  { name: "Prop Firm", href: "/prop-firm" },
   { name: "Calendar", href: "/calendar" },
   { name: "Psychology", href: "/psychology" },
   { name: "Analytics", href: "/analytics" },
