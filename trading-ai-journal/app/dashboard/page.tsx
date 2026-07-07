@@ -1,75 +1,44 @@
 "use client";
 
-import PerformanceBreakdown from "@/components/dashboard/PerformanceBreakdown";
-import AICoachSummary from "@/components/dashboard/AICoachSummary";
-import AnalyticsCards from "@/components/dashboard/AnalyticsCards";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/AppShell";
 
 type Trade = {
   id: string;
-  user_id: string;
   pair: string;
-  session: string;
-  entry_price: number;
-  exit_price: number;
-  profit_loss: number;
   result: string;
-  notes: string;
+  profit_loss: number;
+  session: string;
+  strategy: string | null;
+  direction: string | null;
+  risk_reward: number | null;
   created_at: string;
   ai_score: number | null;
-  ai_risk_score: number | null;
-  ai_psychology_score: number | null;
-  ai_execution_score: number | null;
   ai_feedback: string | null;
 };
 
 export default function DashboardPage() {
   const router = useRouter();
   const [trades, setTrades] = useState<Trade[]>([]);
-const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    async function loadTrades() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  const [loading, setLoading] = useState(true);
 
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
 
       const { data: manualTrades } = await supabase
-        .from("trades")
-        .select("*")
-        .eq("user_id", user.id)
+        .from("trades").select("*").eq("user_id", user.id)
         .order("created_at", { ascending: true });
 
       const { data: mt5Data } = await supabase
-        .from("mt5_trades")
-        .select("*")
-        .eq("user_id", user.id)
+        .from("mt5_trades").select("*").eq("user_id", user.id)
         .order("created_at", { ascending: true });
 
       const mt5Mapped = (mt5Data || []).map((t) => ({
         id: String(t.id),
-        user_id: user.id,
         pair: t.symbol,
         session: "MT5",
         strategy: "MT5 Import",
@@ -86,9 +55,6 @@ const [loading, setLoading] = useState(true);
         image_url: null,
         created_at: t.open_time || new Date().toISOString(),
         ai_score: t.ai_score,
-        ai_risk_score: t.ai_risk_score,
-        ai_psychology_score: t.ai_psychology_score,
-        ai_execution_score: t.ai_execution_score,
         ai_feedback: t.ai_feedback,
       }));
 
@@ -96,428 +62,213 @@ const [loading, setLoading] = useState(true);
       setTrades(allTrades);
       setLoading(false);
     }
+    load();
+  }, []);
 
-    loadTrades();
-  }, [router]);
-
-  const totalTrades = trades.length;
-  const wins = trades.filter((trade) => trade.result === "Win");
-  const losses = trades.filter((trade) => trade.result === "Loss");
-
-  const totalProfit = trades.reduce(
-    (sum, trade) => sum + Number(trade.profit_loss),
-    0
-  );
-
-  const winRate =
-    totalTrades > 0 ? ((wins.length / totalTrades) * 100).toFixed(1) : "0";
-
-  const averageWin =
-    wins.length > 0
-      ? (
-          wins.reduce((sum, trade) => sum + Number(trade.profit_loss), 0) /
-          wins.length
-        ).toFixed(1)
-      : "0";
-
-  const averageLoss =
-    losses.length > 0
-      ? (
-          losses.reduce((sum, trade) => sum + Number(trade.profit_loss), 0) /
-          losses.length
-        ).toFixed(1)
-      : "0";
-
-  const bestTrade =
-    trades.length > 0
-      ? Math.max(...trades.map((trade) => Number(trade.profit_loss)))
-      : 0;
-
-  const worstTrade =
-    trades.length > 0
-      ? Math.min(...trades.map((trade) => Number(trade.profit_loss)))
-      : 0;
-
-  const bestPair = getBestGroup(trades, "pair");
-  const bestSession = getBestGroup(trades, "session");
-
-  let runningProfit = 0;
-  const equityData = trades.map((trade, index) => {
-    runningProfit += Number(trade.profit_loss);
-
-    return {
-      name: `Trade ${index + 1}`,
-      equity: runningProfit,
-      profit: Number(trade.profit_loss),
-    };
-  });
-
-  const dailyData = getDailyData(trades);
-
-  const winLossData = [
-    { name: "Wins", value: wins.length },
-    { name: "Losses", value: losses.length },
-  ];
-
-  const recentTrades = [...trades].reverse().slice(0, 6);
-
-  const averageAiScore = getAverageScore(trades, "ai_score");
-  const averageRiskScore = getAverageScore(trades, "ai_risk_score");
-  const averagePsychologyScore = getAverageScore(
-    trades,
-    "ai_psychology_score"
-  );
-  const averageExecutionScore = getAverageScore(trades, "ai_execution_score");
-const grossWins = wins.reduce((sum, t) => sum + Number(t.profit_loss), 0);
-  const grossLosses = Math.abs(losses.reduce((sum, t) => sum + Number(t.profit_loss), 0));
-  const profitFactor = grossLosses > 0 ? (grossWins / grossLosses).toFixed(2) : "∞";
-  const expectancy = totalTrades > 0
-    ? ((wins.length / totalTrades) * Number(averageWin) + (losses.length / totalTrades) * Number(averageLoss)).toFixed(2)
-    : "0";
-
-  let streak = 0;
-  let streakType = "";
-  const reversedTrades = [...trades].reverse();
-  if (reversedTrades.length > 0) {
-    streakType = reversedTrades[0].result;
-    for (const t of reversedTrades) {
-      if (t.result === streakType) streak++;
-      else break;
-    }
-  }
   if (loading) return (
     <AppShell>
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-10">
-          <div className="h-4 w-32 rounded-full bg-white/10 animate-pulse mb-4" />
-          <div className="h-10 w-64 rounded-2xl bg-white/10 animate-pulse mb-3" />
-          <div className="h-4 w-48 rounded-full bg-white/10 animate-pulse" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="mx-auto max-w-4xl px-4 py-6">
+        <div className="grid grid-cols-2 gap-3 mb-4">
           {[1,2,3,4].map(i => (
             <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 h-24 animate-pulse" />
           ))}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          {[1,2,3,4].map(i => (
-            <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 h-24 animate-pulse" />
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 h-32 animate-pulse mb-4" />
+        <div className="space-y-3">
+          {[1,2,3].map(i => (
+            <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 h-16 animate-pulse" />
           ))}
         </div>
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-96 animate-pulse" />
       </div>
     </AppShell>
   );
+
+  // Calculations
+  const total = trades.length;
+  const wins = trades.filter(t => t.result === "Win");
+  const losses = trades.filter(t => t.result === "Loss");
+  const totalPL = trades.reduce((sum, t) => sum + Number(t.profit_loss), 0);
+  const winRate = total > 0 ? ((wins.length / total) * 100).toFixed(1) : "0";
+  const grossWins = wins.reduce((sum, t) => sum + Number(t.profit_loss), 0);
+  const grossLosses = Math.abs(losses.reduce((sum, t) => sum + Number(t.profit_loss), 0));
+  const profitFactor = grossLosses > 0 ? (grossWins / grossLosses).toFixed(2) : "∞";
+  const avgWin = wins.length > 0 ? (grossWins / wins.length).toFixed(2) : "0";
+  const avgLoss = losses.length > 0 ? (grossLosses / losses.length).toFixed(2) : "0";
+  const expectancy = total > 0
+    ? ((wins.length / total) * Number(avgWin) - (losses.length / total) * Number(avgLoss)).toFixed(2)
+    : "0";
+
+  const recentTrades = [...trades].reverse().slice(0, 5);
+
+  const today = new Date().toDateString();
+  const todayPL = trades
+    .filter(t => new Date(t.created_at).toDateString() === today)
+    .reduce((sum, t) => sum + Number(t.profit_loss), 0);
+
+  const avgAiScore = trades.filter(t => t.ai_score).length > 0
+    ? (trades.filter(t => t.ai_score).reduce((sum, t) => sum + (t.ai_score || 0), 0) / trades.filter(t => t.ai_score).length).toFixed(1)
+    : "N/A";
+
   return (
     <AppShell>
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div className="mx-auto max-w-4xl px-4 py-6">
+
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
-              Private Trading Analytics
-            </p>
-            <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-              Performance Dashboard
-            </h1>
-            <p className="mt-3 text-white/50">
-              Professional charts for your private trading performance.
-            </p>
+            <h1 className="text-2xl font-bold">Dashboard</h1>
+            <p className="text-sm text-white/40">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
           </div>
-
-          <div
-            className={`rounded-2xl border px-5 py-4 ${
-              totalProfit >= 0
-                ? "border-green-500/20 bg-green-500/10"
-                : "border-red-500/20 bg-red-500/10"
-            }`}
-          >
-            <p className="text-sm text-white/50">Net P/L</p>
-            <p
-              className={`text-3xl font-bold ${
-                totalProfit >= 0 ? "text-green-400" : "text-red-400"
-              }`}
-            >
-              {totalProfit}
+          <div className={`rounded-2xl px-4 py-2 text-right ${totalPL >= 0 ? "bg-green-500/10 border border-green-500/20" : "bg-red-500/10 border border-red-500/20"}`}>
+            <p className="text-xs text-white/40">Net P/L</p>
+            <p className={`text-lg font-bold ${totalPL >= 0 ? "text-green-400" : "text-red-400"}`}>
+              ${totalPL.toFixed(2)}
             </p>
           </div>
         </div>
 
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Total Trades" value={totalTrades.toString()} />
-          <StatCard title="Win Rate" value={`${winRate}%`} highlight="blue" />
-          <StatCard title="Wins" value={wins.length.toString()} highlight="green" />
-          <StatCard title="Losses" value={losses.length.toString()} highlight="red" />
-        </div>
-
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Best Trade" value={bestTrade.toString()} highlight="green" />
-          <StatCard title="Worst Trade" value={worstTrade.toString()} highlight="red" />
-          <StatCard title="Average Win" value={averageWin} />
-          <StatCard title="Average Loss" value={averageLoss} />
-        </div>
-
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Profit Factor" value={String(profitFactor)} highlight="blue" />
-          <StatCard title="Expectancy" value={`$${expectancy}`} highlight="green" />
-          <StatCard title="Current Streak" value={streak > 0 ? `${streak} ${streakType}s` : "N/A"} highlight={streakType === "Win" ? "green" : "red"} />
-          <StatCard title="Avg AI Score" value={averageAiScore} highlight="blue" />
-        </div>
-
-        <div className="mb-8 grid gap-4 lg:grid-cols-3">
-          <InfoCard title="Best Pair" value={bestPair} />
-          <AnalyticsCards trades={trades} />
-          <AICoachSummary trades={trades} />
-          <PerformanceBreakdown trades={trades} />
-          <InfoCard title="Best Session" value={bestSession} />
-          <InfoCard
-            title="AI Coach Note"
-            value={
-              totalTrades === 0
-                ? "Add trades to unlock private insights."
-                : wins.length > losses.length
-                ? "Your performance is positive. Keep tracking rules and psychology."
-                : "Review your losing trades and reduce repeated mistakes."
-            }
-          />
-        </div>
-
-        <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-          <h2 className="text-2xl font-semibold">Equity Curve</h2>
-          <p className="mb-6 text-sm text-white/40">
-            Your running profit/loss over time.
-          </p>
-
-          {equityData.length === 0 ? (
-            <p className="text-white/40">No data yet.</p>
-          ) : (
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={equityData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
-                  <XAxis dataKey="name" stroke="#ffffff60" />
-                  <YAxis stroke="#ffffff60" />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#111",
-                      border: "1px solid #ffffff20",
-                      borderRadius: "12px",
-                      color: "#fff",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="equity"
-                    stroke="#22c55e"
-                    fill="#22c55e33"
-                    strokeWidth={3}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+        {/* Today's P/L banner */}
+        <div className={`mb-4 rounded-3xl border p-4 ${todayPL >= 0 ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-white/40">Today's P/L</p>
+              <p className={`text-2xl font-bold ${todayPL >= 0 ? "text-green-400" : "text-red-400"}`}>
+                ${todayPL.toFixed(2)}
+              </p>
             </div>
-          )}
+            <div className="text-right">
+              <p className="text-sm text-white/40">Trades today</p>
+              <p className="text-2xl font-bold">
+                {trades.filter(t => new Date(t.created_at).toDateString() === today).length}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="mb-8 grid gap-4 lg:grid-cols-2">
-          <ChartCard title="Daily Profit / Loss">
-            {dailyData.length === 0 ? (
-              <p className="text-white/40">No data yet.</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={dailyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
-                  <XAxis dataKey="date" stroke="#ffffff60" />
-                  <YAxis stroke="#ffffff60" />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#111",
-                      border: "1px solid #ffffff20",
-                      borderRadius: "12px",
-                      color: "#fff",
-                    }}
-                  />
-                  <Bar dataKey="profit" radius={[8, 8, 0, 0]}>
-                    {dailyData.map((entry, index) => (
-                      <Cell
-                        key={index}
-                        fill={entry.profit >= 0 ? "#22c55e" : "#ef4444"}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-
-          <ChartCard title="Win vs Loss">
-            {totalTrades === 0 ? (
-              <p className="text-white/40">No data yet.</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={winLossData}
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={100}
-                    label
-                  >
-                    <Cell fill="#22c55e" />
-                    <Cell fill="#ef4444" />
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: "#111",
-                      border: "1px solid #ffffff20",
-                      borderRadius: "12px",
-                      color: "#fff",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
+        {/* Core stats — 2x2 grid */}
+        <div className="mb-4 grid grid-cols-2 gap-3">
+          <StatCard label="Win Rate" value={`${winRate}%`} color="text-blue-400" />
+          <StatCard label="Total Trades" value={String(total)} />
+          <StatCard label="Wins" value={String(wins.length)} color="text-green-400" />
+          <StatCard label="Losses" value={String(losses.length)} color="text-red-400" />
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-          <h2 className="text-2xl font-semibold">Recent Trades</h2>
-          <p className="mb-6 text-sm text-white/40">Latest saved trades.</p>
+        {/* Second row stats */}
+        <div className="mb-4 grid grid-cols-2 gap-3">
+          <StatCard label="Profit Factor" value={String(profitFactor)} color="text-yellow-400" />
+          <StatCard label="Expectancy" value={`$${expectancy}`} color={Number(expectancy) >= 0 ? "text-green-400" : "text-red-400"} />
+          <StatCard label="Avg Win" value={`$${avgWin}`} color="text-green-400" />
+          <StatCard label="Avg Loss" value={`$${avgLoss}`} color="text-red-400" />
+        </div>
+
+        {/* AI Score */}
+        {avgAiScore !== "N/A" && (
+          <div className="mb-4 rounded-3xl border border-purple-500/20 bg-purple-500/5 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-white/40">Avg AI Score</p>
+                <p className="text-3xl font-bold text-purple-400">{avgAiScore}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-white/40">out of 100</p>
+                <p className="text-sm text-white/40 mt-1">
+                  {Number(avgAiScore) >= 80 ? "🔥 Excellent" : Number(avgAiScore) >= 60 ? "👍 Good" : "⚠️ Needs work"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Recent Trades */}
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold">Recent Trades</h2>
+            <button
+              onClick={() => router.push("/journal")}
+              className="text-sm text-blue-400 hover:text-blue-300"
+            >
+              See all →
+            </button>
+          </div>
 
           {recentTrades.length === 0 ? (
-            <p className="text-white/40">No trades found yet.</p>
+            <div className="text-center py-8">
+              <p className="text-4xl mb-3">📈</p>
+              <p className="text-white/40 text-sm">No trades yet.</p>
+              <button
+                onClick={() => router.push("/journal")}
+                className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold"
+              >
+                Add First Trade
+              </button>
+            </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {recentTrades.map((trade) => (
-                <div
-                  key={trade.id}
-                  className="rounded-2xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20"
-                >
-                  <div className="flex items-center justify-between gap-4">
+                <div key={trade.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-2 w-2 rounded-full ${trade.result === "Win" ? "bg-green-400" : trade.result === "Loss" ? "bg-red-400" : "bg-white/40"}`} />
                     <div>
-                      <p className="text-lg font-semibold">{trade.pair}</p>
-                      <p className="text-sm text-white/40">{trade.session}</p>
-                    </div>
-
-                    <div className="text-right">
-                      <p
-                        className={`text-lg font-bold ${
-                          trade.profit_loss >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {trade.profit_loss}
-                      </p>
-                      <p className="text-sm text-white/40">{trade.result}</p>
-<p className="text-sm text-blue-300">AI {trade.ai_score ?? "N/A"}</p>
+                      <p className="font-semibold text-sm">{trade.pair}</p>
+                      <p className="text-xs text-white/40">{trade.session}</p>
                     </div>
                   </div>
-
-                  {trade.notes && (
-                    <p className="mt-3 rounded-xl bg-white/[0.03] p-3 text-sm text-white/50">
-                      {trade.notes}
+                  <div className="text-right">
+                    <p className={`font-bold text-sm ${Number(trade.profit_loss) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      ${Number(trade.profit_loss).toFixed(2)}
                     </p>
-                  )}
+                    {trade.ai_score && (
+                      <p className="text-xs text-purple-400">AI {trade.ai_score}</p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* Quick actions */}
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <button
+            onClick={() => router.push("/journal")}
+            className="rounded-3xl border border-blue-500/20 bg-blue-500/10 p-4 text-left hover:bg-blue-500/20 transition"
+          >
+            <p className="text-xl mb-1">📝</p>
+            <p className="font-semibold text-sm text-blue-400">Add Trade</p>
+          </button>
+          <button
+            onClick={() => router.push("/market-analysis")}
+            className="rounded-3xl border border-green-500/20 bg-green-500/10 p-4 text-left hover:bg-green-500/20 transition"
+          >
+            <p className="text-xl mb-1">📊</p>
+            <p className="font-semibold text-sm text-green-400">Market Analysis</p>
+          </button>
+          <button
+            onClick={() => router.push("/daily-journal")}
+            className="rounded-3xl border border-purple-500/20 bg-purple-500/10 p-4 text-left hover:bg-purple-500/20 transition"
+          >
+            <p className="text-xl mb-1">📓</p>
+            <p className="font-semibold text-sm text-purple-400">Daily Journal</p>
+          </button>
+          <button
+            onClick={() => router.push("/prop-firm")}
+            className="rounded-3xl border border-orange-500/20 bg-orange-500/10 p-4 text-left hover:bg-orange-500/20 transition"
+          >
+            <p className="text-xl mb-1">🏦</p>
+            <p className="font-semibold text-sm text-orange-400">Prop Firm</p>
+          </button>
+        </div>
+
       </div>
     </AppShell>
   );
 }
 
-function getBestGroup(trades: Trade[], key: "pair" | "session") {
-  const groups: Record<string, number> = {};
-
-  trades.forEach((trade) => {
-    const groupName = trade[key] || "Unknown";
-    groups[groupName] = (groups[groupName] || 0) + Number(trade.profit_loss);
-  });
-
-  const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
-
-  return sorted.length > 0 ? `${sorted[0][0]} (${sorted[0][1]})` : "No data";
-}
-
-function getDailyData(trades: Trade[]) {
-  const days: Record<string, number> = {};
-
-  trades.forEach((trade) => {
-    const date = new Date(trade.created_at).toLocaleDateString();
-    days[date] = (days[date] || 0) + Number(trade.profit_loss);
-  });
-
-  return Object.entries(days).map(([date, profit]) => ({
-    date,
-    profit,
-  }));
-}
-
-function getAverageScore(
-  trades: Trade[],
-  key:
-    | "ai_score"
-    | "ai_risk_score"
-    | "ai_psychology_score"
-    | "ai_execution_score"
-) {
-  const scores = trades
-    .map((trade) => trade[key])
-    .filter((score): score is number => score !== null && score !== undefined);
-
-  if (scores.length === 0) return "0";
-
-  const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-
-  return average.toFixed(1);
-}
-
-function StatCard({
-  title,
-  value,
-  highlight,
-}: {
-  title: string;
-  value: string;
-  highlight?: "green" | "red" | "blue";
-}) {
-  const color =
-    highlight === "green"
-      ? "text-green-400"
-      : highlight === "red"
-      ? "text-red-400"
-      : highlight === "blue"
-      ? "text-blue-400"
-      : "text-white";
-
+function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-black/30">
-      <p className="text-sm text-white/40">{title}</p>
-      <h2 className={`mt-3 text-3xl font-bold ${color}`}>{value}</h2>
-    </div>
-  );
-}
-
-function InfoCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-black/30">
-      <p className="text-sm text-white/40">{title}</p>
-      <h2 className="mt-3 text-xl font-bold text-white">{value}</h2>
-    </div>
-  );
-}
-
-function ChartCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-      <h2 className="mb-6 text-2xl font-semibold">{title}</h2>
-      {children}
+    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+      <p className="text-xs text-white/40">{label}</p>
+      <p className={`mt-1 text-2xl font-bold ${color || "text-white"}`}>{value}</p>
     </div>
   );
 }
