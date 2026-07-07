@@ -35,19 +35,30 @@ type Analysis = {
   pairs_to_avoid: string[];
 };
 
-const defaultEvents: NewsEvent[] = [
-  { time: "08:30", currency: "USD", event: "NFP", impact: "High", forecast: "180K", previous: "150K" },
-  { time: "10:00", currency: "EUR", event: "CPI y/y", impact: "High", forecast: "2.3%", previous: "2.5%" },
-];
+const defaultEvents: NewsEvent[] = [];
 
 export default function MarketAnalysisPage() {
   const [events, setEvents] = useState<NewsEvent[]>(defaultEvents);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fetchingNews, setFetchingNews] = useState(false);
   const [newEvent, setNewEvent] = useState<NewsEvent>({
     time: "", currency: "USD", event: "", impact: "High", forecast: "", previous: ""
   });
-
+async function fetchTodaysNews() {
+    setFetchingNews(true);
+    try {
+      const response = await fetch("/api/economic-calendar");
+      const data = await response.json();
+      if (data.events && data.events.length > 0) {
+        setEvents(data.events);
+      }
+    } catch (err) {
+      console.error("Failed to fetch news:", err);
+    } finally {
+      setFetchingNews(false);
+    }
+  }
   async function analyze() {
     setLoading(true);
     setAnalysis(null);
@@ -92,7 +103,13 @@ export default function MarketAnalysisPage() {
         {/* Add Events */}
         <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="mb-4 text-xl font-semibold">Today's News Events</h2>
-
+<button
+            onClick={fetchTodaysNews}
+            disabled={fetchingNews}
+            className="mb-4 w-full rounded-2xl border border-blue-500/20 bg-blue-500/10 py-3 text-sm font-semibold text-blue-400 hover:bg-blue-500/20 transition disabled:opacity-50"
+          >
+            {fetchingNews ? "Fetching today's news..." : "🔄 Load Today's Real News"}
+          </button>
           {/* Event list */}
           <div className="mb-4 space-y-2">
             {events.map((e, i) => (
