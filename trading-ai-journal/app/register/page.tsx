@@ -35,11 +35,11 @@ export default function RegisterPage() {
       return;
     }
 
-    setMessage("Account created ✅ Please login.");
+    setMessage("Account created ✅ Setting up your account...");
     setLoading(false);
 
     setTimeout(() => {
-      router.push("/login");
+      router.push("/onboarding");
     }, 1000);
   }
 
