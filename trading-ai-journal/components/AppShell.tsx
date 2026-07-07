@@ -16,6 +16,7 @@ const allLinks = [
   { name: "Dashboard", href: "/dashboard" },
   { name: "Trade Journal", href: "/journal" },
   { name: "Daily Journal", href: "/daily-journal" },
+  { name: "Trading Rules", href: "/trading-rules" },
   { name: "Risk Manager", href: "/risk-manager" },
   { name: "Prop Firm", href: "/prop-firm" },
   { name: "Calendar", href: "/calendar" },
