@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 const links = [
   { name: "Dashboard", href: "/dashboard", icon: "📊" },
-  { name: "Journal", href: "/journal", icon: "📓" },
+  { name: "Trade Journal", href: "/journal", icon: "📓" },
   { name: "Analytics", href: "/analytics", icon: "📈" },
   { name: "AI Coach", href: "/psychology", icon: "🤖" },
   { name: "More", href: "/settings", icon: "☰" },
@@ -14,7 +14,7 @@ const links = [
 
 const allLinks = [
   { name: "Dashboard", href: "/dashboard" },
-  { name: "Journal", href: "/journal" },
+  { name: "Trade Journal", href: "/journal" },
   { name: "Daily Journal", href: "/daily-journal" },
   { name: "Risk Manager", href: "/risk-manager" },
   { name: "Calendar", href: "/calendar" },
