@@ -5,94 +5,91 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { supabase } from "@/lib/supabase";
 
-type Rule = {
-  id: string;
-  title: string;
-  description: string;
-  created_at: string;
-};
-
-export default function TradingRulesPage() {
+export default function SettingsPage() {
   const router = useRouter();
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [plan, setPlan] = useState("free");
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
 
   useEffect(() => {
-    async function load() {
+    async function getUser() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
+      setEmail(user.email || "");
 
-      const { data } = await supabase
-        .from("trading_rules")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
-
-      setRules(data || []);
-      setLoading(false);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+      setPlan(profile?.plan || "free");
     }
-    load();
+    getUser();
   }, []);
 
-  async function addRule() {
-    if (!title.trim()) return;
-    setSaving(true);
+  async function enableNotifications() {
+    setNotifLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      const permission = await Notification.requestPermission();
 
-    const { data, error } = await supabase
-      .from("trading_rules")
-      .insert([{ user_id: user.id, title, description }])
-      .select()
-      .single();
+      if (permission !== 'granted') {
+        setMessage('Please allow notifications.');
+        return;
+      }
 
-    if (error) {
-      setMessage("Error: " + error.message);
-    } else {
-      setRules([...rules, data]);
-      setTitle("");
-      setDescription("");
-      setMessage("Rule added ✅");
+      const vapidKey = 'BND4o4M6f-cWHc9k9DJ6GykoEFh4xewIpVpLspM_r65el8pILrthkFDMZ3oyDGaittdQ1zuH0wHx30gfo1PUheU';
+
+      function urlBase64ToUint8Array(base64String: string) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      }
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      });
+
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription, userId: user.id }),
+      });
+
+      setNotifEnabled(true);
+      setMessage('Notifications enabled ✅');
+    } catch (err) {
+      setMessage('Error: ' + String(err));
+    } finally {
+      setNotifLoading(false);
     }
-    setSaving(false);
   }
 
-  async function deleteRule(id: string) {
-    if (!confirm("Delete this rule?")) return;
-
-    await supabase.from("trading_rules").delete().eq("id", id);
-    setRules(rules.filter(r => r.id !== id));
-    setMessage("Rule deleted ✅");
+  async function logout() {
+    await supabase.auth.signOut();
+    router.push("/login");
   }
-
-  if (loading) return (
-    <AppShell>
-      <div className="mx-auto max-w-3xl px-6 py-8">
-        <div className="space-y-4">
-          {[1,2,3].map(i => (
-            <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-24 animate-pulse" />
-          ))}
-        </div>
-      </div>
-    </AppShell>
-  );
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-3xl px-6 py-8">
-        <div className="mb-8">
-          <p className="mb-3 w-fit rounded-full border border-yellow-500/30 bg-yellow-500/10 px-4 py-1 text-sm text-yellow-300">
-            Trading Rules
+      <div className="mx-auto max-w-2xl px-6 py-8">
+        <div className="mb-10">
+          <p className="mb-3 w-fit rounded-full border border-white/10 bg-white/5 px-4 py-1 text-sm text-white/40">
+            Settings
           </p>
-          <h1 className="text-4xl font-bold">My Trading Rules</h1>
-          <p className="mt-2 text-white/40">
-            These rules are checked by AI on every trade you take.
-          </p>
+          <h1 className="text-4xl font-bold">Account Settings</h1>
+          <p className="mt-3 text-white/50">Manage your account and preferences.</p>
         </div>
 
         {message && (
@@ -101,78 +98,66 @@ export default function TradingRulesPage() {
           </div>
         )}
 
-        {/* Add Rule Form */}
-        <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="mb-4 text-xl font-semibold">Add New Rule</h2>
-          <div className="space-y-4">
-            <input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Rule title e.g. Only trade A+ setups"
-              className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-yellow-500"
-            />
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Describe the rule in detail..."
-              rows={3}
-              className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-yellow-500"
-            />
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+            <h2 className="mb-4 text-lg font-semibold">Account</h2>
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p className="text-sm text-white/40">Email</p>
+              <p className="mt-1 font-semibold">{email}</p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+            <h2 className="mb-4 text-lg font-semibold">Plan</h2>
+            <div className={`rounded-2xl border p-4 ${
+              plan === "pro" ? "border-blue-500/20 bg-blue-500/10" :
+              plan === "elite" ? "border-purple-500/20 bg-purple-500/10" :
+              "border-white/10 bg-white/5"
+            }`}>
+              <p className={`text-sm font-semibold ${
+                plan === "pro" ? "text-blue-400" :
+                plan === "elite" ? "text-purple-400" :
+                "text-white/60"
+              }`}>
+                {plan === "pro" ? "Pro Plan ✅" : plan === "elite" ? "Elite Plan ✅" : "Free Plan"}
+              </p>
+              <p className="mt-1 text-sm text-white/40">
+                {plan === "pro" ? "You have full access to all Pro features." :
+                 plan === "elite" ? "You have full access to all Elite features." :
+                 "Upgrade to Pro for unlimited AI reviews and advanced features."}
+              </p>
+              {plan === "free" && (
+                <a href="/pricing" className="mt-3 inline-block rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-700">
+                  Upgrade Now
+                </a>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+            <h2 className="mb-4 text-lg font-semibold">Notifications</h2>
+            <p className="text-sm text-white/40 mb-4">
+              Get instant alerts when your daily loss limit is hit or profit target reached.
+            </p>
             <button
-              onClick={addRule}
-              disabled={saving || !title.trim()}
-              className="w-full rounded-2xl bg-yellow-600 py-4 font-semibold transition hover:bg-yellow-700 disabled:opacity-50"
+              onClick={enableNotifications}
+              disabled={notifLoading || notifEnabled}
+              className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold transition hover:bg-blue-700 disabled:opacity-50"
             >
-              {saving ? "Adding..." : "Add Rule"}
+              {notifLoading ? "Enabling..." : notifEnabled ? "Notifications Enabled ✅" : "Enable Push Notifications"}
+            </button>
+          </div>
+
+          <div className="rounded-3xl border border-red-500/10 bg-red-500/5 p-6">
+            <h2 className="mb-4 text-lg font-semibold text-red-400">Danger Zone</h2>
+            <button
+              onClick={logout}
+              className="rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-3 text-sm font-semibold text-red-400 transition hover:bg-red-500/20"
+            >
+              Logout
             </button>
           </div>
         </div>
-
-        {/* Rules List */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">My Rules ({rules.length})</h2>
-
-          {rules.length === 0 ? (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-center">
-              <p className="text-4xl mb-4">📋</p>
-              <p className="text-white/40">No rules yet. Add your first trading rule above.</p>
-              <p className="mt-2 text-sm text-white/20">Example: "Only trade during London session", "Always use 1:2 RR", "No trading after 2 losses"</p>
-            </div>
-          ) : (
-            rules.map((rule, index) => (
-              <div key={rule.id} className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-yellow-500/20 text-sm font-bold text-yellow-400">
-                      {index + 1}
-                    </span>
-                    <div>
-                      <p className="font-semibold text-yellow-300">{rule.title}</p>
-                      {rule.description && (
-                        <p className="mt-1 text-sm text-white/50">{rule.description}</p>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => deleteRule(rule.id)}
-                    className="shrink-0 rounded-xl bg-red-500/10 px-3 py-1 text-xs text-red-400 hover:bg-red-500/20"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {rules.length > 0 && (
-          <div className="mt-8 rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
-            <p className="text-sm font-semibold text-blue-400">🤖 AI Coach</p>
-            <p className="mt-2 text-sm text-white/60">
-              Every time you save a trade, AI checks all {rules.length} of your rules and tells you which ones you followed or broke.
-            </p>
-          </div>
-        )}
       </div>
     </AppShell>
   );
