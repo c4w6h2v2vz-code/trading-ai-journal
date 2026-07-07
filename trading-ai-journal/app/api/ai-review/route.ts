@@ -1,9 +1,39 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { trade, history, imageBase64 } = body;
+
+    const userId = trade?.user_id;
+
+    if (userId) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan, ai_reviews_used")
+        .eq("id", userId)
+        .single();
+
+      if (profile?.plan === "free" && (profile?.ai_reviews_used || 0) >= 10) {
+        return NextResponse.json(
+          { error: "Free plan limit reached. Upgrade to Pro for unlimited AI reviews." },
+          { status: 403 }
+        );
+      }
+
+      if (profile?.plan === "free") {
+        await supabase
+          .from("profiles")
+          .update({ ai_reviews_used: (profile?.ai_reviews_used || 0) + 1 })
+          .eq("id", userId);
+      }
+    }
 
     const historyText =
       history && history.length > 0
