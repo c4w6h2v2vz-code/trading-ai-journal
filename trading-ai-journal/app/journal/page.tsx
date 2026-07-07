@@ -58,7 +58,7 @@ export default function JournalPage() {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [image, setImage] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
-
+const [loading, setLoading] = useState(true);
   const [pairFilter, setPairFilter] = useState("");
   const [resultFilter, setResultFilter] = useState("All");
   const [strategyFilter, setStrategyFilter] = useState("All");
@@ -89,6 +89,7 @@ export default function JournalPage() {
 
     if (error) setMessage("Error loading trades: " + error.message);
     else setTrades(data || []);
+    setLoading(false);
   }
 async function loadMt5Trades() {
   const user = await getCurrentUser();
@@ -345,7 +346,22 @@ async function reviewMt5WithAI(trade: MT5Trade) {
 
     return matchesPair && matchesResult && matchesStrategy && matchesGrade;
   });
-
+if (loading) return (
+    <AppShell>
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mb-10">
+          <div className="h-4 w-32 rounded-full bg-white/10 animate-pulse mb-4" />
+          <div className="h-10 w-64 rounded-2xl bg-white/10 animate-pulse mb-3" />
+          <div className="h-4 w-96 rounded-full bg-white/10 animate-pulse" />
+        </div>
+        <div className="space-y-4">
+          {[1,2,3].map(i => (
+            <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-40 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    </AppShell>
+  );
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-6 py-8">
