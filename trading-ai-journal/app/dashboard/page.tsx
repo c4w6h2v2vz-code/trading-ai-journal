@@ -43,7 +43,7 @@ type Trade = {
 export default function DashboardPage() {
   const router = useRouter();
   const [trades, setTrades] = useState<Trade[]>([]);
-
+const [loading, setLoading] = useState(true);
   useEffect(() => {
     async function loadTrades() {
       const {
@@ -94,6 +94,7 @@ export default function DashboardPage() {
 
       const allTrades = [...(manualTrades || []), ...mt5Mapped];
       setTrades(allTrades);
+      setLoading(false);
     }
 
     loadTrades();
@@ -184,6 +185,28 @@ const grossWins = wins.reduce((sum, t) => sum + Number(t.profit_loss), 0);
       else break;
     }
   }
+  if (loading) return (
+    <AppShell>
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mb-10">
+          <div className="h-4 w-32 rounded-full bg-white/10 animate-pulse mb-4" />
+          <div className="h-10 w-64 rounded-2xl bg-white/10 animate-pulse mb-3" />
+          <div className="h-4 w-48 rounded-full bg-white/10 animate-pulse" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 h-24 animate-pulse" />
+          ))}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 h-24 animate-pulse" />
+          ))}
+        </div>
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-96 animate-pulse" />
+      </div>
+    </AppShell>
+  );
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-6 py-8">
