@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Trading AI Journal",
-  description: "Your personal AI trading coach",
+  title: "PipTrak — AI Trading Journal",
+  description: "Your personal AI trading coach. Track trades, get AI coaching, and improve your performance.",
   manifest: "/manifest.json",
 };
 

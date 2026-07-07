@@ -9,7 +9,7 @@ export default function LandingPage() {
     <main className="min-h-screen bg-[#050505] text-white">
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b border-white/5 bg-black/80 px-6 py-4 backdrop-blur-xl">
-        <span className="text-lg font-bold tracking-tight">Trading AI Journal</span>
+        <span className="text-lg font-bold tracking-tight">PipTrak</span>
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/login")} className="rounded-xl px-4 py-2 text-sm text-white/60 hover:text-white transition">
             Login
@@ -251,7 +251,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-white/5 px-6 py-8 text-center text-sm text-white/20">
-        <p>© 2026 Trading AI Journal. Built for traders, by traders.</p>
+        <p>© 2026 PipTrak. Built for traders, by traders.</p>
       </footer>
     </main>
   );

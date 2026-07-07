@@ -42,7 +42,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-screen bg-[#050505] text-white">
       <nav className="hidden md:flex sticky top-0 z-50 items-center gap-2 border-b border-white/10 bg-black/80 px-6 py-3 backdrop-blur-xl">
-        <span className="mr-4 text-lg font-bold tracking-tight">Trading AI</span>
+        <span className="mr-4 text-lg font-bold tracking-tight">PipTrak</span>
         {allLinks.map((link) => (
           <a key={link.href} href={link.href} className={`rounded-xl px-3 py-2 text-sm transition ${pathname === link.href ? "bg-blue-600 text-white" : "text-white/50 hover:bg-white/10 hover:text-white"}`}>
             {link.name}
@@ -51,7 +51,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <button onClick={logout} className="ml-auto rounded-xl bg-white/5 px-4 py-2 text-sm text-white/50 hover:bg-white/10">Logout</button>
       </nav>
       <div className="md:hidden sticky top-0 z-50 flex items-center justify-between border-b border-white/10 bg-black/80 px-4 py-3 backdrop-blur-xl">
-        <span className="text-base font-bold tracking-tight">Trading AI</span>
+        <span className="text-base font-bold tracking-tight">PipTrak</span>
         <button onClick={logout} className="rounded-xl bg-white/5 px-3 py-2 text-xs text-white/50">Logout</button>
       </div>
       <div className="pb-24 md:pb-0">{children}</div>
