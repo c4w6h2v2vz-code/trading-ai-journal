@@ -32,19 +32,24 @@ export default function OnboardingPage() {
 
   async function saveProfile() {
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
 
-    await supabase.from("profiles").update({
-      trading_style: profile.trading_style,
-      main_market: profile.main_market,
-      experience: profile.experience,
-      prop_firm: profile.prop_firm,
-      onboarded: true,
-    }).eq("id", user.id);
+      await supabase.from("profiles").update({
+        trading_style: profile.trading_style,
+        main_market: profile.main_market,
+        experience: profile.experience,
+        prop_firm: profile.prop_firm,
+        onboarded: true,
+      }).eq("id", user.id);
 
-    setSaving(false);
-    setStep(3);
+      setStep(3);
+    } catch (err) {
+      console.error("Profile save error:", err);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function saveRule() {
