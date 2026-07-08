@@ -1,415 +1,161 @@
-"use client";
+import { NextResponse } from "next/server";
 
-import { useState } from "react";
-import AppShell from "@/components/AppShell";
-import { supabase } from "@/lib/supabase";
+async function getRealTimePrices() {
+  try {
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+    const pairs = ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"];
+    const prices: Record<string, any> = {};
 
-type NewsEvent = {
-  time: string;
-  currency: string;
-  event: string;
-  impact: "High" | "Medium" | "Low";
-  forecast: string;
-  previous: string;
-};
+    for (const pair of pairs) {
+      try {
+        let url = "";
+        if (pair === "XAUUSD") {
+          url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=XAU&to_currency=USD&apikey=${apiKey}`;
+        } else {
+          const from = pair.slice(0, 3);
+          const to = pair.slice(3, 6);
+          url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${from}&to_currency=${to}&apikey=${apiKey}`;
+        }
 
-type PairBias = {
-  direction: string;
-  confidence: number;
-  reason: string;
-};
+        const response = await fetch(url, { next: { revalidate: 300 } });
+        const data = await response.json();
+        const rate = data["Realtime Currency Exchange Rate"];
 
-type EventAnalysis = {
-  event: string;
-  currency: string;
-  if_beats: { direction: string; probability: number; avg_pips: number; pairs_affected: string[] };
-  if_misses: { direction: string; probability: number; avg_pips: number; pairs_affected: string[] };
-  trade_plan: string;
-  historical_note: string;
-};
-
-type Analysis = {
-  overall_bias: Record<string, PairBias>;
-  event_analysis: EventAnalysis[];
-  warning: string;
-  best_pairs_to_trade: string[];
-  pairs_to_avoid: string[];
-  key_levels: Record<string, string>;
-  market_context: string;
-};
-
-export default function MarketAnalysisPage() {
-  const [events, setEvents] = useState<NewsEvent[]>([]);
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [fetchingNews, setFetchingNews] = useState(false);
-  const [executing, setExecuting] = useState(false);
-  const [executeMessage, setExecuteMessage] = useState("");
-  const [newEvent, setNewEvent] = useState<NewsEvent>({
-    time: "", currency: "USD", event: "", impact: "High", forecast: "", previous: ""
-  });
-  const [tradeForm, setTradeForm] = useState({
-    symbol: "EURUSD",
-    type: "BUY",
-    lot: 0.01,
-    sl: 30,
-    tp: 60,
-    account: "",
-  });
-
-  async function fetchTodaysNews() {
-    setFetchingNews(true);
-    try {
-      const response = await fetch("/api/economic-calendar");
-      const data = await response.json();
-      if (data.events && data.events.length > 0) {
-        setEvents(data.events);
+        if (rate) {
+          prices[pair] = {
+            price: parseFloat(rate["5. Exchange Rate"]).toFixed(5),
+            high: rate["7. Ask Price"],
+            low: rate["8. Bid Price"],
+            updated: rate["6. Last Refreshed"],
+          };
+        }
+      } catch (err) {
+        console.error(`Failed to fetch ${pair}:`, err);
       }
-    } catch (err) {
-      console.error("Failed to fetch news:", err);
-    } finally {
-      setFetchingNews(false);
     }
-  }
 
-  async function executeTradeSignal() {
-    if (!tradeForm.account) {
-      setExecuteMessage("Please enter your MT5 account number.");
-      return;
+    return prices;
+  } catch (err) {
+    return {};
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const { events } = await request.json();
+
+    const today = new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    const eventsText = events.length > 0
+      ? events.map((e: any) =>
+          `${e.time} - ${e.currency} - ${e.event} - Impact: ${e.impact} - Forecast: ${e.forecast} - Previous: ${e.previous}`
+        ).join("\n")
+      : "No major economic events today.";
+
+    // Fetch real-time prices
+    const prices = await getRealTimePrices();
+    const pricesText = Object.entries(prices).length > 0
+      ? Object.entries(prices).map(([pair, data]: [string, any]) =>
+          `${pair}: ${data.price} (Bid: ${data.low}, Ask: ${data.high})`
+        ).join("\n")
+      : "Real-time prices unavailable.";
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are an elite institutional forex analyst with 20 years of experience. 
+You have deep knowledge of central bank policies, intermarket correlations, and smart money concepts.
+Always give SPECIFIC, ACTIONABLE analysis based on the REAL prices and events provided.
+Never give generic advice. Today is ${today}.`
+          },
+          {
+            role: "user",
+            content: `Today is ${today}.
+
+REAL-TIME PRICES RIGHT NOW:
+${pricesText}
+
+Today's economic events:
+${eventsText}
+
+Based on these REAL prices and today's events, provide a comprehensive market analysis.
+
+Consider:
+1. Whether current prices are at key support/resistance levels
+2. How today's events could push prices from current levels
+3. Risk/reward based on current price positions
+4. What smart money might be doing at these price levels
+
+Return ONLY this exact JSON:
+{
+  "overall_bias": {
+    "EURUSD": { "direction": "Bullish", "confidence": 65, "reason": "Price at 1.0850 near key support, ECB hawkish tone expected" },
+    "GBPUSD": { "direction": "Bearish", "confidence": 55, "reason": "Price rejected at 1.2750 resistance, BOE dovish" },
+    "XAUUSD": { "direction": "Bullish", "confidence": 70, "reason": "Gold at $2,350 support, risk off sentiment building" },
+    "USDJPY": { "direction": "Bearish", "confidence": 60, "reason": "Price at 155.00 intervention zone, BOJ watching closely" }
+  },
+  "event_analysis": [
+    {
+      "event": "Event name",
+      "currency": "USD",
+      "current_price": "Current EURUSD price from real data",
+      "if_beats": { 
+        "direction": "USD Strong", 
+        "probability": 72, 
+        "avg_pips": 80,
+        "target_price": "Where price could go if beats",
+        "pairs_affected": ["EURUSD down 60-80 pips to X.XXXX", "GBPUSD down 50-70 pips"] 
+      },
+      "if_misses": { 
+        "direction": "USD Weak", 
+        "probability": 68, 
+        "avg_pips": 60,
+        "target_price": "Where price could go if misses",
+        "pairs_affected": ["EURUSD up 50-70 pips to X.XXXX", "GBPUSD up 40-60 pips"] 
+      },
+      "trade_plan": "Specific entry with current price levels, exact SL and TP prices not just pips",
+      "historical_note": "Specific historical statistics for this event"
     }
-    setExecuting(true);
-    setExecuteMessage("");
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  ],
+  "warning": "Specific warning about today's conditions",
+  "best_pairs_to_trade": ["EURUSD", "XAUUSD"],
+  "pairs_to_avoid": ["USDJPY"],
+  "key_levels": {
+    "EURUSD": "Support: X.XXXX, Resistance: X.XXXX, Current: X.XXXX",
+    "GBPUSD": "Support: X.XXXX, Resistance: X.XXXX, Current: X.XXXX",
+    "XAUUSD": "Support: $X,XXX, Resistance: $X,XXX, Current: $X,XXX"
+  },
+  "market_context": "2-3 sentences about current market conditions with specific price levels mentioned"
+}`
+          }
+        ],
+      }),
+    });
 
-      const response = await fetch("/api/mt5/signal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          account: tradeForm.account,
-          symbol: tradeForm.symbol,
-          trade_type: tradeForm.type,
-          lot_size: tradeForm.lot,
-          stop_loss_pips: tradeForm.sl,
-          take_profit_pips: tradeForm.tp,
-        }),
-      });
+    const data = await response.json();
+    const text = data.choices?.[0]?.message?.content || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON in response");
+    const parsed = JSON.parse(jsonMatch[0]);
 
-      const data = await response.json();
-      if (data.success) {
-        setExecuteMessage(`✅ Signal sent! MT5 will execute ${tradeForm.type} ${tradeForm.symbol} within 30 seconds.`);
-      } else {
-        setExecuteMessage("Error: " + data.error);
-      }
-    } catch (err) {
-      setExecuteMessage("Error: " + String(err));
-    } finally {
-      setExecuting(false);
-    }
+    // Add real prices to response
+    parsed.real_prices = prices;
+
+    return NextResponse.json(parsed);
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 });
   }
-
-  async function analyze() {
-    setLoading(true);
-    setAnalysis(null);
-    try {
-      const response = await fetch("/api/market-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ events }),
-      });
-      const data = await response.json();
-      setAnalysis(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function addEvent() {
-    if (!newEvent.event || !newEvent.time) return;
-    setEvents([...events, newEvent]);
-    setNewEvent({ time: "", currency: "USD", event: "", impact: "High", forecast: "", previous: "" });
-  }
-
-  function removeEvent(index: number) {
-    setEvents(events.filter((_, i) => i !== index));
-  }
-
-  return (
-    <AppShell>
-      <div className="mx-auto max-w-4xl px-6 py-8">
-        <div className="mb-8">
-          <p className="mb-3 w-fit rounded-full border border-green-500/30 bg-green-500/10 px-4 py-1 text-sm text-green-300">
-            AI Market Analysis
-          </p>
-          <h1 className="text-4xl font-bold">Daily Market Analysis</h1>
-          <p className="mt-2 text-white/40">
-            Load today's real news events and AI will give you institutional-level market analysis.
-          </p>
-        </div>
-
-        {/* Add Events */}
-        <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="mb-4 text-xl font-semibold">Today's News Events</h2>
-
-          <button
-            onClick={fetchTodaysNews}
-            disabled={fetchingNews}
-            className="mb-4 w-full rounded-2xl border border-blue-500/20 bg-blue-500/10 py-3 text-sm font-semibold text-blue-400 hover:bg-blue-500/20 transition disabled:opacity-50"
-          >
-            {fetchingNews ? "Fetching today's news..." : "🔄 Load Today's Real News"}
-          </button>
-
-          <div className="mb-4 space-y-2">
-            {events.length === 0 && (
-              <p className="text-center text-sm text-white/30 py-4">No events added yet. Click "Load Today's Real News" or add manually.</p>
-            )}
-            {events.map((e, i) => (
-              <div key={i} className={`flex items-center justify-between rounded-2xl border p-3 ${
-                e.impact === "High" ? "border-red-500/20 bg-red-500/5" :
-                e.impact === "Medium" ? "border-yellow-500/20 bg-yellow-500/5" :
-                "border-white/10 bg-white/5"
-              }`}>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                    e.impact === "High" ? "bg-red-500/20 text-red-400" :
-                    e.impact === "Medium" ? "bg-yellow-500/20 text-yellow-400" :
-                    "bg-white/10 text-white/40"
-                  }`}>{e.impact}</span>
-                  <span className="text-sm font-semibold">{e.time}</span>
-                  <span className="text-sm text-blue-400">{e.currency}</span>
-                  <span className="text-sm">{e.event}</span>
-                  <span className="text-xs text-white/40">F: {e.forecast} P: {e.previous}</span>
-                </div>
-                <button onClick={() => removeEvent(i)} className="text-xs text-red-400 hover:text-red-300 ml-2">✕</button>
-              </div>
-            ))}
-          </div>
-
-          {/* Add manual event */}
-          <div className="grid gap-2 sm:grid-cols-3">
-            <input value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})}
-              placeholder="Time e.g. 08:30" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
-            <select value={newEvent.currency} onChange={e => setNewEvent({...newEvent, currency: e.target.value})}
-              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500">
-              {["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD"].map(c => <option key={c}>{c}</option>)}
-            </select>
-            <input value={newEvent.event} onChange={e => setNewEvent({...newEvent, event: e.target.value})}
-              placeholder="Event name e.g. NFP" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
-            <input value={newEvent.forecast} onChange={e => setNewEvent({...newEvent, forecast: e.target.value})}
-              placeholder="Forecast" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
-            <input value={newEvent.previous} onChange={e => setNewEvent({...newEvent, previous: e.target.value})}
-              placeholder="Previous" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
-            <select value={newEvent.impact} onChange={e => setNewEvent({...newEvent, impact: e.target.value as any})}
-              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500">
-              <option>High</option>
-              <option>Medium</option>
-              <option>Low</option>
-            </select>
-          </div>
-          <button onClick={addEvent} className="mt-3 rounded-xl bg-white/10 px-4 py-2 text-sm hover:bg-white/20 transition">
-            + Add Event Manually
-          </button>
-        </div>
-
-        {/* Analyze button */}
-        <button
-          onClick={analyze}
-          disabled={loading}
-          className="mb-8 w-full rounded-2xl bg-green-600 py-4 text-lg font-semibold transition hover:bg-green-700 disabled:opacity-50"
-        >
-          {loading ? "🤖 AI Analyzing Market Conditions..." : "🤖 Generate AI Market Analysis"}
-        </button>
-
-        {/* Analysis Results */}
-        {analysis && (
-          <div className="space-y-6">
-
-            {/* Market Context */}
-            {analysis.market_context && (
-              <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-5">
-                <p className="text-sm font-semibold text-blue-400 mb-2">📰 Today's Market Context</p>
-                <p className="text-sm text-white/70 leading-relaxed">{analysis.market_context}</p>
-              </div>
-            )}
-
-            {/* Warning */}
-            {analysis.warning && (
-              <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-5">
-                <p className="font-semibold text-yellow-400">⚠️ {analysis.warning}</p>
-              </div>
-            )}
-
-            {/* Best pairs and avoid */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-5">
-                <p className="mb-3 text-sm font-semibold text-green-400">✅ Best Pairs to Trade</p>
-                <div className="flex flex-wrap gap-2">
-                  {analysis.best_pairs_to_trade?.map(p => (
-                    <span key={p} className="rounded-full bg-green-500/20 px-3 py-1 text-sm text-green-300">{p}</span>
-                  ))}
-                </div>
-              </div>
-              <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-5">
-                <p className="mb-3 text-sm font-semibold text-red-400">❌ Pairs to Avoid</p>
-                <div className="flex flex-wrap gap-2">
-                  {analysis.pairs_to_avoid?.map(p => (
-                    <span key={p} className="rounded-full bg-red-500/20 px-3 py-1 text-sm text-red-300">{p}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Overall bias */}
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-              <h2 className="mb-4 text-xl font-semibold">Today's Market Bias</h2>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {Object.entries(analysis.overall_bias || {}).map(([pair, bias]) => (
-                  <div key={pair} className={`rounded-2xl border p-4 ${
-                    bias.direction === "Bullish" ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"
-                  }`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-bold">{pair}</p>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm font-bold ${bias.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
-                          {bias.direction === "Bullish" ? "↑" : "↓"} {bias.direction}
-                        </span>
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/60">
-                          {bias.confidence}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-2 rounded-full bg-white/10 mb-2">
-                      <div
-                        className={`h-2 rounded-full ${bias.direction === "Bullish" ? "bg-green-500" : "bg-red-500"}`}
-                        style={{ width: `${bias.confidence}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-white/50">{bias.reason}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Key Levels */}
-            {analysis.key_levels && Object.keys(analysis.key_levels).length > 0 && (
-              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-                <h2 className="mb-4 text-xl font-semibold">🎯 Key Levels Today</h2>
-                <div className="space-y-3">
-                  {Object.entries(analysis.key_levels).map(([pair, levels]) => (
-                    <div key={pair} className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                      <p className="font-semibold text-blue-400 mb-1">{pair}</p>
-                      <p className="text-sm text-white/60">{levels}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Event Analysis */}
-            {analysis.event_analysis?.map((e, i) => (
-              <div key={i} className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
-                <h3 className="mb-4 text-lg font-bold text-blue-400">{e.currency} — {e.event}</h3>
-                <div className="grid gap-4 sm:grid-cols-2 mb-4">
-                  <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
-                    <p className="text-sm font-semibold text-green-400 mb-2">If Beats Forecast</p>
-                    <p className="text-2xl font-bold text-green-400">{e.if_beats?.probability}%</p>
-                    <p className="text-sm text-white/60">{e.if_beats?.direction}</p>
-                    <p className="text-sm text-white/40">Avg move: {e.if_beats?.avg_pips} pips</p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {e.if_beats?.pairs_affected?.map((p, j) => (
-                        <span key={j} className="rounded-full bg-green-500/10 px-2 py-0.5 text-xs text-green-300">{p}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
-                    <p className="text-sm font-semibold text-red-400 mb-2">If Misses Forecast</p>
-                    <p className="text-2xl font-bold text-red-400">{e.if_misses?.probability}%</p>
-                    <p className="text-sm text-white/60">{e.if_misses?.direction}</p>
-                    <p className="text-sm text-white/40">Avg move: {e.if_misses?.avg_pips} pips</p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {e.if_misses?.pairs_affected?.map((p, j) => (
-                        <span key={j} className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs text-red-300">{p}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-4 mb-3">
-                  <p className="text-sm font-semibold text-white/60 mb-1">📊 Historical Note</p>
-                  <p className="text-sm text-white/80">{e.historical_note}</p>
-                </div>
-                <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
-                  <p className="text-sm font-semibold text-yellow-400 mb-1">📋 Trade Plan</p>
-                  <p className="text-sm text-white/80">{e.trade_plan}</p>
-                </div>
-              </div>
-            ))}
-
-            {/* Execute Trade in MT5 */}
-            <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
-              <h2 className="mb-2 text-xl font-semibold text-green-400">⚡ Execute Trade in MT5</h2>
-              <p className="mb-4 text-sm text-white/40">Send a trade signal to your MT5 account. EA will execute it automatically within 30 seconds.</p>
-
-              {executeMessage && (
-                <div className="mb-4 rounded-2xl border border-green-500/20 bg-green-500/10 p-3 text-green-300 text-sm">
-                  {executeMessage}
-                </div>
-              )}
-
-              <div className="grid gap-3 sm:grid-cols-3 mb-4">
-                <div>
-                  <label className="text-xs text-white/40 mb-1 block">Symbol</label>
-                  <input value={tradeForm.symbol} onChange={e => setTradeForm({...tradeForm, symbol: e.target.value})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500"
-                    placeholder="EURUSD" />
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 mb-1 block">Direction</label>
-                  <select value={tradeForm.type} onChange={e => setTradeForm({...tradeForm, type: e.target.value})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500">
-                    <option>BUY</option>
-                    <option>SELL</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 mb-1 block">Lot Size</label>
-                  <input type="number" value={tradeForm.lot} onChange={e => setTradeForm({...tradeForm, lot: Number(e.target.value)})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500"
-                    step="0.01" />
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 mb-1 block">Stop Loss (pips)</label>
-                  <input type="number" value={tradeForm.sl} onChange={e => setTradeForm({...tradeForm, sl: Number(e.target.value)})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500" />
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 mb-1 block">Take Profit (pips)</label>
-                  <input type="number" value={tradeForm.tp} onChange={e => setTradeForm({...tradeForm, tp: Number(e.target.value)})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500" />
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 mb-1 block">MT5 Account Number</label>
-                  <input value={tradeForm.account} onChange={e => setTradeForm({...tradeForm, account: e.target.value})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500"
-                    placeholder="521091015" />
-                </div>
-              </div>
-
-              <button
-                onClick={executeTradeSignal}
-                disabled={executing}
-                className="w-full rounded-2xl bg-green-600 py-3 font-semibold transition hover:bg-green-700 disabled:opacity-50"
-              >
-                {executing ? "Sending Signal to MT5..." : "⚡ Execute Trade in MT5"}
-              </button>
-            </div>
-
-          </div>
-        )}
-      </div>
-    </AppShell>
-  );
 }
