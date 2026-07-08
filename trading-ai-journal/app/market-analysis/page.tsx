@@ -28,6 +28,25 @@ type EventAnalysis = {
   historical_note: string;
 };
 
+type CoinAnalysis = {
+  coin: string;
+  current_price: string;
+  direction: string;
+  probability: number;
+  target: string;
+  move_percent: string;
+  reason: string;
+};
+
+type CryptoAnalysis = {
+  market_sentiment: string;
+  fear_greed: string;
+  best_coins_today: CoinAnalysis[];
+  coins_to_avoid: string[];
+  meme_coin_alert: string;
+  crypto_trade_plan: string;
+};
+
 type Analysis = {
   overall_bias: Record<string, PairBias>;
   event_analysis: EventAnalysis[];
@@ -36,6 +55,7 @@ type Analysis = {
   pairs_to_avoid: string[];
   key_levels: Record<string, string>;
   market_context: string;
+  crypto_analysis: CryptoAnalysis;
 };
 
 export default function MarketAnalysisPage() {
@@ -310,6 +330,83 @@ export default function MarketAnalysisPage() {
             )}
 
             {/* Event Analysis */}
+            {/* Crypto Analysis */}
+            {analysis.crypto_analysis && (
+              <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-6">
+                <h2 className="mb-4 text-xl font-semibold">🪙 Crypto Market Analysis</h2>
+                
+                <div className="grid gap-4 sm:grid-cols-2 mb-4">
+                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                    <p className="text-sm text-white/40">Market Sentiment</p>
+                    <p className={`text-xl font-bold mt-1 ${
+                      analysis.crypto_analysis.market_sentiment === "Bullish" ? "text-green-400" : 
+                      analysis.crypto_analysis.market_sentiment === "Bearish" ? "text-red-400" : 
+                      "text-yellow-400"
+                    }`}>{analysis.crypto_analysis.market_sentiment}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                    <p className="text-sm text-white/40">Fear & Greed Index</p>
+                    <p className="text-xl font-bold mt-1 text-yellow-400">{analysis.crypto_analysis.fear_greed}</p>
+                  </div>
+                </div>
+
+                {analysis.crypto_analysis.meme_coin_alert && (
+                  <div className="mb-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
+                    <p className="text-sm font-semibold text-orange-400 mb-1">🔥 Meme Coin Alert</p>
+                    <p className="text-sm text-white/70">{analysis.crypto_analysis.meme_coin_alert}</p>
+                  </div>
+                )}
+
+                <h3 className="mb-3 font-semibold text-yellow-400">Best Coins Today</h3>
+                <div className="space-y-3 mb-4">
+                  {analysis.crypto_analysis.best_coins_today?.map((coin, i) => (
+                    <div key={i} className={`rounded-2xl border p-4 ${
+                      coin.direction === "Bullish" ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-lg">{coin.coin}</span>
+                          <span className="text-sm text-white/40">{coin.current_price}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold ${coin.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
+                            {coin.move_percent}
+                          </span>
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/60">
+                            {coin.probability}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 mb-2">
+                        <span className="text-xs text-white/40">Target: {coin.target}</span>
+                        <span className={`text-xs font-semibold ${coin.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
+                          {coin.direction === "Bullish" ? "↑" : "↓"} {coin.direction}
+                        </span>
+                      </div>
+                      <p className="text-xs text-white/50">{coin.reason}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {analysis.crypto_analysis.coins_to_avoid?.length > 0 && (
+                  <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+                    <p className="text-sm font-semibold text-red-400 mb-2">❌ Coins to Avoid Today</p>
+                    <div className="flex flex-wrap gap-2">
+                      {analysis.crypto_analysis.coins_to_avoid.map((coin, i) => (
+                        <span key={i} className="rounded-full bg-red-500/20 px-3 py-1 text-sm text-red-300">{coin}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analysis.crypto_analysis.crypto_trade_plan && (
+                  <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
+                    <p className="text-sm font-semibold text-yellow-400 mb-1">📋 Crypto Trade Plan</p>
+                    <p className="text-sm text-white/80">{analysis.crypto_analysis.crypto_trade_plan}</p>
+                  </div>
+                )}
+              </div>
+            )}
             {analysis.event_analysis?.map((e, i) => (
               <div key={i} className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
                 <h3 className="mb-4 text-lg font-bold text-blue-400">{e.currency} — {e.event}</h3>
