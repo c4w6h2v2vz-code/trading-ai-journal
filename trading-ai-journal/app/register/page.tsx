@@ -38,8 +38,13 @@ export default function RegisterPage() {
     setMessage("Account created ✅ Setting up your account...");
     setLoading(false);
 
-    setTimeout(() => {
-      router.push("/onboarding");
+    setTimeout(async () => {
+      const { data } = await supabase.auth.signInWithPassword({ email, password });
+      if (data.user) {
+        router.push("/onboarding");
+      } else {
+        router.push("/login");
+      }
     }, 1000);
   }
 
