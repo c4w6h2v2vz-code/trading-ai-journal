@@ -34,6 +34,8 @@ type Analysis = {
   warning: string;
   best_pairs_to_trade: string[];
   pairs_to_avoid: string[];
+  key_levels: Record<string, string>;
+  market_context: string;
 };
 
 export default function MarketAnalysisPage() {
@@ -145,7 +147,7 @@ export default function MarketAnalysisPage() {
           </p>
           <h1 className="text-4xl font-bold">Daily Market Analysis</h1>
           <p className="mt-2 text-white/40">
-            Add today's news events and AI will analyze historical data to give you trade probabilities.
+            Load today's real news events and AI will give you institutional-level market analysis.
           </p>
         </div>
 
@@ -162,13 +164,16 @@ export default function MarketAnalysisPage() {
           </button>
 
           <div className="mb-4 space-y-2">
+            {events.length === 0 && (
+              <p className="text-center text-sm text-white/30 py-4">No events added yet. Click "Load Today's Real News" or add manually.</p>
+            )}
             {events.map((e, i) => (
               <div key={i} className={`flex items-center justify-between rounded-2xl border p-3 ${
                 e.impact === "High" ? "border-red-500/20 bg-red-500/5" :
                 e.impact === "Medium" ? "border-yellow-500/20 bg-yellow-500/5" :
                 "border-white/10 bg-white/5"
               }`}>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                     e.impact === "High" ? "bg-red-500/20 text-red-400" :
                     e.impact === "Medium" ? "bg-yellow-500/20 text-yellow-400" :
@@ -179,52 +184,66 @@ export default function MarketAnalysisPage() {
                   <span className="text-sm">{e.event}</span>
                   <span className="text-xs text-white/40">F: {e.forecast} P: {e.previous}</span>
                 </div>
-                <button onClick={() => removeEvent(i)} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                <button onClick={() => removeEvent(i)} className="text-xs text-red-400 hover:text-red-300 ml-2">✕</button>
               </div>
             ))}
           </div>
 
+          {/* Add manual event */}
           <div className="grid gap-2 sm:grid-cols-3">
             <input value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})}
-              placeholder="Time e.g. 08:30" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" />
+              placeholder="Time e.g. 08:30" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
             <select value={newEvent.currency} onChange={e => setNewEvent({...newEvent, currency: e.target.value})}
-              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none">
+              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500">
               {["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD"].map(c => <option key={c}>{c}</option>)}
             </select>
             <input value={newEvent.event} onChange={e => setNewEvent({...newEvent, event: e.target.value})}
-              placeholder="Event name e.g. NFP" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" />
+              placeholder="Event name e.g. NFP" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
             <input value={newEvent.forecast} onChange={e => setNewEvent({...newEvent, forecast: e.target.value})}
-              placeholder="Forecast" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" />
+              placeholder="Forecast" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
             <input value={newEvent.previous} onChange={e => setNewEvent({...newEvent, previous: e.target.value})}
-              placeholder="Previous" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" />
+              placeholder="Previous" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
             <select value={newEvent.impact} onChange={e => setNewEvent({...newEvent, impact: e.target.value as any})}
-              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none">
+              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500">
               <option>High</option>
               <option>Medium</option>
               <option>Low</option>
             </select>
           </div>
-          <button onClick={addEvent} className="mt-3 rounded-xl bg-white/10 px-4 py-2 text-sm hover:bg-white/20">
-            + Add Event
+          <button onClick={addEvent} className="mt-3 rounded-xl bg-white/10 px-4 py-2 text-sm hover:bg-white/20 transition">
+            + Add Event Manually
           </button>
         </div>
 
+        {/* Analyze button */}
         <button
           onClick={analyze}
-          disabled={loading || events.length === 0}
+          disabled={loading}
           className="mb-8 w-full rounded-2xl bg-green-600 py-4 text-lg font-semibold transition hover:bg-green-700 disabled:opacity-50"
         >
-          {loading ? "🤖 AI Analyzing Historical Data..." : "🤖 Generate AI Market Analysis"}
+          {loading ? "🤖 AI Analyzing Market Conditions..." : "🤖 Generate AI Market Analysis"}
         </button>
 
+        {/* Analysis Results */}
         {analysis && (
           <div className="space-y-6">
+
+            {/* Market Context */}
+            {analysis.market_context && (
+              <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-5">
+                <p className="text-sm font-semibold text-blue-400 mb-2">📰 Today's Market Context</p>
+                <p className="text-sm text-white/70 leading-relaxed">{analysis.market_context}</p>
+              </div>
+            )}
+
+            {/* Warning */}
             {analysis.warning && (
               <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-5">
                 <p className="font-semibold text-yellow-400">⚠️ {analysis.warning}</p>
               </div>
             )}
 
+            {/* Best pairs and avoid */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-5">
                 <p className="mb-3 text-sm font-semibold text-green-400">✅ Best Pairs to Trade</p>
@@ -244,6 +263,7 @@ export default function MarketAnalysisPage() {
               </div>
             </div>
 
+            {/* Overall bias */}
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
               <h2 className="mb-4 text-xl font-semibold">Today's Market Bias</h2>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -262,18 +282,34 @@ export default function MarketAnalysisPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="h-2 rounded-full bg-white/10">
+                    <div className="h-2 rounded-full bg-white/10 mb-2">
                       <div
                         className={`h-2 rounded-full ${bias.direction === "Bullish" ? "bg-green-500" : "bg-red-500"}`}
                         style={{ width: `${bias.confidence}%` }}
                       />
                     </div>
-                    <p className="mt-2 text-xs text-white/50">{bias.reason}</p>
+                    <p className="text-xs text-white/50">{bias.reason}</p>
                   </div>
                 ))}
               </div>
             </div>
 
+            {/* Key Levels */}
+            {analysis.key_levels && Object.keys(analysis.key_levels).length > 0 && (
+              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+                <h2 className="mb-4 text-xl font-semibold">🎯 Key Levels Today</h2>
+                <div className="space-y-3">
+                  {Object.entries(analysis.key_levels).map(([pair, levels]) => (
+                    <div key={pair} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                      <p className="font-semibold text-blue-400 mb-1">{pair}</p>
+                      <p className="text-sm text-white/60">{levels}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Event Analysis */}
             {analysis.event_analysis?.map((e, i) => (
               <div key={i} className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
                 <h3 className="mb-4 text-lg font-bold text-blue-400">{e.currency} — {e.event}</h3>
@@ -314,8 +350,8 @@ export default function MarketAnalysisPage() {
 
             {/* Execute Trade in MT5 */}
             <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
-              <h2 className="mb-2 text-xl font-semibold text-green-400">🤖 Execute Trade in MT5</h2>
-              <p className="mb-4 text-sm text-white/40">Send a trade signal to your MT5 account. EA will execute it automatically.</p>
+              <h2 className="mb-2 text-xl font-semibold text-green-400">⚡ Execute Trade in MT5</h2>
+              <p className="mb-4 text-sm text-white/40">Send a trade signal to your MT5 account. EA will execute it automatically within 30 seconds.</p>
 
               {executeMessage && (
                 <div className="mb-4 rounded-2xl border border-green-500/20 bg-green-500/10 p-3 text-green-300 text-sm">
@@ -326,60 +362,39 @@ export default function MarketAnalysisPage() {
               <div className="grid gap-3 sm:grid-cols-3 mb-4">
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Symbol</label>
-                  <input
-                    value={tradeForm.symbol}
-                    onChange={e => setTradeForm({...tradeForm, symbol: e.target.value})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
-                    placeholder="EURUSD"
-                  />
+                  <input value={tradeForm.symbol} onChange={e => setTradeForm({...tradeForm, symbol: e.target.value})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500"
+                    placeholder="EURUSD" />
                 </div>
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Direction</label>
-                  <select
-                    value={tradeForm.type}
-                    onChange={e => setTradeForm({...tradeForm, type: e.target.value})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
-                  >
+                  <select value={tradeForm.type} onChange={e => setTradeForm({...tradeForm, type: e.target.value})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500">
                     <option>BUY</option>
                     <option>SELL</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Lot Size</label>
-                  <input
-                    type="number"
-                    value={tradeForm.lot}
-                    onChange={e => setTradeForm({...tradeForm, lot: Number(e.target.value)})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
-                    step="0.01"
-                  />
+                  <input type="number" value={tradeForm.lot} onChange={e => setTradeForm({...tradeForm, lot: Number(e.target.value)})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500"
+                    step="0.01" />
                 </div>
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Stop Loss (pips)</label>
-                  <input
-                    type="number"
-                    value={tradeForm.sl}
-                    onChange={e => setTradeForm({...tradeForm, sl: Number(e.target.value)})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
-                  />
+                  <input type="number" value={tradeForm.sl} onChange={e => setTradeForm({...tradeForm, sl: Number(e.target.value)})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500" />
                 </div>
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Take Profit (pips)</label>
-                  <input
-                    type="number"
-                    value={tradeForm.tp}
-                    onChange={e => setTradeForm({...tradeForm, tp: Number(e.target.value)})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
-                  />
+                  <input type="number" value={tradeForm.tp} onChange={e => setTradeForm({...tradeForm, tp: Number(e.target.value)})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500" />
                 </div>
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">MT5 Account Number</label>
-                  <input
-                    value={tradeForm.account}
-                    onChange={e => setTradeForm({...tradeForm, account: e.target.value})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
-                    placeholder="521091015"
-                  />
+                  <input value={tradeForm.account} onChange={e => setTradeForm({...tradeForm, account: e.target.value})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500"
+                    placeholder="521091015" />
                 </div>
               </div>
 
@@ -388,7 +403,7 @@ export default function MarketAnalysisPage() {
                 disabled={executing}
                 className="w-full rounded-2xl bg-green-600 py-3 font-semibold transition hover:bg-green-700 disabled:opacity-50"
               >
-                {executing ? "Sending Signal..." : "⚡ Execute Trade in MT5"}
+                {executing ? "Sending Signal to MT5..." : "⚡ Execute Trade in MT5"}
               </button>
             </div>
 
