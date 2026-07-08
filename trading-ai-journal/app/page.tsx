@@ -176,7 +176,7 @@ export default function LandingPage() {
             />
             <PricingCard
               name="Pro"
-              price="€19"
+              price="€9.99"
               period="per month"
               description="For active traders"
               features={[
@@ -195,7 +195,7 @@ export default function LandingPage() {
             />
             <PricingCard
               name="Elite"
-              price="€49"
+              price="€19.99"
               period="per month"
               description="For prop firm traders"
               features={[

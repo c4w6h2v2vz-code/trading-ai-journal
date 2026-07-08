@@ -27,8 +27,8 @@ export default function PricingPage() {
 
     try {
       const priceId = plan === "pro"
-        ? "price_1Tq9yUDK6vNJBERV7DuR6zuq"
-        : "price_1Tq9ywDK6vNJBERVldSLdb2H";
+        ? "price_1Tq9ywDK6vNJBERVldSLdb2H"
+        : "price_1Tq9yUDK6vNJBERV7DuR6zuq";
 
       const response = await fetch("/api/create-checkout", {
         method: "POST",
@@ -45,7 +45,7 @@ export default function PricingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert("Error: " + JSON.stringify(data));
+        alert("Error creating checkout: " + data.error);
       }
     } catch (err) {
       alert("Error: " + String(err));
@@ -57,7 +57,7 @@ export default function PricingPage() {
   return (
     <main className="min-h-screen bg-[#050505] text-white">
       <nav className="flex items-center justify-between border-b border-white/5 bg-black/80 px-6 py-4">
-        <span className="text-lg font-bold">Trading AI Journal</span>
+        <span className="text-lg font-bold">PipTrak</span>
         <button
           onClick={() => router.push("/dashboard")}
           className="rounded-xl bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
@@ -97,7 +97,7 @@ export default function PricingPage() {
           {/* Pro */}
           <div className="rounded-3xl border border-blue-500/50 bg-blue-500/10 p-6">
             <p className="text-sm text-blue-400">Pro</p>
-            <p className="mt-2 text-4xl font-bold">€19</p>
+            <p className="mt-2 text-4xl font-bold">€9.99</p>
             <p className="text-sm text-white/40">per month</p>
             <p className="mt-2 text-sm text-white/60">For active traders</p>
             <ul className="mt-6 space-y-3">
@@ -108,6 +108,8 @@ export default function PricingPage() {
                 "Weekly AI reports",
                 "Psychology coaching",
                 "Advanced analytics",
+                "AI Market Analysis",
+                "Daily Journal",
               ].map((f, i) => (
                 <li key={i} className="flex items-center gap-2 text-sm text-white/70">
                   <span className="text-green-400">✓</span> {f}
@@ -126,14 +128,16 @@ export default function PricingPage() {
           {/* Elite */}
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
             <p className="text-sm text-white/40">Elite</p>
-            <p className="mt-2 text-4xl font-bold">€49</p>
+            <p className="mt-2 text-4xl font-bold">€19.99</p>
             <p className="text-sm text-white/40">per month</p>
             <p className="mt-2 text-sm text-white/60">For prop firm traders</p>
             <ul className="mt-6 space-y-3">
               {[
                 "Everything in Pro",
                 "MT5 auto import",
-                "Prop firm tools",
+                "Auto trade execution",
+                "Risk Guardian",
+                "Prop firm tracker",
                 "Priority AI coaching",
                 "Custom trading rules",
                 "Monthly AI reports",
