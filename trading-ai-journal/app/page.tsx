@@ -23,7 +23,7 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="flex min-h-screen flex-col items-center justify-center px-6 pt-20 text-center">
         <div className="mb-6 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-sm text-blue-300">
-          Built for Forex & Prop Firm Traders
+          Built for All Traders Worldwide
         </div>
 
         <h1 className="max-w-4xl text-5xl font-bold leading-tight tracking-tight md:text-7xl">
@@ -35,7 +35,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="mt-6 max-w-2xl text-lg text-white/50 md:text-xl">
-          PipTrak connects to your MT5 account, analyzes the market with AI, executes trades automatically, and closes everything when you hit your daily limit. The only trading journal that actually protects your prop firm account.
+          PipTrak connects to your trading account, analyzes the market with AI, executes trades automatically, and closes everything when you hit your daily limit. The only trading journal that actually protects your account.
         </p>
 
         <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
