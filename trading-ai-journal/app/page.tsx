@@ -27,17 +27,15 @@ export default function LandingPage() {
         </div>
 
         <h1 className="max-w-4xl text-5xl font-bold leading-tight tracking-tight md:text-7xl">
-          Your Personal{" "}
-          <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            AI Trading Coach
-          </span>
+          The AI Trading System
           <br />
-          Built From Every Trade
+          <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            That Trades For You
+          </span>
         </h1>
 
         <p className="mt-6 max-w-2xl text-lg text-white/50 md:text-xl">
-          Turn every trade into data, discipline, and better decisions.
-          AI reviews your charts, detects your mistakes, and coaches you to consistency.
+          PipTrak connects to your MT5 account, analyzes the market with AI, executes trades automatically, and closes everything when you hit your daily limit. The only trading journal that actually protects your prop firm account.
         </p>
 
         <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
@@ -57,11 +55,10 @@ export default function LandingPage() {
 
         <p className="mt-4 text-sm text-white/30">No credit card required · Free forever plan</p>
 
-        {/* Stats */}
         <div className="mt-20 grid gap-8 sm:grid-cols-3">
-          <Stat number="10+" label="AI metrics per trade" />
-          <Stat number="MT5" label="Auto import from FTMO" />
-          <Stat number="100%" label="Private & secure" />
+          <Stat number="AI" label="Auto trade execution" />
+          <Stat number="3%" label="Daily loss protection" />
+          <Stat number="MT5" label="Direct broker connection" />
         </div>
       </section>
 
@@ -100,6 +97,16 @@ export default function LandingPage() {
               description="Connect your FTMO MT5 account. Trades import automatically. No manual entry needed."
             />
             <FeatureCard
+              icon="⚡"
+              title="Auto Trade Execution"
+              description="AI analyzes the market and executes trades automatically in MT5. Set your risk and let AI trade for you."
+            />
+            <FeatureCard
+              icon="🛡️"
+              title="Risk Guardian"
+              description="Automatically closes all trades when you hit your daily loss or profit target. Never blow your account again."
+            />
+            <FeatureCard
               icon="📈"
               title="Weekly AI Reports"
               description="Every week, AI generates a full performance report with lessons, mistakes, and goals for next week."
@@ -113,6 +120,11 @@ export default function LandingPage() {
               icon="📅"
               title="Trade Calendar"
               description="See your performance mapped to a calendar. Identify your best and worst trading days instantly."
+            />
+            <FeatureCard
+              icon="📰"
+              title="AI Market Analysis"
+              description="AI analyzes today's news events using 10 years of historical data and gives you trade probabilities."
             />
             <FeatureCard
               icon="🏦"
@@ -130,10 +142,11 @@ export default function LandingPage() {
           <h2 className="mb-16 text-center text-4xl font-bold">How it works</h2>
 
           <div className="space-y-6">
-            <Step number="1" title="Log your trade" description="Add trade details, upload your chart screenshot, and record your emotion and mistakes." />
-            <Step number="2" title="AI reviews instantly" description="Our AI scores your execution, risk management, and psychology. It checks your chart and trading rules." />
-            <Step number="3" title="Track your patterns" description="Over time, AI detects your repeated mistakes, best setups, and worst habits." />
-            <Step number="4" title="Get coached weekly" description="Every week, receive a full AI coaching report with your performance summary and goals for next week." />
+            <Step number="1" title="Connect your MT5" description="Install our EA on MetaTrader 5. Trades sync automatically to PipTrak in real time." />
+            <Step number="2" title="AI reviews every trade" description="Our AI scores your execution, risk management, and psychology. It checks your chart and trading rules." />
+            <Step number="3" title="Get AI market analysis" description="Every day AI analyzes news events and gives you trade probabilities based on 10 years of historical data." />
+            <Step number="4" title="Auto execute trades" description="Click one button and AI executes the trade plan in MT5 automatically with your risk settings." />
+            <Step number="5" title="Risk Guardian protects you" description="Hit your daily loss limit? All trades close automatically. Your prop firm account stays safe." />
           </div>
         </div>
       </section>
@@ -173,6 +186,8 @@ export default function LandingPage() {
                 "Weekly AI reports",
                 "Psychology coaching",
                 "Advanced analytics",
+                "AI Market Analysis",
+                "Daily Journal",
               ]}
               cta="Start Pro"
               onClick={() => router.push("/register")}
@@ -186,7 +201,9 @@ export default function LandingPage() {
               features={[
                 "Everything in Pro",
                 "MT5 auto import",
-                "Prop firm tools",
+                "Auto trade execution",
+                "Risk Guardian",
+                "Prop firm tracker",
                 "Priority AI coaching",
                 "Custom trading rules",
                 "Monthly AI reports",
@@ -211,20 +228,22 @@ export default function LandingPage() {
                 "No chart screenshot AI",
                 "No psychology coaching",
                 "No MT5 auto import",
+                "No auto trade execution",
+                "No risk protection",
                 "Expensive with no AI",
-                "Generic feedback",
               ]}
               positive={false}
             />
             <CompareCard
-              title="Trading AI Journal"
+              title="PipTrak"
               points={[
                 "MT5 auto import",
+                "Auto trade execution",
+                "Risk Guardian protection",
                 "Chart screenshot AI analysis",
                 "Personal AI trading coach",
                 "Psychology & emotion tracking",
-                "Weekly AI coaching reports",
-                "Built for prop firm traders",
+                "AI Market Analysis with probabilities",
               ]}
               positive={true}
             />
