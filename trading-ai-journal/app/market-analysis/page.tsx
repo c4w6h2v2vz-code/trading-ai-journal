@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
+import { supabase } from "@/lib/supabase";
 
 type NewsEvent = {
   time: string;
@@ -35,17 +36,26 @@ type Analysis = {
   pairs_to_avoid: string[];
 };
 
-const defaultEvents: NewsEvent[] = [];
-
 export default function MarketAnalysisPage() {
-  const [events, setEvents] = useState<NewsEvent[]>(defaultEvents);
+  const [events, setEvents] = useState<NewsEvent[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingNews, setFetchingNews] = useState(false);
+  const [executing, setExecuting] = useState(false);
+  const [executeMessage, setExecuteMessage] = useState("");
   const [newEvent, setNewEvent] = useState<NewsEvent>({
     time: "", currency: "USD", event: "", impact: "High", forecast: "", previous: ""
   });
-async function fetchTodaysNews() {
+  const [tradeForm, setTradeForm] = useState({
+    symbol: "EURUSD",
+    type: "BUY",
+    lot: 0.01,
+    sl: 30,
+    tp: 60,
+    account: "",
+  });
+
+  async function fetchTodaysNews() {
     setFetchingNews(true);
     try {
       const response = await fetch("/api/economic-calendar");
@@ -59,6 +69,45 @@ async function fetchTodaysNews() {
       setFetchingNews(false);
     }
   }
+
+  async function executeTradeSignal() {
+    if (!tradeForm.account) {
+      setExecuteMessage("Please enter your MT5 account number.");
+      return;
+    }
+    setExecuting(true);
+    setExecuteMessage("");
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const response = await fetch("/api/mt5/signal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          account: tradeForm.account,
+          symbol: tradeForm.symbol,
+          trade_type: tradeForm.type,
+          lot_size: tradeForm.lot,
+          stop_loss_pips: tradeForm.sl,
+          take_profit_pips: tradeForm.tp,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setExecuteMessage(`✅ Signal sent! MT5 will execute ${tradeForm.type} ${tradeForm.symbol} within 30 seconds.`);
+      } else {
+        setExecuteMessage("Error: " + data.error);
+      }
+    } catch (err) {
+      setExecuteMessage("Error: " + String(err));
+    } finally {
+      setExecuting(false);
+    }
+  }
+
   async function analyze() {
     setLoading(true);
     setAnalysis(null);
@@ -103,14 +152,15 @@ async function fetchTodaysNews() {
         {/* Add Events */}
         <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="mb-4 text-xl font-semibold">Today's News Events</h2>
-<button
+
+          <button
             onClick={fetchTodaysNews}
             disabled={fetchingNews}
             className="mb-4 w-full rounded-2xl border border-blue-500/20 bg-blue-500/10 py-3 text-sm font-semibold text-blue-400 hover:bg-blue-500/20 transition disabled:opacity-50"
           >
             {fetchingNews ? "Fetching today's news..." : "🔄 Load Today's Real News"}
           </button>
-          {/* Event list */}
+
           <div className="mb-4 space-y-2">
             {events.map((e, i) => (
               <div key={i} className={`flex items-center justify-between rounded-2xl border p-3 ${
@@ -134,7 +184,6 @@ async function fetchTodaysNews() {
             ))}
           </div>
 
-          {/* Add new event */}
           <div className="grid gap-2 sm:grid-cols-3">
             <input value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})}
               placeholder="Time e.g. 08:30" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" />
@@ -160,7 +209,6 @@ async function fetchTodaysNews() {
           </button>
         </div>
 
-        {/* Analyze button */}
         <button
           onClick={analyze}
           disabled={loading || events.length === 0}
@@ -169,17 +217,14 @@ async function fetchTodaysNews() {
           {loading ? "🤖 AI Analyzing Historical Data..." : "🤖 Generate AI Market Analysis"}
         </button>
 
-        {/* Analysis Results */}
         {analysis && (
           <div className="space-y-6">
-            {/* Warning */}
             {analysis.warning && (
               <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-5">
                 <p className="font-semibold text-yellow-400">⚠️ {analysis.warning}</p>
               </div>
             )}
 
-            {/* Best pairs and avoid */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-5">
                 <p className="mb-3 text-sm font-semibold text-green-400">✅ Best Pairs to Trade</p>
@@ -199,7 +244,6 @@ async function fetchTodaysNews() {
               </div>
             </div>
 
-            {/* Overall bias */}
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
               <h2 className="mb-4 text-xl font-semibold">Today's Market Bias</h2>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -218,7 +262,6 @@ async function fetchTodaysNews() {
                         </span>
                       </div>
                     </div>
-                    {/* Confidence bar */}
                     <div className="h-2 rounded-full bg-white/10">
                       <div
                         className={`h-2 rounded-full ${bias.direction === "Bullish" ? "bg-green-500" : "bg-red-500"}`}
@@ -231,11 +274,9 @@ async function fetchTodaysNews() {
               </div>
             </div>
 
-            {/* Event Analysis */}
             {analysis.event_analysis?.map((e, i) => (
               <div key={i} className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
                 <h3 className="mb-4 text-lg font-bold text-blue-400">{e.currency} — {e.event}</h3>
-
                 <div className="grid gap-4 sm:grid-cols-2 mb-4">
                   <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
                     <p className="text-sm font-semibold text-green-400 mb-2">If Beats Forecast</p>
@@ -248,7 +289,6 @@ async function fetchTodaysNews() {
                       ))}
                     </div>
                   </div>
-
                   <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
                     <p className="text-sm font-semibold text-red-400 mb-2">If Misses Forecast</p>
                     <p className="text-2xl font-bold text-red-400">{e.if_misses?.probability}%</p>
@@ -261,18 +301,97 @@ async function fetchTodaysNews() {
                     </div>
                   </div>
                 </div>
-
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4 mb-3">
                   <p className="text-sm font-semibold text-white/60 mb-1">📊 Historical Note</p>
                   <p className="text-sm text-white/80">{e.historical_note}</p>
                 </div>
-
                 <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
                   <p className="text-sm font-semibold text-yellow-400 mb-1">📋 Trade Plan</p>
                   <p className="text-sm text-white/80">{e.trade_plan}</p>
                 </div>
               </div>
             ))}
+
+            {/* Execute Trade in MT5 */}
+            <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
+              <h2 className="mb-2 text-xl font-semibold text-green-400">🤖 Execute Trade in MT5</h2>
+              <p className="mb-4 text-sm text-white/40">Send a trade signal to your MT5 account. EA will execute it automatically.</p>
+
+              {executeMessage && (
+                <div className="mb-4 rounded-2xl border border-green-500/20 bg-green-500/10 p-3 text-green-300 text-sm">
+                  {executeMessage}
+                </div>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-3 mb-4">
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Symbol</label>
+                  <input
+                    value={tradeForm.symbol}
+                    onChange={e => setTradeForm({...tradeForm, symbol: e.target.value})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
+                    placeholder="EURUSD"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Direction</label>
+                  <select
+                    value={tradeForm.type}
+                    onChange={e => setTradeForm({...tradeForm, type: e.target.value})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
+                  >
+                    <option>BUY</option>
+                    <option>SELL</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Lot Size</label>
+                  <input
+                    type="number"
+                    value={tradeForm.lot}
+                    onChange={e => setTradeForm({...tradeForm, lot: Number(e.target.value)})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Stop Loss (pips)</label>
+                  <input
+                    type="number"
+                    value={tradeForm.sl}
+                    onChange={e => setTradeForm({...tradeForm, sl: Number(e.target.value)})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Take Profit (pips)</label>
+                  <input
+                    type="number"
+                    value={tradeForm.tp}
+                    onChange={e => setTradeForm({...tradeForm, tp: Number(e.target.value)})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">MT5 Account Number</label>
+                  <input
+                    value={tradeForm.account}
+                    onChange={e => setTradeForm({...tradeForm, account: e.target.value})}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none"
+                    placeholder="521091015"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={executeTradeSignal}
+                disabled={executing}
+                className="w-full rounded-2xl bg-green-600 py-3 font-semibold transition hover:bg-green-700 disabled:opacity-50"
+              >
+                {executing ? "Sending Signal..." : "⚡ Execute Trade in MT5"}
+              </button>
+            </div>
+
           </div>
         )}
       </div>
