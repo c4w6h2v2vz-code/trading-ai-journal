@@ -16,6 +16,8 @@ type NewsEvent = {
 type PairBias = {
   direction: string;
   confidence: number;
+  current_price: string;
+  target: string;
   reason: string;
 };
 
@@ -36,11 +38,14 @@ type CoinAnalysis = {
   target: string;
   move_percent: string;
   reason: string;
+  community_buzz: string;
+  category: string;
 };
 
 type CryptoAnalysis = {
   market_sentiment: string;
   fear_greed: string;
+  btc_analysis: string;
   best_coins_today: CoinAnalysis[];
   coins_to_avoid: string[];
   meme_coin_alert: string;
@@ -48,6 +53,7 @@ type CryptoAnalysis = {
 };
 
 type Analysis = {
+  analysis_date: string;
   overall_bias: Record<string, PairBias>;
   event_analysis: EventAnalysis[];
   warning: string;
@@ -56,6 +62,9 @@ type Analysis = {
   key_levels: Record<string, string>;
   market_context: string;
   crypto_analysis: CryptoAnalysis;
+  dxy_analysis: string;
+  institutional_flow: string;
+  smart_money_summary: string;
 };
 
 export default function MarketAnalysisPage() {
@@ -166,26 +175,31 @@ export default function MarketAnalysisPage() {
             AI Market Analysis
           </p>
           <h1 className="text-4xl font-bold">Daily Market Analysis</h1>
+          <p className="mt-1 text-sm text-blue-400">
+            📅 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+          </p>
           <p className="mt-2 text-white/40">
-            Load today's real news events and AI will give you institutional-level market analysis.
+            AI scans real news, institutional flow, and smart money positioning to give you today's market intelligence.
           </p>
         </div>
 
         {/* Add Events */}
         <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="mb-4 text-xl font-semibold">Today's News Events</h2>
+          <h2 className="mb-4 text-xl font-semibold">Today's Economic Events</h2>
 
           <button
             onClick={fetchTodaysNews}
             disabled={fetchingNews}
             className="mb-4 w-full rounded-2xl border border-blue-500/20 bg-blue-500/10 py-3 text-sm font-semibold text-blue-400 hover:bg-blue-500/20 transition disabled:opacity-50"
           >
-            {fetchingNews ? "Fetching today's news..." : "🔄 Load Today's Real News"}
+            {fetchingNews ? "Fetching today's events..." : "🔄 Load Today's Economic Calendar"}
           </button>
 
           <div className="mb-4 space-y-2">
             {events.length === 0 && (
-              <p className="text-center text-sm text-white/30 py-4">No events added yet. Click "Load Today's Real News" or add manually.</p>
+              <p className="text-center text-sm text-white/30 py-4">
+                Click above to load today's events, or add manually. AI will also scan today's news automatically.
+              </p>
             )}
             {events.map((e, i) => (
               <div key={i} className={`flex items-center justify-between rounded-2xl border p-3 ${
@@ -209,22 +223,21 @@ export default function MarketAnalysisPage() {
             ))}
           </div>
 
-          {/* Add manual event */}
           <div className="grid gap-2 sm:grid-cols-3">
             <input value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})}
               placeholder="Time e.g. 08:30" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
             <select value={newEvent.currency} onChange={e => setNewEvent({...newEvent, currency: e.target.value})}
-              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500">
+              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none">
               {["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD"].map(c => <option key={c}>{c}</option>)}
             </select>
             <input value={newEvent.event} onChange={e => setNewEvent({...newEvent, event: e.target.value})}
-              placeholder="Event name e.g. NFP" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
+              placeholder="Event name" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
             <input value={newEvent.forecast} onChange={e => setNewEvent({...newEvent, forecast: e.target.value})}
-              placeholder="Forecast" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
+              placeholder="Forecast" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" />
             <input value={newEvent.previous} onChange={e => setNewEvent({...newEvent, previous: e.target.value})}
-              placeholder="Previous" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500" />
+              placeholder="Previous" className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" />
             <select value={newEvent.impact} onChange={e => setNewEvent({...newEvent, impact: e.target.value as any})}
-              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-blue-500">
+              className="rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none">
               <option>High</option>
               <option>Medium</option>
               <option>Low</option>
@@ -235,24 +248,53 @@ export default function MarketAnalysisPage() {
           </button>
         </div>
 
-        {/* Analyze button */}
         <button
           onClick={analyze}
           disabled={loading}
           className="mb-8 w-full rounded-2xl bg-green-600 py-4 text-lg font-semibold transition hover:bg-green-700 disabled:opacity-50"
         >
-          {loading ? "🤖 AI Analyzing Market Conditions..." : "🤖 Generate AI Market Analysis"}
+          {loading ? "🤖 Scanning News, Prices & Smart Money Flow..." : "🤖 Generate Full Market Intelligence"}
         </button>
 
-        {/* Analysis Results */}
         {analysis && (
           <div className="space-y-6">
+
+            {/* Date */}
+            {analysis.analysis_date && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/40">
+                📅 Analysis for: {analysis.analysis_date}
+              </div>
+            )}
 
             {/* Market Context */}
             {analysis.market_context && (
               <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-5">
                 <p className="text-sm font-semibold text-blue-400 mb-2">📰 Today's Market Context</p>
                 <p className="text-sm text-white/70 leading-relaxed">{analysis.market_context}</p>
+              </div>
+            )}
+
+            {/* Smart Money */}
+            {analysis.smart_money_summary && (
+              <div className="rounded-3xl border border-purple-500/20 bg-purple-500/5 p-5">
+                <p className="text-sm font-semibold text-purple-400 mb-2">🏦 Smart Money Analysis</p>
+                <p className="text-sm text-white/70 leading-relaxed">{analysis.smart_money_summary}</p>
+              </div>
+            )}
+
+            {/* DXY */}
+            {analysis.dxy_analysis && (
+              <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-5">
+                <p className="text-sm font-semibold text-yellow-400 mb-2">💵 DXY Analysis</p>
+                <p className="text-sm text-white/70 leading-relaxed">{analysis.dxy_analysis}</p>
+              </div>
+            )}
+
+            {/* Institutional Flow */}
+            {analysis.institutional_flow && (
+              <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-5">
+                <p className="text-sm font-semibold text-green-400 mb-2">🏛️ Institutional Flow</p>
+                <p className="text-sm text-white/70 leading-relaxed">{analysis.institutional_flow}</p>
               </div>
             )}
 
@@ -263,10 +305,10 @@ export default function MarketAnalysisPage() {
               </div>
             )}
 
-            {/* Best pairs and avoid */}
+            {/* Best/Avoid pairs */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-5">
-                <p className="mb-3 text-sm font-semibold text-green-400">✅ Best Pairs to Trade</p>
+                <p className="mb-3 text-sm font-semibold text-green-400">✅ Best to Trade</p>
                 <div className="flex flex-wrap gap-2">
                   {analysis.best_pairs_to_trade?.map(p => (
                     <span key={p} className="rounded-full bg-green-500/20 px-3 py-1 text-sm text-green-300">{p}</span>
@@ -274,7 +316,7 @@ export default function MarketAnalysisPage() {
                 </div>
               </div>
               <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-5">
-                <p className="mb-3 text-sm font-semibold text-red-400">❌ Pairs to Avoid</p>
+                <p className="mb-3 text-sm font-semibold text-red-400">❌ Avoid Today</p>
                 <div className="flex flex-wrap gap-2">
                   {analysis.pairs_to_avoid?.map(p => (
                     <span key={p} className="rounded-full bg-red-500/20 px-3 py-1 text-sm text-red-300">{p}</span>
@@ -283,7 +325,7 @@ export default function MarketAnalysisPage() {
               </div>
             </div>
 
-            {/* Overall bias */}
+            {/* Overall Bias */}
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
               <h2 className="mb-4 text-xl font-semibold">Today's Market Bias</h2>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -297,17 +339,19 @@ export default function MarketAnalysisPage() {
                         <span className={`text-sm font-bold ${bias.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
                           {bias.direction === "Bullish" ? "↑" : "↓"} {bias.direction}
                         </span>
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/60">
-                          {bias.confidence}%
-                        </span>
+                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{bias.confidence}%</span>
                       </div>
                     </div>
                     <div className="h-2 rounded-full bg-white/10 mb-2">
-                      <div
-                        className={`h-2 rounded-full ${bias.direction === "Bullish" ? "bg-green-500" : "bg-red-500"}`}
-                        style={{ width: `${bias.confidence}%` }}
-                      />
+                      <div className={`h-2 rounded-full ${bias.direction === "Bullish" ? "bg-green-500" : "bg-red-500"}`}
+                        style={{ width: `${bias.confidence}%` }} />
                     </div>
+                    {bias.current_price && (
+                      <div className="flex gap-3 text-xs text-white/40 mb-1">
+                        <span>Now: {bias.current_price}</span>
+                        {bias.target && <span>→ Target: {bias.target}</span>}
+                      </div>
+                    )}
                     <p className="text-xs text-white/50">{bias.reason}</p>
                   </div>
                 ))}
@@ -329,26 +373,32 @@ export default function MarketAnalysisPage() {
               </div>
             )}
 
-            {/* Event Analysis */}
             {/* Crypto Analysis */}
             {analysis.crypto_analysis && (
               <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-6">
                 <h2 className="mb-4 text-xl font-semibold">🪙 Crypto Market Analysis</h2>
-                
-                <div className="grid gap-4 sm:grid-cols-2 mb-4">
+
+                <div className="grid gap-3 sm:grid-cols-2 mb-4">
                   <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-sm text-white/40">Market Sentiment</p>
+                    <p className="text-sm text-white/40">Sentiment</p>
                     <p className={`text-xl font-bold mt-1 ${
-                      analysis.crypto_analysis.market_sentiment === "Bullish" ? "text-green-400" : 
-                      analysis.crypto_analysis.market_sentiment === "Bearish" ? "text-red-400" : 
+                      analysis.crypto_analysis.market_sentiment === "Bullish" ? "text-green-400" :
+                      analysis.crypto_analysis.market_sentiment === "Bearish" ? "text-red-400" :
                       "text-yellow-400"
                     }`}>{analysis.crypto_analysis.market_sentiment}</p>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-sm text-white/40">Fear & Greed Index</p>
+                    <p className="text-sm text-white/40">Fear & Greed</p>
                     <p className="text-xl font-bold mt-1 text-yellow-400">{analysis.crypto_analysis.fear_greed}</p>
                   </div>
                 </div>
+
+                {analysis.crypto_analysis.btc_analysis && (
+                  <div className="mb-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
+                    <p className="text-sm font-semibold text-orange-400 mb-1">₿ BTC Analysis</p>
+                    <p className="text-sm text-white/70">{analysis.crypto_analysis.btc_analysis}</p>
+                  </div>
+                )}
 
                 {analysis.crypto_analysis.meme_coin_alert && (
                   <div className="mb-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
@@ -366,38 +416,22 @@ export default function MarketAnalysisPage() {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
                           <span className="font-bold text-lg">{coin.coin}</span>
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/40">{coin.category}</span>
                           <span className="text-sm text-white/40">{coin.current_price}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-sm font-bold ${coin.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
+                          <span className={`font-bold ${coin.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
                             {coin.move_percent}
                           </span>
-                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/60">
-                            {coin.probability}%
-                          </span>
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{coin.probability}%</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 mb-2">
-                        <span className="text-xs text-white/40">Target: {coin.target}</span>
-                        <span className={`text-xs font-semibold ${coin.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
-                          {coin.direction === "Bullish" ? "↑" : "↓"} {coin.direction}
-                        </span>
-                      </div>
-                      <p className="text-xs text-white/50">{coin.reason}</p>
+                      <p className="text-xs text-white/40 mb-1">Target: {coin.target}</p>
+                      <p className="text-xs text-white/60 mb-1">{coin.reason}</p>
+                      <p className="text-xs text-yellow-400">💬 {coin.community_buzz}</p>
                     </div>
                   ))}
                 </div>
-
-                {analysis.crypto_analysis.coins_to_avoid?.length > 0 && (
-                  <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
-                    <p className="text-sm font-semibold text-red-400 mb-2">❌ Coins to Avoid Today</p>
-                    <div className="flex flex-wrap gap-2">
-                      {analysis.crypto_analysis.coins_to_avoid.map((coin, i) => (
-                        <span key={i} className="rounded-full bg-red-500/20 px-3 py-1 text-sm text-red-300">{coin}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {analysis.crypto_analysis.crypto_trade_plan && (
                   <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
@@ -407,6 +441,8 @@ export default function MarketAnalysisPage() {
                 )}
               </div>
             )}
+
+            {/* Event Analysis */}
             {analysis.event_analysis?.map((e, i) => (
               <div key={i} className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
                 <h3 className="mb-4 text-lg font-bold text-blue-400">{e.currency} — {e.event}</h3>
@@ -445,10 +481,10 @@ export default function MarketAnalysisPage() {
               </div>
             ))}
 
-            {/* Execute Trade in MT5 */}
+            {/* Execute Trade */}
             <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
               <h2 className="mb-2 text-xl font-semibold text-green-400">⚡ Execute Trade in MT5</h2>
-              <p className="mb-4 text-sm text-white/40">Send a trade signal to your MT5 account. EA will execute it automatically within 30 seconds.</p>
+              <p className="mb-4 text-sm text-white/40">Send a signal to your MT5 EA. Trade executes automatically within 30 seconds.</p>
 
               {executeMessage && (
                 <div className="mb-4 rounded-2xl border border-green-500/20 bg-green-500/10 p-3 text-green-300 text-sm">
@@ -460,13 +496,12 @@ export default function MarketAnalysisPage() {
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Symbol</label>
                   <input value={tradeForm.symbol} onChange={e => setTradeForm({...tradeForm, symbol: e.target.value})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500"
-                    placeholder="EURUSD" />
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" placeholder="EURUSD" />
                 </div>
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Direction</label>
                   <select value={tradeForm.type} onChange={e => setTradeForm({...tradeForm, type: e.target.value})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500">
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none">
                     <option>BUY</option>
                     <option>SELL</option>
                   </select>
@@ -474,33 +509,28 @@ export default function MarketAnalysisPage() {
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Lot Size</label>
                   <input type="number" value={tradeForm.lot} onChange={e => setTradeForm({...tradeForm, lot: Number(e.target.value)})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500"
-                    step="0.01" />
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" step="0.01" />
                 </div>
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Stop Loss (pips)</label>
                   <input type="number" value={tradeForm.sl} onChange={e => setTradeForm({...tradeForm, sl: Number(e.target.value)})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500" />
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" />
                 </div>
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Take Profit (pips)</label>
                   <input type="number" value={tradeForm.tp} onChange={e => setTradeForm({...tradeForm, tp: Number(e.target.value)})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500" />
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">MT5 Account Number</label>
+                  <label className="text-xs text-white/40 mb-1 block">MT5 Account</label>
                   <input value={tradeForm.account} onChange={e => setTradeForm({...tradeForm, account: e.target.value})}
-                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none focus:border-green-500"
-                    placeholder="521091015" />
+                    className="w-full rounded-xl border border-white/10 bg-black/50 p-3 text-sm text-white outline-none" placeholder="521091015" />
                 </div>
               </div>
 
-              <button
-                onClick={executeTradeSignal}
-                disabled={executing}
-                className="w-full rounded-2xl bg-green-600 py-3 font-semibold transition hover:bg-green-700 disabled:opacity-50"
-              >
-                {executing ? "Sending Signal to MT5..." : "⚡ Execute Trade in MT5"}
+              <button onClick={executeTradeSignal} disabled={executing}
+                className="w-full rounded-2xl bg-green-600 py-3 font-semibold transition hover:bg-green-700 disabled:opacity-50">
+                {executing ? "Sending Signal..." : "⚡ Execute Trade in MT5"}
               </button>
             </div>
 
