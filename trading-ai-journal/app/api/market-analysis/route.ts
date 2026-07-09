@@ -1,111 +1,85 @@
 import { NextResponse } from "next/server";
 
-async function getRealTimePrices() {
+async function scanCryptoNews() {
   try {
-    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
-    const pairs = ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"];
-    const prices: Record<string, any> = {};
+    const today = new Date().toISOString().slice(0, 10);
+    const queries = [
+      "memecoin pump today",
+      "crypto trending today",
+      "bitcoin ethereum price today",
+      "crypto whale alert today",
+      "dogecoin shiba pepe news today",
+    ];
 
-    for (const pair of pairs) {
+    const results: string[] = [];
+
+    for (const q of queries) {
       try {
-        const from = pair === "XAUUSD" ? "XAU" : pair.slice(0, 3);
-        const to = pair === "XAUUSD" ? "USD" : pair.slice(3, 6);
-        const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${from}&to_currency=${to}&apikey=${apiKey}`;
-        const response = await fetch(url, { next: { revalidate: 300 } });
+        const response = await fetch(
+          `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&from=${today}&sortBy=publishedAt&language=en&apiKey=${process.env.NEWS_API_KEY}&pageSize=5`,
+          { next: { revalidate: 1800 } }
+        );
         const data = await response.json();
-        const rate = data["Realtime Currency Exchange Rate"];
-        if (rate) {
-          prices[pair] = {
-            price: parseFloat(rate["5. Exchange Rate"]).toFixed(5),
-            bid: rate["8. Bid Price"],
-            ask: rate["7. Ask Price"],
-          };
+        if (data.articles) {
+          data.articles.forEach((a: any) => {
+            results.push(`- ${a.title} (${a.source.name})`);
+          });
         }
-      } catch (err) {
-        console.error(`Failed to fetch ${pair}`);
+      } catch {
+        console.error(`Failed news fetch`);
       }
     }
-    return prices;
+
+    return results.slice(0, 20).join("\n");
   } catch {
-    return {};
+    return "";
   }
 }
 
 async function getCryptoPrices() {
   try {
     const coins = ["BTC", "ETH", "SOL", "DOGE", "XRP"];
-    const prices: Record<string, any> = {};
+    const prices: Record<string, string> = {};
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
 
     for (const coin of coins) {
       try {
-        const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
         const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${coin}&to_currency=USD&apikey=${apiKey}`;
         const response = await fetch(url, { next: { revalidate: 300 } });
         const data = await response.json();
         const rate = data["Realtime Currency Exchange Rate"];
         if (rate) {
-          prices[coin] = {
-            price: parseFloat(rate["5. Exchange Rate"]).toFixed(2),
-            bid: rate["8. Bid Price"],
-            ask: rate["7. Ask Price"],
-          };
+          prices[coin] = parseFloat(rate["5. Exchange Rate"]).toFixed(
+            coin === "BTC" ? 0 : coin === "ETH" || coin === "SOL" ? 2 : 4
+          );
         }
       } catch {
         console.error(`Failed to fetch ${coin}`);
       }
     }
+
     return prices;
   } catch {
     return {};
   }
 }
 
-async function getTodaysNews() {
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const response = await fetch(
-      `https://newsapi.org/v2/everything?q=forex+crypto+trading&from=${today}&sortBy=publishedAt&language=en&apiKey=${process.env.NEWS_API_KEY}&pageSize=10`,
-      { next: { revalidate: 1800 } }
-    );
-    const data = await response.json();
-    if (data.articles) {
-      return data.articles.map((a: any) => `- ${a.title}`).join("\n");
-    }
-    return "";
-  } catch {
-    return "";
-  }
-}
-
 export async function POST(request: Request) {
   try {
-    const { events } = await request.json();
-
     const today = new Date().toLocaleDateString("en-US", {
       weekday: "long", year: "numeric", month: "long", day: "numeric",
     });
 
-    const eventsText = events.length > 0
-      ? events.map((e: any) =>
-          `${e.time} - ${e.currency} - ${e.event} - Impact: ${e.impact} - Forecast: ${e.forecast} - Previous: ${e.previous}`
-        ).join("\n")
-      : "No major economic events today.";
+    const todayDate = new Date().toISOString().slice(0, 10);
 
-    const [forexPrices, cryptoPrices, newsHeadlines] = await Promise.all([
-      getRealTimePrices(),
+    const [newsHeadlines, prices] = await Promise.all([
+      scanCryptoNews(),
       getCryptoPrices(),
-      getTodaysNews(),
     ]);
 
-    const forexText = Object.entries(forexPrices).length > 0
-      ? Object.entries(forexPrices).map(([pair, d]: [string, any]) =>
-          `${pair}: ${d.price}`).join(" | ")
-      : "Forex prices unavailable";
-
-    const cryptoText = Object.entries(cryptoPrices).length > 0
-      ? Object.entries(cryptoPrices).map(([coin, d]: [string, any]) =>
-          `${coin}/USD: $${d.price}`).join(" | ")
-      : "Crypto prices unavailable";
+    const pricesText = Object.entries(prices).length > 0
+      ? Object.entries(prices).map(([coin, price]) => `${coin}: $${price}`).join("\n")
+      : "Prices temporarily unavailable";
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -118,99 +92,97 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: `You are an elite market analyst covering both forex and crypto markets. Today is ${today}.
-You have access to real-time prices and today's news. Give SPECIFIC, ACTIONABLE analysis.
-For crypto, analyze meme coins, altcoins, and major coins.
-Always mention specific price targets and percentage moves.`,
+            content: `You are an elite crypto analyst. Today's date is ${today} (${todayDate}).
+You must provide REAL analysis based on actual market conditions RIGHT NOW.
+NEVER use placeholder or example data.
+All prices, percentages, and targets must be based on the REAL prices provided.
+Be specific about percentage moves - use ranges like "+8% to +15%".`,
           },
           {
             role: "user",
             content: `Today is ${today}.
 
-REAL-TIME FOREX PRICES:
-${forexText}
+REAL CRYPTO PRICES RIGHT NOW:
+${pricesText}
 
-REAL-TIME CRYPTO PRICES:
-${cryptoText}
+TODAY'S REAL NEWS HEADLINES:
+${newsHeadlines || "Use your knowledge of crypto market conditions as of ${todayDate}."}
 
-TODAY'S ECONOMIC EVENTS:
-${eventsText}
+Based on REAL data above, analyze:
+1. Which coins are showing real momentum TODAY (${todayDate})?
+2. What are realistic percentage move targets based on current prices?
+3. What is actually happening in meme coin communities right now?
+4. Which coins do whales seem to be accumulating based on recent news?
+5. What should a trader do TODAY specifically?
 
-TODAY'S NEWS HEADLINES:
-${newsHeadlines || "No news headlines available - use your knowledge of current market conditions."}
+IMPORTANT RULES:
+- Use the REAL prices shown above for all calculations
+- Give SPECIFIC percentage targets (e.g. "+8% to +15%")
+- Base analysis on ${today} conditions
+- Never use fake example data like "$0.0000089" unless that's the real PEPE price
 
-Based on ALL this data, provide a comprehensive forex + crypto market analysis.
-
-For crypto specifically:
-- Which coins have the highest probability of moving significantly today?
-- Are there any meme coins showing momentum?
-- What percentage moves are realistic?
-- How does today's forex news affect crypto?
-
-Return ONLY this exact JSON:
+Return ONLY this JSON with REAL data:
 {
-  "overall_bias": {
-    "EURUSD": { "direction": "Bullish", "confidence": 65, "reason": "Specific reason with price" },
-    "GBPUSD": { "direction": "Bearish", "confidence": 55, "reason": "Specific reason with price" },
-    "XAUUSD": { "direction": "Bullish", "confidence": 70, "reason": "Specific reason with price" },
-    "USDJPY": { "direction": "Bearish", "confidence": 60, "reason": "Specific reason with price" }
+  "analysis_date": "${today}",
+  "market_overview": {
+    "sentiment": "Bullish/Bearish/Neutral",
+    "fear_greed": "Number + label e.g. 68 - Greed",
+    "btc_dominance": "Real estimate e.g. 54%",
+    "market_trend": "What is actually happening in crypto right now on ${todayDate}"
   },
-  "crypto_analysis": {
-    "market_sentiment": "Bullish/Bearish/Neutral",
-    "fear_greed": "65 - Greed",
-    "best_coins_today": [
-      {
-        "coin": "BTC",
-        "current_price": "$43,250",
-        "direction": "Bullish",
-        "probability": 68,
-        "target": "$44,500",
-        "move_percent": "+2.9%",
-        "reason": "Specific reason based on today's news and price"
-      },
-      {
-        "coin": "ETH",
-        "current_price": "$2,280",
-        "direction": "Bullish",
-        "probability": 62,
-        "target": "$2,350",
-        "move_percent": "+3.1%",
-        "reason": "Specific reason"
-      },
-      {
-        "coin": "DOGE",
-        "current_price": "$0.12",
-        "direction": "Bullish",
-        "probability": 55,
-        "target": "$0.135",
-        "move_percent": "+12.5%",
-        "reason": "Meme coin momentum + social media trending"
-      }
-    ],
-    "coins_to_avoid": ["XRP", "ADA"],
-    "meme_coin_alert": "Any meme coin trending today and why",
-    "crypto_trade_plan": "Specific crypto trade recommendation for today"
-  },
-  "event_analysis": [
+  "top_coins_to_watch": [
     {
-      "event": "Event name",
-      "currency": "USD",
-      "if_beats": { "direction": "USD Strong", "probability": 72, "avg_pips": 80, "pairs_affected": ["EURUSD down 60-80 pips", "BTC could drop 2-3%"] },
-      "if_misses": { "direction": "USD Weak", "probability": 68, "avg_pips": 60, "pairs_affected": ["EURUSD up 50-70 pips", "BTC could pump 3-5%"] },
-      "trade_plan": "Specific trade plan with prices",
-      "historical_note": "Historical statistics"
+      "coin": "BTC",
+      "price": "Real price from above",
+      "timeframe": "24-48 hours",
+      "direction": "Bullish",
+      "probability": 65,
+      "potential_gain": "+5% to +8%",
+      "potential_loss": "-4%",
+      "risk_level": "Medium",
+      "sentiment_score": 72,
+      "momentum_score": 68,
+      "reason": "Real reason based on today's news",
+      "community_buzz": "Real community activity",
+      "entry": "Real entry based on current price",
+      "target": "Real target price",
+      "stop_loss": "Real stop loss",
+      "category": "Layer1"
     }
   ],
-  "warning": "Specific warning for today",
-  "best_pairs_to_trade": ["EURUSD", "BTCUSD"],
-  "pairs_to_avoid": ["USDJPY"],
-  "key_levels": {
-    "EURUSD": "Support: X.XXXX, Resistance: X.XXXX",
-    "BTCUSD": "Support: $XX,XXX, Resistance: $XX,XXX",
-    "XAUUSD": "Support: $X,XXX, Resistance: $X,XXX"
+  "meme_coins_alert": [
+    {
+      "coin": "Real memecoin",
+      "reason": "Real reason trending today",
+      "buzz_level": "High",
+      "risk": "High"
+    }
+  ],
+  "whale_alerts": [
+    {
+      "coin": "Real coin",
+      "action": "Real whale activity",
+      "impact": "Expected price impact"
+    }
+  ],
+  "coins_to_avoid": [
+    {
+      "coin": "Real coin",
+      "reason": "Real reason to avoid today",
+      "risk": "High"
+    }
+  ],
+  "rug_pull_warnings": [],
+  "best_trade_today": {
+    "coin": "Best coin for today",
+    "entry": "Real entry price",
+    "target": "Real target with percentage",
+    "stop_loss": "Real stop loss",
+    "timeframe": "24-48 hours",
+    "reason": "Real detailed reason for today ${todayDate}"
   },
-  "market_context": "2-3 sentences covering both forex and crypto market conditions today"
-}`
+  "weekly_outlook": "Real weekly outlook for crypto this week starting ${todayDate}"
+}`,
           }
         ],
       }),
@@ -221,7 +193,8 @@ Return ONLY this exact JSON:
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
     const parsed = JSON.parse(jsonMatch[0]);
-    parsed.real_prices = { forex: forexPrices, crypto: cryptoPrices };
+    parsed.real_prices = prices;
+    parsed.generated_at = new Date().toISOString();
 
     return NextResponse.json(parsed);
   } catch (error) {
