@@ -83,6 +83,9 @@ export default function CryptoIntelligencePage() {
           <h1 className="text-4xl font-bold">Crypto Market Intelligence</h1>
           <p className="mt-2 text-white/40">
             AI scans Reddit, Twitter, news, and whale movements to find the best crypto opportunities today.
+        </p>
+        <p className="mt-1 text-sm text-blue-400">
+          📅 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
         </div>
 
