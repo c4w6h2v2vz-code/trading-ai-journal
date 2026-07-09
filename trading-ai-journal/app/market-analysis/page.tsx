@@ -51,7 +51,22 @@ type CryptoAnalysis = {
   meme_coin_alert: string;
   crypto_trade_plan: string;
 };
+type PairVolatility = {
+  rating: string;
+  score: number;
+  expected_range: string;
+  best_time: string;
+};
 
+type VolatilityAnalysis = {
+  overall_volatility: string;
+  vix_estimate: string;
+  best_trading_window: string;
+  avoid_times: string;
+  pairs_volatility: Record<string, PairVolatility>;
+  news_impact: string;
+  recommendation: string;
+};
 type Analysis = {
   analysis_date: string;
   overall_bias: Record<string, PairBias>;
@@ -65,6 +80,7 @@ type Analysis = {
   dxy_analysis: string;
   institutional_flow: string;
   smart_money_summary: string;
+  volatility_analysis: VolatilityAnalysis;
 };
 
 export default function MarketAnalysisPage() {
@@ -441,7 +457,85 @@ export default function MarketAnalysisPage() {
                 )}
               </div>
             )}
+{/* Volatility Analysis */}
+            {analysis.volatility_analysis && (
+              <div className="rounded-3xl border border-orange-500/20 bg-orange-500/5 p-6">
+                <h2 className="mb-4 text-xl font-semibold text-orange-400">⚡ Volatility Analysis</h2>
 
+                <div className="grid gap-3 sm:grid-cols-3 mb-4">
+                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                    <p className="text-sm text-white/40">Overall Volatility</p>
+                    <p className={`text-xl font-bold mt-1 ${
+                      analysis.volatility_analysis.overall_volatility === "High" ? "text-red-400" :
+                      analysis.volatility_analysis.overall_volatility === "Medium" ? "text-yellow-400" :
+                      "text-green-400"
+                    }`}>{analysis.volatility_analysis.overall_volatility}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                    <p className="text-sm text-white/40">VIX Estimate</p>
+                    <p className="text-xl font-bold mt-1 text-blue-400">{analysis.volatility_analysis.vix_estimate}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                    <p className="text-sm text-white/40">Best Trading Window</p>
+                    <p className="text-sm font-bold mt-1 text-green-400">{analysis.volatility_analysis.best_trading_window}</p>
+                  </div>
+                </div>
+
+                {/* Pair volatility meters */}
+                <div className="space-y-3 mb-4">
+                  {Object.entries(analysis.volatility_analysis.pairs_volatility || {}).map(([pair, vol]) => (
+                    <div key={pair} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <p className="font-bold">{pair}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                            vol.rating === "High" || vol.rating === "Extreme" ? "bg-red-500/20 text-red-400" :
+                            vol.rating === "Medium" ? "bg-yellow-500/20 text-yellow-400" :
+                            "bg-green-500/20 text-green-400"
+                          }`}>{vol.rating}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-white/70">{vol.expected_range}</p>
+                          <p className="text-xs text-white/30">{vol.best_time}</p>
+                        </div>
+                      </div>
+                      <div className="h-2 rounded-full bg-white/10">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            vol.score >= 80 ? "bg-red-500" :
+                            vol.score >= 60 ? "bg-yellow-500" :
+                            "bg-green-500"
+                          }`}
+                          style={{ width: `${vol.score}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-white/30 mt-1">Volatility score: {vol.score}/100</p>
+                    </div>
+                  ))}
+                </div>
+
+                {analysis.volatility_analysis.news_impact && (
+                  <div className="mb-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+                    <p className="text-sm font-semibold text-red-400 mb-1">📰 News Impact</p>
+                    <p className="text-sm text-white/70">{analysis.volatility_analysis.news_impact}</p>
+                  </div>
+                )}
+
+                {analysis.volatility_analysis.avoid_times && (
+                  <div className="mb-3 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
+                    <p className="text-sm font-semibold text-yellow-400 mb-1">⚠️ Avoid Trading</p>
+                    <p className="text-sm text-white/70">{analysis.volatility_analysis.avoid_times}</p>
+                  </div>
+                )}
+
+                {analysis.volatility_analysis.recommendation && (
+                  <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
+                    <p className="text-sm font-semibold text-green-400 mb-1">✅ Recommendation</p>
+                    <p className="text-sm text-white/70">{analysis.volatility_analysis.recommendation}</p>
+                  </div>
+                )}
+              </div>
+            )}
             {/* Event Analysis */}
             {analysis.event_analysis?.map((e, i) => (
               <div key={i} className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">

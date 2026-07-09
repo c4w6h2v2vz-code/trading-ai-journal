@@ -128,6 +128,20 @@ Return ONLY this JSON:
       "historical_note": "Historical context"
     }
   ],
+  "volatility_analysis": {
+    "overall_volatility": "Medium",
+    "vix_estimate": "18.5 - Normal",
+    "best_trading_window": "08:00-11:00 GMT (London open)",
+    "avoid_times": "12:00-14:00 GMT (lunch hour low volatility)",
+    "pairs_volatility": {
+      "EURUSD": { "rating": "Medium", "score": 65, "expected_range": "60-80 pips", "best_time": "08:00-10:00 GMT" },
+      "GBPUSD": { "rating": "High", "score": 78, "expected_range": "80-120 pips", "best_time": "08:00-11:00 GMT" },
+      "XAUUSD": { "rating": "High", "score": 82, "expected_range": "$15-$25", "best_time": "08:00-12:00 GMT" },
+      "USDJPY": { "rating": "Low", "score": 45, "expected_range": "40-60 pips", "best_time": "00:00-03:00 GMT" }
+    },
+    "news_impact": "FOMC minutes could spike volatility by 150% at 18:00 GMT",
+    "recommendation": "Trade during London session, reduce size before FOMC"
+  },
   "crypto_analysis": {
     "market_sentiment": "Bullish",
     "fear_greed": "65 - Greed",
