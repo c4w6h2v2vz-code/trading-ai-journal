@@ -85,7 +85,8 @@ export default function IntelligencePage() {
   const [executingTrade, setExecutingTrade] = useState<number | null>(null);
   const [tradeMessages, setTradeMessages] = useState<Record<number, string>>({});
   const [autoExecute, setAutoExecute] = useState(false);
-
+const [tradesExecutedToday, setTradesExecutedToday] = useState(0);
+  const MAX_TRADES_PER_DAY = 2;
   useEffect(() => {
     const saved = localStorage.getItem("intelligence-settings");
     if (saved) {
@@ -134,6 +135,11 @@ export default function IntelligencePage() {
       return;
     }
 
+    if (tradesExecutedToday >= MAX_TRADES_PER_DAY) {
+      alert(`⛔ Daily limit reached. You have already executed ${MAX_TRADES_PER_DAY} trades today. Come back tomorrow.`);
+      return;
+    }
+
     setExecutingTrade(rank);
     setTradeMessages(prev => ({ ...prev, [rank]: "Sending signal to MT5..." }));
 
@@ -163,9 +169,11 @@ export default function IntelligencePage() {
 
       const data = await res.json();
       if (data.success) {
+        const newCount = tradesExecutedToday + 1;
+        setTradesExecutedToday(newCount);
         setTradeMessages(prev => ({
           ...prev,
-          [rank]: `✅ Signal sent! ${trade.direction} ${trade.asset} — Lot: ${lotSize} (${riskPercent}% risk = $${((accountBalance * riskPercent) / 100).toFixed(0)}) — SL: ${slPips} pips — TP: ${tpPips} pips`
+          [rank]: `✅ Signal sent! ${trade.direction} ${trade.asset} — Lot: ${lotSize} (${riskPercent}% risk = $${((accountBalance * riskPercent) / 100).toFixed(0)}) — SL: ${slPips} pips — TP: ${tpPips} pips — Trade ${newCount}/${MAX_TRADES_PER_DAY} today`
         }));
       } else {
         setTradeMessages(prev => ({ ...prev, [rank]: "Error: " + data.error }));
@@ -290,7 +298,19 @@ export default function IntelligencePage() {
             </div>
           )}
         </div>
-
+{tradesExecutedToday > 0 && (
+          <div className={`mb-4 rounded-2xl border p-4 text-center ${
+            tradesExecutedToday >= MAX_TRADES_PER_DAY 
+              ? "border-red-500/20 bg-red-500/10" 
+              : "border-yellow-500/20 bg-yellow-500/10"
+          }`}>
+            <p className={`font-semibold ${tradesExecutedToday >= MAX_TRADES_PER_DAY ? "text-red-400" : "text-yellow-400"}`}>
+              {tradesExecutedToday >= MAX_TRADES_PER_DAY 
+                ? "⛔ Daily limit reached — No more trades today" 
+                : `⚡ ${tradesExecutedToday}/${MAX_TRADES_PER_DAY} trades executed today`}
+            </p>
+          </div>
+        )}
         <button
           onClick={generate}
           disabled={loading}
@@ -432,15 +452,23 @@ export default function IntelligencePage() {
 
                       {/* Execute button */}
                       {trade.confidence >= 65 && (
-                        <button
-                          onClick={() => executeTrade(trade, trade.rank)}
-                          disabled={executingTrade === trade.rank}
-                          className="w-full rounded-xl bg-green-600 py-2.5 text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
-                        >
-                          {executingTrade === trade.rank
-                            ? "Sending to MT5..."
-                            : `⚡ Execute ${trade.direction} ${trade.asset} in MT5`}
-                        </button>
+                        <>
+                          {tradesExecutedToday < MAX_TRADES_PER_DAY ? (
+                            <button
+                              onClick={() => executeTrade(trade, trade.rank)}
+                              disabled={executingTrade === trade.rank}
+                              className="w-full rounded-xl bg-green-600 py-2.5 text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
+                            >
+                              {executingTrade === trade.rank
+                                ? "Sending to MT5..."
+                                : `⚡ Execute ${trade.direction} ${trade.asset} in MT5 (${MAX_TRADES_PER_DAY - tradesExecutedToday} trades left today)`}
+                            </button>
+                          ) : (
+                            <div className="rounded-xl bg-red-500/10 p-2 text-xs text-red-400 text-center">
+                              ⛔ Daily limit reached — {MAX_TRADES_PER_DAY} trades executed today
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {trade.confidence < 65 && (
