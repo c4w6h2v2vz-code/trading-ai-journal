@@ -137,7 +137,8 @@ async function getEconomicEvents() {
 
 export async function POST() {
   try {
-    const now = new Date();
+    const now = new Date(); const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const today = now.toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
@@ -154,10 +155,10 @@ export async function POST() {
     });
 
     const [forexPrices, cryptoPrices, news, events] = await Promise.all([
-      getForexPrices(),
+      isWeekend ? Promise.resolve({} as Record<string, string>) : getForexPrices(),
       getCryptoPrices(),
       getAllNews(),
-      getEconomicEvents(),
+      isWeekend ? Promise.resolve([] as any[]) : getEconomicEvents(),
     ]);
 
     const forexText = Object.entries(forexPrices).length > 0
@@ -210,7 +211,9 @@ ${eventsText}
 TODAY'S NEWS FROM REUTERS, BLOOMBERG, FOREXFACTORY:
 ${news || "Use your knowledge of current market conditions."}
 
-Generate a COMPLETE Morning Intelligence Brief.
+${isWeekend 
+  ? "TODAY IS WEEKEND - Forex markets are CLOSED. Focus ONLY on crypto analysis since crypto trades 24/7. For forex, give a preview of what to expect on Monday. Do NOT give forex trade signals for today." 
+  : "Generate a COMPLETE Morning Intelligence Brief for today's live markets."}
 Use REAL prices above for ALL calculations.
 Include ALL pairs: EURUSD, GBPUSD, USDJPY, XAUUSD, AUDUSD.
 Also analyze cross pairs: GBPJPY, EURJPY, EURGBP.
