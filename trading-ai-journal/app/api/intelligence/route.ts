@@ -4,7 +4,7 @@ async function getCOTData() {
   try {
     const response = await fetch(
       "https://newsapi.org/v2/everything?q=commitment+traders+COT+report+forex+institutional&sortBy=publishedAt&language=en&apiKey=" + process.env.NEWS_API_KEY + "&pageSize=5",
-      { next: { revalidate: 86400 } }
+      { cache: "no-store" }
     );
     const data = await response.json();
     if (data.articles) {
@@ -31,7 +31,7 @@ async function getMarketNews() {
       try {
         const response = await fetch(
           `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&from=${today}&sortBy=publishedAt&language=en&apiKey=${process.env.NEWS_API_KEY}&pageSize=3`,
-          { next: { revalidate: 3600 } }
+          { cache: "no-store" }
         );
         const data = await response.json();
         if (data.articles) {
@@ -60,7 +60,7 @@ async function getPrices() {
     for (const pair of pairs) {
       try {
         const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${pair.from}&to_currency=${pair.to}&apikey=${apiKey}`;
-        const response = await fetch(url, { next: { revalidate: 600 } });
+        const response = await fetch(url, { cache: "no-store" });
         const data = await response.json();
         const rate = data["Realtime Currency Exchange Rate"];
         if (rate) {

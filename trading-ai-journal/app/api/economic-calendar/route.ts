@@ -7,7 +7,7 @@ export async function GET() {
 
     const response = await fetch(
       `https://nfs.faireconomy.media/ff_calendar_thisweek.json`,
-      { next: { revalidate: 3600 } }
+      { cache: "no-store" }
     );
 
     if (!response.ok) {

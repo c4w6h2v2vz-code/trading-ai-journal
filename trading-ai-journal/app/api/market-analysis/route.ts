@@ -5,7 +5,6 @@ async function getForexPrices() {
     const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
     const results: Record<string, string> = {};
 
-    // Only fetch 2 pairs to stay within rate limit
     const pairs = [
       { from: "EUR", to: "USD", name: "EURUSD" },
       { from: "XAU", to: "USD", name: "XAUUSD" },
@@ -14,7 +13,7 @@ async function getForexPrices() {
     for (const pair of pairs) {
       try {
         const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${pair.from}&to_currency=${pair.to}&apikey=${apiKey}`;
-        const response = await fetch(url, { next: { revalidate: 600 } });
+        const response = await fetch(url, { cache: "no-store" });
         const data = await response.json();
         const rate = data["Realtime Currency Exchange Rate"];
         if (rate) {
@@ -35,7 +34,7 @@ async function getNews() {
     const today = new Date().toISOString().slice(0, 10);
     const response = await fetch(
       `https://newsapi.org/v2/everything?q=forex+dollar+euro+gold+fed&from=${today}&sortBy=publishedAt&language=en&apiKey=${process.env.NEWS_API_KEY}&pageSize=10`,
-      { next: { revalidate: 3600 } }
+      { cache: "no-store" }
     );
     const data = await response.json();
     if (data.articles) {
@@ -61,7 +60,6 @@ export async function POST(request: Request) {
         ).join("\n")
       : "No major events today.";
 
-    // Fetch in parallel but limit calls
     const [prices, news] = await Promise.all([
       getForexPrices(),
       getNews(),
@@ -118,16 +116,6 @@ Return ONLY this JSON:
     "EURUSD": "Support: X.XXXX Resistance: X.XXXX Current: ${prices["EURUSD"] || "1.1430"}",
     "XAUUSD": "Support: $XXXX Resistance: $XXXX Current: ${prices["XAUUSD"] || "2350"}"
   },
-  "event_analysis": [
-    {
-      "event": "event name",
-      "currency": "USD",
-      "if_beats": { "direction": "USD Strong", "probability": 65, "avg_pips": 50, "pairs_affected": ["EURUSD down 40-60 pips"] },
-      "if_misses": { "direction": "USD Weak", "probability": 60, "avg_pips": 45, "pairs_affected": ["EURUSD up 35-50 pips"] },
-      "trade_plan": "Specific trade with real prices",
-      "historical_note": "Historical context"
-    }
-  ],
   "volatility_analysis": {
     "overall_volatility": "Medium",
     "vix_estimate": "18.5 - Normal",
@@ -139,9 +127,19 @@ Return ONLY this JSON:
       "XAUUSD": { "rating": "High", "score": 82, "expected_range": "$15-$25", "best_time": "08:00-12:00 GMT" },
       "USDJPY": { "rating": "Low", "score": 45, "expected_range": "40-60 pips", "best_time": "00:00-03:00 GMT" }
     },
-    "news_impact": "FOMC minutes could spike volatility by 150% at 18:00 GMT",
-    "recommendation": "Trade during London session, reduce size before FOMC"
+    "news_impact": "Specific news impact on volatility today",
+    "recommendation": "Specific recommendation for today"
   },
+  "event_analysis": [
+    {
+      "event": "event name",
+      "currency": "USD",
+      "if_beats": { "direction": "USD Strong", "probability": 65, "avg_pips": 50, "pairs_affected": ["EURUSD down 40-60 pips"] },
+      "if_misses": { "direction": "USD Weak", "probability": 60, "avg_pips": 45, "pairs_affected": ["EURUSD up 35-50 pips"] },
+      "trade_plan": "Specific trade with real prices",
+      "historical_note": "Historical context"
+    }
+  ],
   "crypto_analysis": {
     "market_sentiment": "Bullish",
     "fear_greed": "65 - Greed",
