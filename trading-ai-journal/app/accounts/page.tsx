@@ -103,12 +103,23 @@ export default function AccountsPage() {
       .update({ is_active: true })
       .eq("id", accountId);
 
+    const activeAccount = accounts.find(a => a.id === accountId);
+    if (activeAccount) {
+      localStorage.setItem("active_account", JSON.stringify({
+        id: accountId,
+        account_number: activeAccount.account_number,
+        account_name: activeAccount.account_name,
+        platform: activeAccount.platform,
+      }));
+    }
+
     setAccounts(accounts.map(a => ({
       ...a,
       is_active: a.id === accountId,
     })));
 
-    setMessage("Active account changed ✅");
+    setMessage("Active account changed ✅ Redirecting to dashboard...");
+    setTimeout(() => router.push("/dashboard"), 1500);
   }
 
   async function deleteAccount(accountId: string) {
