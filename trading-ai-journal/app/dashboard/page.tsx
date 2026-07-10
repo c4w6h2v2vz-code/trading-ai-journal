@@ -29,13 +29,22 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
+      const activeAccount = localStorage.getItem("active_account");
+      const activeAccountNumber = activeAccount ? JSON.parse(activeAccount).account_number : null;
+
       const { data: manualTrades } = await supabase
         .from("trades").select("*").eq("user_id", user.id)
         .order("created_at", { ascending: true });
 
-      const { data: mt5Data } = await supabase
+      let mt5Query = supabase
         .from("mt5_trades").select("*").eq("user_id", user.id)
         .order("created_at", { ascending: true });
+
+      if (activeAccountNumber) {
+        mt5Query = mt5Query.eq("account", activeAccountNumber);
+      }
+
+      const { data: mt5Data } = await mt5Query;
 
       const mt5Mapped = (mt5Data || []).map((t) => ({
         id: String(t.id),
