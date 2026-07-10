@@ -26,6 +26,7 @@ const allLinks = [
   { name: "Psychology", href: "/psychology" },
   { name: "Analytics", href: "/analytics" },
   { name: "Goals", href: "/goals" },
+  { name: "Accounts", href: "/accounts" },
   { name: "Profile", href: "/profile" },
   { name: "Reports", href: "/reports" },
   { name: "Settings", href: "/settings" },
