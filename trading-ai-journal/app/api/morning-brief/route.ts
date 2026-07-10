@@ -7,7 +7,9 @@ async function getForexPrices() {
   const pairs = [
     { from: "EUR", to: "USD", name: "EURUSD" },
     { from: "GBP", to: "USD", name: "GBPUSD" },
+    { from: "USD", to: "JPY", name: "USDJPY" },
     { from: "XAU", to: "USD", name: "XAUUSD" },
+    { from: "AUD", to: "USD", name: "AUDUSD" },
   ];
 
   for (const pair of pairs) {
@@ -17,9 +19,14 @@ async function getForexPrices() {
       const data = await response.json();
       const rate = data["Realtime Currency Exchange Rate"];
       if (rate) {
-        prices[pair.name] = parseFloat(rate["5. Exchange Rate"]).toFixed(
-          pair.name === "XAUUSD" ? 2 : 5
-        );
+        const price = parseFloat(rate["5. Exchange Rate"]);
+        if (pair.name === "XAUUSD") {
+          prices[pair.name] = price.toFixed(2);
+        } else if (pair.name === "USDJPY") {
+          prices[pair.name] = price.toFixed(3);
+        } else {
+          prices[pair.name] = price.toFixed(5);
+        }
       }
     } catch (err) {
       console.error("Price fetch failed:", pair.name);
@@ -32,7 +39,6 @@ async function getForexPrices() {
 async function getCryptoPrices() {
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
   const prices: Record<string, string> = {};
-
   const coins = ["BTC", "ETH"];
 
   for (const coin of coins) {
@@ -42,9 +48,7 @@ async function getCryptoPrices() {
       const data = await response.json();
       const rate = data["Realtime Currency Exchange Rate"];
       if (rate) {
-        prices[coin] = parseFloat(rate["5. Exchange Rate"]).toFixed(
-          coin === "BTC" ? 0 : 2
-        );
+        prices[coin] = parseFloat(rate["5. Exchange Rate"]).toFixed(coin === "BTC" ? 0 : 2);
       }
     } catch (err) {
       console.error("Crypto price failed:", coin);
@@ -59,11 +63,16 @@ async function getAllNews() {
   const allNews: string[] = [];
 
   const queries = [
-    "forex dollar euro fed reserve today",
-    "gold price analysis today",
+    "forex EURUSD GBPUSD USDJPY market today",
+    "gold XAUUSD price analysis today",
     "bitcoin crypto market today",
-    "institutional trading hedge fund today",
-    "central bank interest rate today",
+    "federal reserve interest rate inflation",
+    "ECB BOE BOJ central bank policy",
+    "forex factory economic calendar impact",
+    "institutional trading hedge fund positioning",
+    "DXY dollar index trend today",
+    "GBPJPY AUDUSD forex volatility",
+    "oil prices geopolitical risk today",
   ];
 
   for (const q of queries) {
@@ -83,7 +92,7 @@ async function getAllNews() {
     }
   }
 
-  return allNews.slice(0, 15).join("\n");
+  return allNews.slice(0, 20).join("\n");
 }
 
 async function getEconomicEvents() {
@@ -152,11 +161,11 @@ export async function POST() {
     ]);
 
     const forexText = Object.entries(forexPrices).length > 0
-      ? Object.entries(forexPrices).map(([p, v]) => `${p}: ${v}`).join(" | ")
+      ? Object.entries(forexPrices).map(([p, v]) => `${p}: ${v}`).join("\n")
       : "Prices loading...";
 
     const cryptoText = Object.entries(cryptoPrices).length > 0
-      ? Object.entries(cryptoPrices).map(([c, v]) => `${c}: $${v}`).join(" | ")
+      ? Object.entries(cryptoPrices).map(([c, v]) => `${c}: $${v}`).join("\n")
       : "Prices loading...";
 
     const eventsText = events.length > 0
@@ -174,14 +183,16 @@ export async function POST() {
         messages: [
           {
             role: "system",
-            content: `You are an elite Bloomberg Terminal-level market analyst. Today is ${today}, current EU time is ${euTime} CET.
-You provide institutional-grade intelligence for forex and crypto traders.
+            content: `You are an elite Bloomberg Terminal-level market analyst. Today is ${today}, EU time is ${euTime} CET.
 RULES:
-- Use ONLY the real prices provided below
-- All times must be in CET (Central European Time)
-- Give specific price targets calculated from real current prices
-- Never use placeholder or example data
-- Think like Goldman Sachs, JPMorgan, and Bridgewater combined`,
+- Use ONLY the real prices provided — never invent prices
+- All times in CET (Central European Time)
+- Calculate specific targets from real current prices
+- Never use placeholder data
+- Analyze ALL pairs provided including cross pairs like GBPJPY
+- Identify which pairs have the HIGHEST volatility today
+- Think like Goldman Sachs and JPMorgan combined
+- Include real support/resistance levels based on current prices`,
           },
           {
             role: "user",
@@ -196,19 +207,32 @@ ${cryptoText}
 TODAY'S ECONOMIC EVENTS (CET):
 ${eventsText}
 
-TODAY'S NEWS HEADLINES:
-${news || "Use your knowledge of current market conditions as of today."}
+TODAY'S NEWS FROM REUTERS, BLOOMBERG, FOREXFACTORY:
+${news || "Use your knowledge of current market conditions."}
 
-Generate a COMPLETE Morning Intelligence Brief. Use REAL prices above for all calculations.
+Generate a COMPLETE Morning Intelligence Brief.
+Use REAL prices above for ALL calculations.
+Include ALL pairs: EURUSD, GBPUSD, USDJPY, XAUUSD, AUDUSD.
+Also analyze cross pairs: GBPJPY, EURJPY, EURGBP.
+Identify the HOTTEST pairs with most volatility today.
 
 Return ONLY this JSON:
 {
   "brief_date": "${today}",
   "brief_time": "${euTime} CET",
-  "headline": "One powerful headline for today's markets",
+  "headline": "One powerful headline for today's markets based on real news",
   "market_mood": "Risk-On/Risk-Off/Neutral",
-  "summary": "3 sentences covering the most important things happening today with specific prices",
+  "summary": "3 sentences with real prices and real news context",
   "key_theme": "The #1 theme driving markets today",
+
+  "hot_pairs": [
+    {
+      "pair": "The pair with highest volatility today",
+      "reason": "Why this pair is hot today",
+      "expected_move": "XX pips",
+      "direction": "Bullish/Bearish"
+    }
+  ],
 
   "forex_analysis": {
     "pairs": [
@@ -219,7 +243,7 @@ Return ONLY this JSON:
         "confidence": 65,
         "target": "calculated from current price",
         "stop_loss": "calculated from current price",
-        "reason": "Specific reason using real price and today's news",
+        "reason": "Specific reason with real price and news",
         "volatility": "Low/Medium/High/Extreme",
         "volatility_score": 65,
         "expected_range": "XX pips",
@@ -231,7 +255,7 @@ Return ONLY this JSON:
         "pair": "GBPUSD",
         "current_price": "${forexPrices["GBPUSD"] || "N/A"}",
         "direction": "Bullish/Bearish",
-        "confidence": 55,
+        "confidence": 60,
         "target": "calculated",
         "stop_loss": "calculated",
         "reason": "Real reason",
@@ -241,6 +265,21 @@ Return ONLY this JSON:
         "best_time_cet": "09:00-12:00 CET",
         "key_support": "X.XXXX",
         "key_resistance": "X.XXXX"
+      },
+      {
+        "pair": "USDJPY",
+        "current_price": "${forexPrices["USDJPY"] || "N/A"}",
+        "direction": "Bullish/Bearish",
+        "confidence": 55,
+        "target": "calculated",
+        "stop_loss": "calculated",
+        "reason": "Real reason",
+        "volatility": "Medium",
+        "volatility_score": 60,
+        "expected_range": "XX pips",
+        "best_time_cet": "01:00-05:00 CET",
+        "key_support": "XXX.XX",
+        "key_resistance": "XXX.XX"
       },
       {
         "pair": "XAUUSD",
@@ -256,10 +295,70 @@ Return ONLY this JSON:
         "best_time_cet": "14:00-17:00 CET",
         "key_support": "$XXXX",
         "key_resistance": "$XXXX"
+      },
+      {
+        "pair": "AUDUSD",
+        "current_price": "${forexPrices["AUDUSD"] || "N/A"}",
+        "direction": "Bullish/Bearish",
+        "confidence": 55,
+        "target": "calculated",
+        "stop_loss": "calculated",
+        "reason": "Real reason",
+        "volatility": "Medium",
+        "volatility_score": 55,
+        "expected_range": "XX pips",
+        "best_time_cet": "01:00-05:00 CET",
+        "key_support": "X.XXXX",
+        "key_resistance": "X.XXXX"
+      },
+      {
+        "pair": "GBPJPY",
+        "current_price": "calculate from GBPUSD and USDJPY",
+        "direction": "Bullish/Bearish",
+        "confidence": 60,
+        "target": "calculated",
+        "stop_loss": "calculated",
+        "reason": "Cross pair analysis",
+        "volatility": "High",
+        "volatility_score": 85,
+        "expected_range": "XX pips",
+        "best_time_cet": "09:00-12:00 CET",
+        "key_support": "XXX.XX",
+        "key_resistance": "XXX.XX"
+      },
+      {
+        "pair": "EURJPY",
+        "current_price": "calculate from EURUSD and USDJPY",
+        "direction": "Bullish/Bearish",
+        "confidence": 55,
+        "target": "calculated",
+        "stop_loss": "calculated",
+        "reason": "Cross pair analysis",
+        "volatility": "High",
+        "volatility_score": 78,
+        "expected_range": "XX pips",
+        "best_time_cet": "09:00-12:00 CET",
+        "key_support": "XXX.XX",
+        "key_resistance": "XXX.XX"
+      },
+      {
+        "pair": "EURGBP",
+        "current_price": "calculate from EURUSD and GBPUSD",
+        "direction": "Bullish/Bearish",
+        "confidence": 50,
+        "target": "calculated",
+        "stop_loss": "calculated",
+        "reason": "Cross pair analysis",
+        "volatility": "Low",
+        "volatility_score": 40,
+        "expected_range": "XX pips",
+        "best_time_cet": "09:00-11:00 CET",
+        "key_support": "X.XXXX",
+        "key_resistance": "X.XXXX"
       }
     ],
     "dxy_analysis": "How DXY is affecting all pairs today with specific levels",
-    "best_forex_trade": "The single best forex trade today with exact entry, TP, SL prices"
+    "best_forex_trade": "The single best forex trade today with exact entry, TP, SL"
   },
 
   "crypto_analysis": {
@@ -288,71 +387,87 @@ Return ONLY this JSON:
         "category": "Layer1"
       }
     ],
-    "meme_alert": "Any meme coin trending today and why",
-    "best_crypto_trade": "Best crypto trade today with entry, target, stop"
+    "meme_alert": "Any meme coin trending today",
+    "best_crypto_trade": "Best crypto trade with entry, target, stop"
   },
 
   "cot_report": {
     "summary": "What institutions are positioned for this week",
     "positions": [
-      { "pair": "EUR/USD", "position": "Net Long +45,000", "signal": "Bullish", "insight": "Why this matters" },
-      { "pair": "GOLD", "position": "Net Long +285,000", "signal": "Bullish", "insight": "Why this matters" },
-      { "pair": "BTC", "position": "Net Long +15,000", "signal": "Bullish", "insight": "Why this matters" }
+      { "pair": "EUR/USD", "position": "Net Long/Short +XX,000", "signal": "Bullish/Bearish", "insight": "What this means for trading today" },
+      { "pair": "GBP/USD", "position": "Net Long/Short +XX,000", "signal": "Bullish/Bearish", "insight": "What this means" },
+      { "pair": "USD/JPY", "position": "Net Long/Short +XX,000", "signal": "Bullish/Bearish", "insight": "What this means" },
+      { "pair": "GOLD", "position": "Net Long/Short +XXX,000", "signal": "Bullish/Bearish", "insight": "What this means" },
+      { "pair": "BTC", "position": "Net Long/Short +XX,000", "signal": "Bullish/Bearish", "insight": "What this means" }
     ]
   },
 
   "correlations": [
-    { "assets": "DXY ↔ EURUSD", "value": "-0.92", "meaning": "Specific meaning for today", "action": "What to do" },
-    { "assets": "DXY ↔ GOLD", "value": "-0.78", "meaning": "Specific meaning", "action": "What to do" },
-    { "assets": "BTC ↔ SP500", "value": "+0.65", "meaning": "Specific meaning", "action": "What to do" }
+    { "assets": "DXY ↔ EURUSD", "value": "-0.XX", "meaning": "Specific meaning for today", "action": "What to do" },
+    { "assets": "DXY ↔ GOLD", "value": "-0.XX", "meaning": "Specific meaning", "action": "What to do" },
+    { "assets": "BTC ↔ SP500", "value": "+0.XX", "meaning": "Specific meaning", "action": "What to do" },
+    { "assets": "OIL ↔ USDJPY", "value": "+0.XX", "meaning": "Specific meaning", "action": "What to do" }
   ],
 
   "economic_surprises": [
-    { "event": "Recent event", "result": "Beat/Miss", "impact": "How it affects today's trading" }
+    { "event": "Recent real event", "result": "Beat/Miss with numbers", "impact": "How it affects today's trading" }
   ],
 
   "events_today": [
-    { "time": "CET time", "currency": "USD", "event": "Event name", "impact": "High", "forecast": "XX", "previous": "XX", "expected_move": "XX pips on EURUSD" }
+    { "time": "CET time", "currency": "USD", "event": "Event name", "impact": "High", "forecast": "XX", "previous": "XX", "expected_move": "XX pips on affected pairs" }
   ],
 
   "best_trades": [
     {
       "rank": 1,
-      "asset": "EURUSD",
+      "asset": "Best pair today",
       "direction": "Buy/Sell",
       "entry": "real price",
       "target": "real target",
       "stop": "real stop",
       "confidence": 72,
-      "risk_reward": "1:2.5",
+      "risk_reward": "1:X.X",
       "timeframe": "Today",
-      "reasoning": "Full reasoning with real data"
+      "reasoning": "Full reasoning with real data and news"
     },
     {
       "rank": 2,
-      "asset": "XAUUSD",
+      "asset": "Second best",
       "direction": "Buy/Sell",
       "entry": "real price",
       "target": "real target",
       "stop": "real stop",
       "confidence": 68,
-      "risk_reward": "1:2",
+      "risk_reward": "1:X.X",
       "timeframe": "24-48h",
+      "reasoning": "Full reasoning"
+    },
+    {
+      "rank": 3,
+      "asset": "Third best (can be crypto)",
+      "direction": "Buy/Sell",
+      "entry": "real price",
+      "target": "real target",
+      "stop": "real stop",
+      "confidence": 62,
+      "risk_reward": "1:X.X",
+      "timeframe": "48-72h",
       "reasoning": "Full reasoning"
     }
   ],
 
   "volatility_overview": {
-    "overall": "Medium",
-    "best_window_cet": "09:00-12:00 CET (London session)",
-    "avoid_window_cet": "13:00-14:00 CET (lunch low volatility)",
-    "news_warning": "Specific warning about upcoming news volatility"
+    "overall": "Low/Medium/High/Extreme",
+    "hottest_pair": "Which pair has most volatility today",
+    "best_window_cet": "XX:00-XX:00 CET",
+    "avoid_window_cet": "XX:00-XX:00 CET",
+    "news_warning": "Specific warning about upcoming news"
   },
 
   "action_items": [
-    "Specific thing to do #1",
-    "Specific thing to do #2",
-    "Specific thing to do #3"
+    "Specific action #1 with real prices",
+    "Specific action #2",
+    "Specific action #3"
   ]
 }`
           }

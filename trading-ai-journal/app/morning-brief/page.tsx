@@ -44,6 +44,13 @@ type BestTrade = {
   reasoning: string;
 };
 
+type HotPair = {
+  pair: string;
+  reason: string;
+  expected_move: string;
+  direction: string;
+};
+
 type Brief = {
   brief_date: string;
   brief_time: string;
@@ -51,6 +58,7 @@ type Brief = {
   market_mood: string;
   summary: string;
   key_theme: string;
+  hot_pairs: HotPair[];
   forex_analysis: {
     pairs: ForexPair[];
     dxy_analysis: string;
@@ -74,6 +82,7 @@ type Brief = {
   best_trades: BestTrade[];
   volatility_overview: {
     overall: string;
+    hottest_pair: string;
     best_window_cet: string;
     avoid_window_cet: string;
     news_warning: string;
@@ -168,7 +177,7 @@ export default function MorningBriefPage() {
             🕐 {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Vienna" })} CET
           </p>
           <p className="mt-2 text-white/40">
-            Bloomberg-level intelligence. Real prices, real news, institutional analysis. All in one place.
+            Bloomberg-level intelligence. Real prices, real news, 8 forex pairs, crypto, COT data. All in CET.
           </p>
         </div>
 
@@ -205,6 +214,29 @@ export default function MorningBriefPage() {
               </div>
             </div>
 
+            {/* Hot Pairs */}
+            {brief.hot_pairs && brief.hot_pairs.length > 0 && (
+              <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
+                <h2 className="mb-4 text-xl font-semibold text-red-400">🔥 Hottest Pairs Today</h2>
+                <div className="space-y-3">
+                  {brief.hot_pairs.map((hp, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-2xl border border-red-500/20 bg-black/30 p-4">
+                      <div>
+                        <p className="font-bold text-lg">{hp.pair}</p>
+                        <p className="text-xs text-white/60">{hp.reason}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-bold ${hp.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
+                          {hp.direction === "Bullish" ? "↑" : "↓"} {hp.direction}
+                        </p>
+                        <p className="text-xs text-yellow-400">{hp.expected_move}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Volatility Overview */}
             {brief.volatility_overview && (
               <div className="rounded-3xl border border-orange-500/20 bg-orange-500/5 p-6">
@@ -222,6 +254,11 @@ export default function MorningBriefPage() {
                     <p className="text-sm font-bold mt-1 text-green-400">{brief.volatility_overview.best_window_cet}</p>
                   </div>
                 </div>
+                {brief.volatility_overview.hottest_pair && (
+                  <div className="mt-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-3">
+                    <p className="text-xs text-red-400">🔥 Hottest: {brief.volatility_overview.hottest_pair}</p>
+                  </div>
+                )}
                 {brief.volatility_overview.avoid_window_cet && (
                   <div className="mt-3 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-3">
                     <p className="text-xs text-yellow-400">⚠️ Avoid: {brief.volatility_overview.avoid_window_cet}</p>
@@ -244,7 +281,7 @@ export default function MorningBriefPage() {
                     <div key={i} className={`flex items-center justify-between rounded-2xl border p-3 ${
                       evt.impact === "High" ? "border-red-500/20 bg-red-500/5" : "border-yellow-500/20 bg-yellow-500/5"
                     }`}>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                           evt.impact === "High" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"
                         }`}>{evt.impact}</span>
@@ -262,7 +299,7 @@ export default function MorningBriefPage() {
             {/* Forex Analysis */}
             {brief.forex_analysis && (
               <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-green-400">💱 Forex Analysis</h2>
+                <h2 className="mb-4 text-xl font-semibold text-green-400">💱 Forex Analysis (8 Pairs)</h2>
 
                 {brief.forex_analysis.dxy_analysis && (
                   <div className="mb-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-3">
@@ -436,6 +473,26 @@ export default function MorningBriefPage() {
                       </div>
                       <p className="text-xs text-white/60">{corr.meaning}</p>
                       <p className="text-xs text-blue-400 mt-1">→ {corr.action}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Economic Surprises */}
+            {brief.economic_surprises && brief.economic_surprises.length > 0 && (
+              <div className="rounded-3xl border border-orange-500/20 bg-orange-500/5 p-6">
+                <h2 className="mb-4 text-xl font-semibold text-orange-400">📊 Economic Surprises</h2>
+                <div className="space-y-2">
+                  {brief.economic_surprises.map((s, i) => (
+                    <div key={i} className="rounded-2xl border border-white/10 bg-black/30 p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-bold text-sm">{s.event}</p>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                          s.result.toLowerCase().includes("beat") ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+                        }`}>{s.result}</span>
+                      </div>
+                      <p className="text-xs text-white/60">{s.impact}</p>
                     </div>
                   ))}
                 </div>
