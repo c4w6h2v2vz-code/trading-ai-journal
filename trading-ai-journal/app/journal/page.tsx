@@ -95,9 +95,19 @@ async function loadMt5Trades() {
   const user = await getCurrentUser();
   if (!user) return;
 
-  const { data, error } = await supabase
+  const activeAccount = localStorage.getItem("active_account");
+  const activeAccountNumber = activeAccount ? JSON.parse(activeAccount).account_number : null;
+
+  let query = supabase
     .from("mt5_trades")
     .select("*")
+    .eq("user_id", user.id);
+
+  if (activeAccountNumber) {
+    query = query.eq("account", activeAccountNumber);
+  }
+
+  const { data, error } = await query
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
