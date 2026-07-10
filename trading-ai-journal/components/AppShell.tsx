@@ -17,6 +17,7 @@ const allLinks = [
   { name: "Trade Journal", href: "/journal" },
   { name: "Daily Journal", href: "/daily-journal" },
   { name: "Trading Rules", href: "/trading-rules" },
+  { name: "Morning Brief", href: "/morning-brief" },
   { name: "Intelligence", href: "/intelligence" },
   { name: "Market Analysis", href: "/market-analysis" },
   { name: "Crypto Intel", href: "/crypto-intelligence" },
