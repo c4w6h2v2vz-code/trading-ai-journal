@@ -59,6 +59,11 @@ type Brief = {
   summary: string;
   key_theme: string;
   hot_pairs: HotPair[];
+  top_movers: {
+    gainers: { symbol: string; price: string; change_24h: string; continue_probability: number; next_24h_target: string; reason: string; trade_plan: string }[];
+    losers: { symbol: string; price: string; change_24h: string; bounce_probability: number; reason: string }[];
+    best_momentum_trade: string;
+  };
   forex_analysis: {
     pairs: ForexPair[];
     dxy_analysis: string;
@@ -372,7 +377,71 @@ export default function MorningBriefPage() {
                 )}
               </div>
             )}
+{/* Top Movers */}
+            {brief.top_movers && (
+              <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
+                <h2 className="mb-4 text-xl font-semibold text-green-400">🚀 Top Movers (24h Real Data)</h2>
 
+                {brief.top_movers.gainers?.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold text-green-400 mb-3">📈 Top Gainers</p>
+                    <div className="space-y-3">
+                      {brief.top_movers.gainers.map((g, i) => (
+                        <div key={i} className="rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg font-bold">{g.symbol}</span>
+                              <span className="text-sm text-white/40">{g.price}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-green-400 font-bold">{g.change_24h}%</span>
+                              <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
+                                {g.continue_probability}% continue
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-white/40 mb-1">Next 24h: {g.next_24h_target}</p>
+                          <p className="text-xs text-white/60 mb-1">{g.reason}</p>
+                          <p className="text-xs text-yellow-400">📋 {g.trade_plan}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {brief.top_movers.losers?.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold text-red-400 mb-3">📉 Top Losers</p>
+                    <div className="space-y-3">
+                      {brief.top_movers.losers.map((l, i) => (
+                        <div key={i} className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg font-bold">{l.symbol}</span>
+                              <span className="text-sm text-white/40">{l.price}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-red-400 font-bold">{l.change_24h}%</span>
+                              <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-400">
+                                {l.bounce_probability}% bounce
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-white/60">{l.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {brief.top_movers.best_momentum_trade && (
+                  <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
+                    <p className="text-xs font-semibold text-green-400 mb-1">🏆 Best Momentum Trade</p>
+                    <p className="text-sm text-white/70">{brief.top_movers.best_momentum_trade}</p>
+                  </div>
+                )}
+              </div>
+            )}
             {/* Crypto Analysis */}
             {brief.crypto_analysis && (
               <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-6">

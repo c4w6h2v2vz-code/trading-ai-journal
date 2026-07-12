@@ -1,5 +1,41 @@
 import { NextResponse } from "next/server";
 
+async function getTopMovers() {
+  try {
+    const response = await fetch(
+      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h",
+      { cache: "no-store" }
+    );
+    const data = await response.json();
+    if (!Array.isArray(data)) return { gainers: [], losers: [] };
+
+    const sorted = [...data].sort((a, b) => (b.price_change_percentage_24h || 0) - (a.price_change_percentage_24h || 0));
+
+    const gainers = sorted.slice(0, 5).map((c: any) => ({
+      name: c.name,
+      symbol: c.symbol.toUpperCase(),
+      price: c.current_price,
+      change_24h: (c.price_change_percentage_24h || 0).toFixed(2),
+      volume: c.total_volume,
+      market_cap: c.market_cap,
+    }));
+
+    const losers = sorted.slice(-5).reverse().map((c: any) => ({
+      name: c.name,
+      symbol: c.symbol.toUpperCase(),
+      price: c.current_price,
+      change_24h: (c.price_change_percentage_24h || 0).toFixed(2),
+      volume: c.total_volume,
+      market_cap: c.market_cap,
+    }));
+
+    return { gainers, losers };
+  } catch (err) {
+    console.error("CoinGecko fetch failed");
+    return { gainers: [], losers: [] };
+  }
+}
+
 async function getForexPrices() {
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
   const prices: Record<string, string> = {};
@@ -20,13 +56,9 @@ async function getForexPrices() {
       const rate = data["Realtime Currency Exchange Rate"];
       if (rate) {
         const price = parseFloat(rate["5. Exchange Rate"]);
-        if (pair.name === "XAUUSD") {
-          prices[pair.name] = price.toFixed(2);
-        } else if (pair.name === "USDJPY") {
-          prices[pair.name] = price.toFixed(3);
-        } else {
-          prices[pair.name] = price.toFixed(5);
-        }
+        if (pair.name === "XAUUSD") prices[pair.name] = price.toFixed(2);
+        else if (pair.name === "USDJPY") prices[pair.name] = price.toFixed(3);
+        else prices[pair.name] = price.toFixed(5);
       }
     } catch (err) {
       console.error("Price fetch failed:", pair.name);
@@ -137,8 +169,7 @@ async function getEconomicEvents() {
 
 export async function POST() {
   try {
-    const now = new Date(); const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const now = new Date();
     const today = now.toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
@@ -154,16 +185,20 @@ export async function POST() {
       timeZone: "Europe/Vienna",
     });
 
-    const [forexPrices, cryptoPrices, news, events] = await Promise.all([
+    const dayOfWeek = now.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    const [forexPrices, cryptoPrices, news, events, topMovers] = await Promise.all([
       isWeekend ? Promise.resolve({} as Record<string, string>) : getForexPrices(),
       getCryptoPrices(),
       getAllNews(),
       isWeekend ? Promise.resolve([] as any[]) : getEconomicEvents(),
+      getTopMovers(),
     ]);
 
     const forexText = Object.entries(forexPrices).length > 0
       ? Object.entries(forexPrices).map(([p, v]) => `${p}: ${v}`).join("\n")
-      : "Prices loading...";
+      : "Forex markets closed (weekend)";
 
     const cryptoText = Object.entries(cryptoPrices).length > 0
       ? Object.entries(cryptoPrices).map(([c, v]) => `${c}: $${v}`).join("\n")
@@ -172,6 +207,11 @@ export async function POST() {
     const eventsText = events.length > 0
       ? events.map((e: any) => `${e.time} CET - ${e.currency} - ${e.event} (${e.impact}) - F: ${e.forecast} P: ${e.previous}`).join("\n")
       : "No major events today.";
+
+    const moversText = topMovers.gainers.length > 0
+      ? "TOP GAINERS (24h):\n" + topMovers.gainers.map((g: any) => `${g.symbol}: $${g.price} (${g.change_24h}%)`).join("\n") +
+        "\n\nTOP LOSERS (24h):\n" + topMovers.losers.map((l: any) => `${l.symbol}: $${l.price} (${l.change_24h}%)`).join("\n")
+      : "Top movers data unavailable";
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -193,11 +233,16 @@ RULES:
 - Analyze ALL pairs provided including cross pairs like GBPJPY
 - Identify which pairs have the HIGHEST volatility today
 - Think like Goldman Sachs and JPMorgan combined
-- Include real support/resistance levels based on current prices`,
+- For crypto: Analyze the TOP GAINERS shown. For each gainer, give probability of continuing to pump in next 24 hours
+- Also identify which LOSERS might bounce back`,
           },
           {
             role: "user",
             content: `TODAY: ${today} | EU TIME: ${euTime} CET
+
+${isWeekend
+  ? "TODAY IS WEEKEND - Forex markets are CLOSED. Focus ONLY on crypto analysis since crypto trades 24/7. For forex, give a preview of what to expect on Monday. Do NOT give forex trade signals for today."
+  : "Generate a COMPLETE Morning Intelligence Brief for today's live markets."}
 
 REAL-TIME FOREX PRICES:
 ${forexText}
@@ -205,37 +250,41 @@ ${forexText}
 REAL-TIME CRYPTO PRICES:
 ${cryptoText}
 
+TODAY'S TOP MOVERS (REAL DATA FROM COINGECKO):
+${moversText}
+
 TODAY'S ECONOMIC EVENTS (CET):
 ${eventsText}
 
-TODAY'S NEWS FROM REUTERS, BLOOMBERG, FOREXFACTORY:
+TODAY'S NEWS:
 ${news || "Use your knowledge of current market conditions."}
 
-${isWeekend 
-  ? "TODAY IS WEEKEND - Forex markets are CLOSED. Focus ONLY on crypto analysis since crypto trades 24/7. For forex, give a preview of what to expect on Monday. Do NOT give forex trade signals for today." 
-  : "Generate a COMPLETE Morning Intelligence Brief for today's live markets."}
 Use REAL prices above for ALL calculations.
-Include ALL pairs: EURUSD, GBPUSD, USDJPY, XAUUSD, AUDUSD.
-Also analyze cross pairs: GBPJPY, EURJPY, EURGBP.
+Include ALL pairs: EURUSD, GBPUSD, USDJPY, XAUUSD, AUDUSD, GBPJPY, EURJPY, EURGBP.
 Identify the HOTTEST pairs with most volatility today.
 
 Return ONLY this JSON:
 {
   "brief_date": "${today}",
   "brief_time": "${euTime} CET",
-  "headline": "One powerful headline for today's markets based on real news",
+  "headline": "One powerful headline based on real news",
   "market_mood": "Risk-On/Risk-Off/Neutral",
   "summary": "3 sentences with real prices and real news context",
   "key_theme": "The #1 theme driving markets today",
 
   "hot_pairs": [
-    {
-      "pair": "The pair with highest volatility today",
-      "reason": "Why this pair is hot today",
-      "expected_move": "XX pips",
-      "direction": "Bullish/Bearish"
-    }
+    { "pair": "Hottest pair today", "reason": "Why", "expected_move": "XX pips", "direction": "Bullish/Bearish" }
   ],
+
+  "top_movers": {
+    "gainers": [
+      { "symbol": "REAL COIN from data", "price": "real price", "change_24h": "real change", "continue_probability": 65, "next_24h_target": "+X% more", "reason": "Why momentum may continue", "trade_plan": "Entry, target, stop" }
+    ],
+    "losers": [
+      { "symbol": "REAL COIN from data", "price": "real price", "change_24h": "real change", "bounce_probability": 45, "reason": "Why it might or might not bounce" }
+    ],
+    "best_momentum_trade": "Best momentum trade from today's gainers with entry and target"
+  },
 
   "forex_analysis": {
     "pairs": [
@@ -245,9 +294,9 @@ Return ONLY this JSON:
         "direction": "Bullish/Bearish",
         "confidence": 65,
         "target": "calculated from current price",
-        "stop_loss": "calculated from current price",
-        "reason": "Specific reason with real price and news",
-        "volatility": "Low/Medium/High/Extreme",
+        "stop_loss": "calculated",
+        "reason": "Real reason",
+        "volatility": "Low/Medium/High",
         "volatility_score": 65,
         "expected_range": "XX pips",
         "best_time_cet": "09:00-12:00 CET",
@@ -360,8 +409,8 @@ Return ONLY this JSON:
         "key_resistance": "X.XXXX"
       }
     ],
-    "dxy_analysis": "How DXY is affecting all pairs today with specific levels",
-    "best_forex_trade": "The single best forex trade today with exact entry, TP, SL"
+    "dxy_analysis": "How DXY is affecting all pairs today",
+    "best_forex_trade": "Best forex trade today with exact entry, TP, SL"
   },
 
   "crypto_analysis": {
@@ -369,108 +418,53 @@ Return ONLY this JSON:
     "fear_greed": "XX - Label",
     "btc_dominance": "XX%",
     "coins": [
-      {
-        "coin": "BTC",
-        "price": "${cryptoPrices["BTC"] || "N/A"}",
-        "direction": "Bullish/Bearish",
-        "confidence": 65,
-        "target": "calculated from real price",
-        "move_percent": "+X%",
-        "reason": "Real reason based on today's news",
-        "category": "Layer1"
-      },
-      {
-        "coin": "ETH",
-        "price": "${cryptoPrices["ETH"] || "N/A"}",
-        "direction": "Bullish/Bearish",
-        "confidence": 60,
-        "target": "calculated",
-        "move_percent": "+X%",
-        "reason": "Real reason",
-        "category": "Layer1"
-      }
+      { "coin": "BTC", "price": "${cryptoPrices["BTC"] || "N/A"}", "direction": "Bullish/Bearish", "confidence": 65, "target": "calculated", "move_percent": "+X%", "reason": "Real reason", "category": "Layer1" },
+      { "coin": "ETH", "price": "${cryptoPrices["ETH"] || "N/A"}", "direction": "Bullish/Bearish", "confidence": 60, "target": "calculated", "move_percent": "+X%", "reason": "Real reason", "category": "Layer1" }
     ],
     "meme_alert": "Any meme coin trending today",
     "best_crypto_trade": "Best crypto trade with entry, target, stop"
   },
 
   "cot_report": {
-    "summary": "What institutions are positioned for this week",
+    "summary": "What institutions are positioned for",
     "positions": [
-      { "pair": "EUR/USD", "position": "Net Long/Short +XX,000", "signal": "Bullish/Bearish", "insight": "What this means for trading today" },
-      { "pair": "GBP/USD", "position": "Net Long/Short +XX,000", "signal": "Bullish/Bearish", "insight": "What this means" },
-      { "pair": "USD/JPY", "position": "Net Long/Short +XX,000", "signal": "Bullish/Bearish", "insight": "What this means" },
+      { "pair": "EUR/USD", "position": "Net Long/Short +XX,000", "signal": "Bullish/Bearish", "insight": "What this means" },
       { "pair": "GOLD", "position": "Net Long/Short +XXX,000", "signal": "Bullish/Bearish", "insight": "What this means" },
       { "pair": "BTC", "position": "Net Long/Short +XX,000", "signal": "Bullish/Bearish", "insight": "What this means" }
     ]
   },
 
   "correlations": [
-    { "assets": "DXY ↔ EURUSD", "value": "-0.XX", "meaning": "Specific meaning for today", "action": "What to do" },
-    { "assets": "DXY ↔ GOLD", "value": "-0.XX", "meaning": "Specific meaning", "action": "What to do" },
-    { "assets": "BTC ↔ SP500", "value": "+0.XX", "meaning": "Specific meaning", "action": "What to do" },
-    { "assets": "OIL ↔ USDJPY", "value": "+0.XX", "meaning": "Specific meaning", "action": "What to do" }
+    { "assets": "DXY ↔ EURUSD", "value": "-0.XX", "meaning": "Meaning for today", "action": "What to do" },
+    { "assets": "DXY ↔ GOLD", "value": "-0.XX", "meaning": "Meaning", "action": "What to do" },
+    { "assets": "BTC ↔ SP500", "value": "+0.XX", "meaning": "Meaning", "action": "What to do" }
   ],
 
   "economic_surprises": [
-    { "event": "Recent real event", "result": "Beat/Miss with numbers", "impact": "How it affects today's trading" }
+    { "event": "Recent event", "result": "Beat/Miss", "impact": "Effect on trading" }
   ],
 
   "events_today": [
-    { "time": "CET time", "currency": "USD", "event": "Event name", "impact": "High", "forecast": "XX", "previous": "XX", "expected_move": "XX pips on affected pairs" }
+    { "time": "CET time", "currency": "USD", "event": "Name", "impact": "High", "forecast": "XX", "previous": "XX", "expected_move": "XX pips" }
   ],
 
   "best_trades": [
-    {
-      "rank": 1,
-      "asset": "Best pair today",
-      "direction": "Buy/Sell",
-      "entry": "real price",
-      "target": "real target",
-      "stop": "real stop",
-      "confidence": 72,
-      "risk_reward": "1:X.X",
-      "timeframe": "Today",
-      "reasoning": "Full reasoning with real data and news"
-    },
-    {
-      "rank": 2,
-      "asset": "Second best",
-      "direction": "Buy/Sell",
-      "entry": "real price",
-      "target": "real target",
-      "stop": "real stop",
-      "confidence": 68,
-      "risk_reward": "1:X.X",
-      "timeframe": "24-48h",
-      "reasoning": "Full reasoning"
-    },
-    {
-      "rank": 3,
-      "asset": "Third best (can be crypto)",
-      "direction": "Buy/Sell",
-      "entry": "real price",
-      "target": "real target",
-      "stop": "real stop",
-      "confidence": 62,
-      "risk_reward": "1:X.X",
-      "timeframe": "48-72h",
-      "reasoning": "Full reasoning"
-    }
+    { "rank": 1, "asset": "Best pair", "direction": "Buy/Sell", "entry": "real price", "target": "real target", "stop": "real stop", "confidence": 72, "risk_reward": "1:X.X", "timeframe": "Today", "reasoning": "Full reasoning" },
+    { "rank": 2, "asset": "Second best", "direction": "Buy/Sell", "entry": "real price", "target": "real target", "stop": "real stop", "confidence": 68, "risk_reward": "1:X.X", "timeframe": "24-48h", "reasoning": "Full reasoning" }
   ],
 
   "volatility_overview": {
-    "overall": "Low/Medium/High/Extreme",
-    "hottest_pair": "Which pair has most volatility today",
+    "overall": "Low/Medium/High",
+    "hottest_pair": "Which pair has most volatility",
     "best_window_cet": "XX:00-XX:00 CET",
     "avoid_window_cet": "XX:00-XX:00 CET",
-    "news_warning": "Specific warning about upcoming news"
+    "news_warning": "Warning about upcoming news"
   },
 
   "action_items": [
-    "Specific action #1 with real prices",
-    "Specific action #2",
-    "Specific action #3"
+    "Action #1 with real prices",
+    "Action #2",
+    "Action #3"
   ]
 }`
           }
@@ -488,6 +482,7 @@ Return ONLY this JSON:
       forex: forexPrices,
       crypto: cryptoPrices,
     };
+    parsed.top_movers_raw = topMovers;
     parsed.events_raw = events;
     parsed.generated_at = new Date().toISOString();
 
