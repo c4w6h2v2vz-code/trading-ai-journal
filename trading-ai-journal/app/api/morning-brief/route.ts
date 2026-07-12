@@ -185,7 +185,8 @@ export async function POST() {
       timeZone: "Europe/Vienna",
     });
 
-    const dayOfWeek = now.getDay();
+    const viennaTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Vienna" }));
+    const dayOfWeek = viennaTime.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
     const [forexPrices, cryptoPrices, news, events, topMovers] = await Promise.all([
@@ -241,7 +242,7 @@ RULES:
             content: `TODAY: ${today} | EU TIME: ${euTime} CET
 
 ${isWeekend
-  ? "TODAY IS WEEKEND - Forex markets are CLOSED. Focus ONLY on crypto analysis since crypto trades 24/7. For forex, give a preview of what to expect on Monday. Do NOT give forex trade signals for today."
+  ? "TODAY IS WEEKEND (SUNDAY) - Forex markets are COMPLETELY CLOSED. DO NOT analyze forex pairs. DO NOT give forex trade signals. DO NOT give forex entry/target/stop prices. ONLY analyze crypto because crypto trades 24/7 including weekends. For forex, ONLY give a 1-sentence preview of what to expect Monday. Focus 90% of your analysis on crypto, top movers, and meme coins."
   : "Generate a COMPLETE Morning Intelligence Brief for today's live markets."}
 
 REAL-TIME FOREX PRICES:
@@ -260,7 +261,9 @@ TODAY'S NEWS:
 ${news || "Use your knowledge of current market conditions."}
 
 Use REAL prices above for ALL calculations.
-Include ALL pairs: EURUSD, GBPUSD, USDJPY, XAUUSD, AUDUSD, GBPJPY, EURJPY, EURGBP.
+${isWeekend
+  ? "FOREX IS CLOSED. Skip forex_analysis pairs completely — return empty array for pairs. Focus on crypto top_movers and crypto_analysis ONLY."
+  : "Include ALL pairs: EURUSD, GBPUSD, USDJPY, XAUUSD, AUDUSD, GBPJPY, EURJPY, EURGBP."}
 Identify the HOTTEST pairs with most volatility today.
 
 Return ONLY this JSON:
@@ -285,7 +288,7 @@ Return ONLY this JSON:
     ],
     "best_momentum_trade": "Best momentum trade from today's gainers with entry and target"
   },
-
+${isWeekend ? '"forex_closed": "Forex markets closed until Monday. No trading signals available.",' : ''}
   "forex_analysis": {
     "pairs": [
       {
