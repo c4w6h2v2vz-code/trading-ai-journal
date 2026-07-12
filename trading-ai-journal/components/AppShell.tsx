@@ -28,6 +28,7 @@ const allLinks = [
   { name: "Analytics", href: "/analytics" },
   { name: "Goals", href: "/goals" },
   { name: "Accounts", href: "/accounts" },
+  { name: "Import", href: "/import" },
   { name: "Profile", href: "/profile" },
   { name: "Reports", href: "/reports" },
   { name: "Settings", href: "/settings" },
