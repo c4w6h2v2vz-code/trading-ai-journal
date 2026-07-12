@@ -399,14 +399,14 @@ if (loading) return (
   id="manual-trade-form"
   className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40"
 >
-  <h2 className="text-2xl font-semibold">MT5 Imported Trades</h2>
+  <h2 className="text-2xl font-semibold">Imported Trades</h2>
 
   <p className="mb-6 text-sm text-white/40">
-    Trades automatically imported from your FTMO MT5 account.
+    Trades imported from your trading platform (MT4, MT5, cTrader, DXtrade, CSV).
   </p>
 
   {mt5Trades.length === 0 ? (
-    <p className="text-white/40">No MT5 trades imported yet.</p>
+    <p className="text-white/40">No trades imported yet. Connect MT5 or import CSV from any platform.</p>
   ) : (
     <div className="space-y-4">
       {mt5Trades.map((trade) => (
