@@ -19,6 +19,7 @@ const navGroups = [
       { name: "Morning Brief", href: "/morning-brief" },
       { name: "Market Analysis", href: "/market-analysis" },
       { name: "Crypto Intel", href: "/crypto-intelligence" },
+      { name: "Alpha", href: "/alpha" },
       { name: "Intelligence", href: "/intelligence" },
     ],
   },
