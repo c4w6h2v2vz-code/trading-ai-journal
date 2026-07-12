@@ -41,7 +41,18 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    // Check if user needs onboarding
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("onboarded")
+      .eq("id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+
+    if (!profile?.onboarded) {
+      router.push("/onboarding");
+    } else {
+      router.push("/dashboard");
+    }
   }
 
   return (
