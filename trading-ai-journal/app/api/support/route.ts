@@ -33,7 +33,8 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           from: "PipTrak Support <noreply@piptrak.com>",
-          to: "jamashire04@gmail.com",
+          to: "support@piptrak.com",
+          reply_to: email,
           subject: `New support ticket: ${subject}`,
           text: `From: ${email}\n\n${message}`,
         }),

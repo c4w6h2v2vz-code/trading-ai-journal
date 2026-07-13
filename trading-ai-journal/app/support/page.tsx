@@ -65,7 +65,10 @@ export default function SupportPage() {
             💬 Support
           </p>
           <h1 className="text-4xl font-bold">Need Help?</h1>
-          <p className="mt-2 text-white/40">Check common issues below, or contact us directly.</p>
+          <p className="mt-2 text-white/40">
+            Check common issues below, or email us directly at{" "}
+            <a href="mailto:support@piptrak.com" className="text-blue-400 hover:underline">support@piptrak.com</a>
+          </p>
         </div>
 
         {/* Common Issues */}
