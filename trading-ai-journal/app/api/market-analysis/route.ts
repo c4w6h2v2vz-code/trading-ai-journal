@@ -15,12 +15,16 @@ async function getForexPrices() {
       const response = await fetch(url, { cache: "no-store" });
       const data = await response.json();
       const rate = data["Realtime Currency Exchange Rate"];
-      if (rate) {
+      if (rate && rate["5. Exchange Rate"]) {
         const price = parseFloat(rate["5. Exchange Rate"]);
         prices[pair.name] = pair.name === "XAUUSD" ? price.toFixed(2) : price.toFixed(5);
+      } else {
+        console.error(`No rate data for ${pair.name}:`, JSON.stringify(data).slice(0, 200));
       }
-    } catch {
-      console.error(`Failed ${pair.name}`);
+      // Small delay to avoid Alpha Vantage rate limit
+      await new Promise(resolve => setTimeout(resolve, 800));
+    } catch (err) {
+      console.error(`Failed ${pair.name}:`, err);
     }
   }
   return prices;
