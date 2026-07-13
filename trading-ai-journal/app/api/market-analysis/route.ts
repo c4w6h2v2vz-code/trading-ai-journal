@@ -14,15 +14,23 @@ async function getForexPrices() {
       const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${pair.from}&to_currency=${pair.to}&apikey=${apiKey}`;
       const response = await fetch(url, { cache: "no-store" });
       const data = await response.json();
+
+      if (data["Note"] || data["Information"]) {
+        console.error(`Alpha Vantage rate limit hit for ${pair.name}:`, data["Note"] || data["Information"]);
+        continue;
+      }
+
       const rate = data["Realtime Currency Exchange Rate"];
       if (rate && rate["5. Exchange Rate"]) {
         const price = parseFloat(rate["5. Exchange Rate"]);
-        prices[pair.name] = pair.name === "XAUUSD" ? price.toFixed(2) : price.toFixed(5);
+        if (!isNaN(price) && price > 0) {
+          prices[pair.name] = pair.name === "XAUUSD" ? price.toFixed(2) : price.toFixed(5);
+        }
       } else {
-        console.error(`No rate data for ${pair.name}:`, JSON.stringify(data).slice(0, 200));
+        console.error(`No rate data for ${pair.name}:`, JSON.stringify(data).slice(0, 300));
       }
-      // Small delay to avoid Alpha Vantage rate limit
-      await new Promise(resolve => setTimeout(resolve, 800));
+
+      await new Promise(resolve => setTimeout(resolve, 1200));
     } catch (err) {
       console.error(`Failed ${pair.name}:`, err);
     }
@@ -141,12 +149,12 @@ Return ONLY this JSON:
   "best_pairs_to_trade": ${isWeekend ? '["BTC", "ETH"]' : '["EURUSD", "XAUUSD"]'},
   "pairs_to_avoid": ["USDJPY"],
   "overall_bias": {
-    "EURUSD": { "direction": "Bullish", "confidence": 65, "current_price": "${prices["EURUSD"] || "Closed"}", "target": "calculate", "reason": "Real reason" },
-    "XAUUSD": { "direction": "Bullish", "confidence": 70, "current_price": "${prices["XAUUSD"] || "Closed"}", "target": "calculate", "reason": "Real reason" }
+    "EURUSD": { "direction": "Bullish", "confidence": 65, "current_price": "${prices["EURUSD"] || "Price unavailable"}", "target": "calculate", "reason": "Real reason" },
+    "XAUUSD": { "direction": "Bullish", "confidence": 70, "current_price": "${prices["XAUUSD"] || "Price unavailable"}", "target": "calculate", "reason": "Real reason" }
   },
   "key_levels": {
-    "EURUSD": "Support: X.XXXX Resistance: X.XXXX Current: ${prices["EURUSD"] || "Closed"}",
-    "XAUUSD": "Support: $XXXX Resistance: $XXXX Current: ${prices["XAUUSD"] || "Closed"}"
+    "EURUSD": "Support: X.XXXX Resistance: X.XXXX Current: ${prices["EURUSD"] || "Price unavailable"}",
+    "XAUUSD": "Support: $XXXX Resistance: $XXXX Current: ${prices["XAUUSD"] || "Price unavailable"}"
   },
   "volatility_analysis": {
     "overall_volatility": "Medium",
