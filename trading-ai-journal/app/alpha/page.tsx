@@ -3,48 +3,63 @@
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
 
-const DEMO_TOKENS = [
-  { name: "BONK", price: 0.0000234, change: 45.2, volume: "12.4M", mcap: "1.8B", liquidity: "4.2M", alpha: 82, trend: "🔥", risk: "Medium", category: "Meme" },
-  { name: "WIF", price: 2.34, change: 28.7, volume: "8.9M", mcap: "2.3B", liquidity: "6.1M", alpha: 78, trend: "🔥", risk: "Medium", category: "Meme" },
-  { name: "POPCAT", price: 0.87, change: 19.3, volume: "5.2M", mcap: "850M", liquidity: "2.8M", alpha: 71, trend: "📈", risk: "High", category: "Meme" },
-  { name: "JUP", price: 1.12, change: 12.1, volume: "15.7M", mcap: "1.5B", liquidity: "8.3M", alpha: 85, trend: "📈", risk: "Low", category: "DeFi" },
-  { name: "RENDER", price: 8.45, change: 8.9, volume: "22.1M", mcap: "3.2B", liquidity: "12.5M", alpha: 88, trend: "📈", risk: "Low", category: "AI" },
-  { name: "PYTH", price: 0.42, change: -5.3, volume: "3.1M", mcap: "680M", liquidity: "1.9M", alpha: 62, trend: "📉", risk: "Medium", category: "Oracle" },
-  { name: "MYRO", price: 0.067, change: 67.8, volume: "4.8M", mcap: "67M", liquidity: "890K", alpha: 58, trend: "🔥🔥", risk: "Very High", category: "Meme" },
-  { name: "SLERF", price: 0.23, change: -12.4, volume: "1.2M", mcap: "23M", liquidity: "340K", alpha: 35, trend: "📉", risk: "Very High", category: "Meme" },
-];
+type Opportunity = {
+  symbol: string;
+  name: string;
+  price: string;
+  ai_score: number;
+  risk_score: number;
+  score_explanation: string;
+  entry_zone: string;
+  stop_loss: string;
+  take_profit: string;
+  risk_reward: string;
+  market_cap: string;
+  liquidity: string;
+  volume_24h: string;
+  reason: string;
+};
 
-const DEMO_NEW_LAUNCHES = [
-  { name: "CATGPT", age: "2 hours", price: 0.00012, change: 340, liquidity: "45K", holders: 234, risk: "Extreme", alpha: 22 },
-  { name: "SOLDOG", age: "5 hours", price: 0.0034, change: 180, liquidity: "120K", holders: 567, risk: "Very High", alpha: 38 },
-  { name: "TRUMPSOL", age: "12 hours", price: 0.089, change: 95, liquidity: "280K", holders: 1240, risk: "High", alpha: 45 },
-];
-
-const DEMO_WALLET_ACTIVITY = [
-  { wallet: "7xKp...3mFq", action: "Bought", token: "BONK", amount: "$240,000", time: "12 min ago", type: "Smart Wallet" },
-  { wallet: "9aRt...7nWz", action: "Sold", token: "SLERF", amount: "$89,000", time: "34 min ago", type: "Whale" },
-  { wallet: "4bCd...2kLm", action: "Bought", token: "WIF", amount: "$520,000", time: "1 hour ago", type: "Insider" },
-  { wallet: "8eFg...5jHi", action: "Bought", token: "POPCAT", amount: "$175,000", time: "2 hours ago", type: "Smart Wallet" },
-  { wallet: "2gHi...9pQr", action: "Sold", token: "MYRO", amount: "$340,000", time: "3 hours ago", type: "Developer" },
-];
-
-const DEMO_HIGH_RISK = [
-  { name: "CATGPT", risk: "Extreme", reason: "No audit, dev holds 45% supply, liquidity only $45K", flags: ["No Audit", "Dev Concentrated", "Low Liquidity"] },
-  { name: "SLERF", risk: "Very High", reason: "Liquidity dropping, holder count declining, dev wallet active", flags: ["Declining Liquidity", "Losing Holders", "Dev Selling"] },
-  { name: "TRUMPSOL", risk: "High", reason: "Political token, high volatility, no real utility", flags: ["No Utility", "Extreme Volatility", "Pump & Dump Risk"] },
-];
+type AlphaBrief = {
+  analysis_date: string;
+  market_grade: string;
+  market_bias: string;
+  btc_trend: string;
+  sol_trend: string;
+  risk_level: string;
+  ai_market_summary: string;
+  top_opportunities: Opportunity[];
+  high_risk_opportunities: { symbol: string; reason: string }[];
+  coins_to_avoid: { symbol: string; reason: string }[];
+  volume_breakouts: { symbol: string; detail: string }[];
+  rug_pull_warnings: { symbol: string; warning: string }[];
+};
 
 export default function AlphaPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTab, setSelectedTab] = useState("trending");
+  const [loading, setLoading] = useState(false);
+  const [brief, setBrief] = useState<AlphaBrief | null>(null);
+  const [error, setError] = useState("");
+  const [expandedToken, setExpandedToken] = useState<string | null>(null);
 
-  const filteredTokens = searchQuery
-    ? DEMO_TOKENS.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : DEMO_TOKENS;
+  async function generate() {
+    setLoading(true);
+    setError("");
+    setBrief(null);
+    try {
+      const response = await fetch("/api/alpha", { method: "POST" });
+      const data = await response.json();
+      if (data.error) setError(data.error);
+      else setBrief(data);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8">
 
         {/* Header */}
         <div className="mb-8">
@@ -52,331 +67,232 @@ export default function AlphaPage() {
             <p className="w-fit rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-1 text-sm text-purple-300">
               ⚡ Alpha
             </p>
-            <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-0.5 text-xs text-yellow-400">
-              DEMO DATA
+            <span className="rounded-full border border-green-500/30 bg-green-500/10 px-3 py-0.5 text-xs text-green-400">
+              REAL DATA
             </span>
           </div>
-          <h1 className="text-4xl font-bold">PipTrak Alpha</h1>
+          <h1 className="text-4xl font-bold">AI Morning Alpha Brief</h1>
           <p className="mt-2 text-white/40">
-            AI-powered Solana memecoin research. Risk rankings, smart wallet tracking, and market intelligence.
-          </p>
-          <p className="mt-1 text-xs text-yellow-400">
-            ⚠️ This is demo data for preview. Real data coming soon. Not financial advice.
+            Real Solana token data from DexScreener + RugCheck. Research and risk-ranking only — not financial advice, not a signal service.
+            Execute trades manually on Axiom or your preferred DEX.
           </p>
         </div>
 
-        {/* Market Overview */}
-        <div className="mb-6 grid gap-3 sm:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs text-white/40">Total Crypto Market</p>
-            <p className="text-xl font-bold text-blue-400 mt-1">$2.34T</p>
-            <p className="text-xs text-green-400">+2.1%</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs text-white/40">SOL Price</p>
-            <p className="text-xl font-bold text-purple-400 mt-1">$178.50</p>
-            <p className="text-xs text-green-400">+4.8%</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs text-white/40">Fear & Greed</p>
-            <p className="text-xl font-bold text-yellow-400 mt-1">72</p>
-            <p className="text-xs text-yellow-400">Greed</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs text-white/40">SOL Meme Volume</p>
-            <p className="text-xl font-bold text-green-400 mt-1">$89.4M</p>
-            <p className="text-xs text-green-400">+34% vs yesterday</p>
-          </div>
-        </div>
+        <button
+          onClick={generate}
+          disabled={loading}
+          className="mb-8 w-full rounded-2xl bg-purple-600 py-4 text-lg font-semibold transition hover:bg-purple-700 disabled:opacity-50"
+        >
+          {loading ? "🤖 Scanning Solana Markets..." : "🌅 Generate Today's Alpha Brief"}
+        </button>
 
-        {/* AI Market Summary */}
-        <div className="mb-6 rounded-3xl border border-purple-500/20 bg-purple-500/5 p-6">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">🤖</span>
-            <h2 className="text-lg font-semibold text-purple-400">AI Market Summary</h2>
-          </div>
-          <p className="text-sm text-white/70 leading-relaxed">
-            Solana meme season is heating up with 34% more volume than yesterday. Smart wallets are accumulating BONK and WIF aggressively.
-            New launches are showing extreme volatility — CATGPT pumped 340% in 2 hours but has no audit and dev holds 45% of supply.
-            Risk-adjusted, JUP and RENDER offer the best setups today with strong fundamentals and growing institutional interest.
-            Avoid SLERF — liquidity is declining and developer wallet has been selling since yesterday.
-          </p>
-        </div>
-
-        {/* Search */}
-        <div className="mb-6">
-          <input
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="🔍 Search any Solana token..."
-            className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-purple-500"
-          />
-        </div>
-
-        {/* Tabs */}
-        <div className="mb-6 flex gap-2 overflow-x-auto">
-          {[
-            { id: "trending", label: "🔥 Trending" },
-            { id: "new", label: "🆕 New Launches" },
-            { id: "watchlist", label: "👁️ AI Watchlist" },
-            { id: "risk", label: "⚠️ High Risk" },
-            { id: "wallets", label: "🐋 Smart Wallets" },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedTab(tab.id)}
-              className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                selectedTab === tab.id
-                  ? "bg-purple-600 text-white"
-                  : "bg-white/5 text-white/40 hover:bg-white/10"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Trending Tokens */}
-        {selectedTab === "trending" && (
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold mb-2">🔥 Trending Tokens</h2>
-            {filteredTokens
-              .sort((a, b) => b.change - a.change)
-              .map((token, i) => (
-              <div key={i} className={`rounded-2xl border p-4 transition hover:border-white/20 ${
-                token.change > 20 ? "border-green-500/20 bg-green-500/5" :
-                token.change > 0 ? "border-white/10 bg-white/[0.04]" :
-                "border-red-500/20 bg-red-500/5"
-              }`}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{token.trend}</span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-lg">{token.name}</span>
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/40">{token.category}</span>
-                      </div>
-                      <p className="text-sm text-white/40">${token.price}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-bold ${token.change >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {token.change >= 0 ? "+" : ""}{token.change}%
-                    </p>
-                    <p className="text-xs text-white/30">24h</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-2 mb-3">
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">Volume</p>
-                    <p className="text-xs font-semibold">${token.volume}</p>
-                  </div>
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">MCap</p>
-                    <p className="text-xs font-semibold">${token.mcap}</p>
-                  </div>
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">Liquidity</p>
-                    <p className="text-xs font-semibold">${token.liquidity}</p>
-                  </div>
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">Alpha</p>
-                    <p className={`text-xs font-bold ${token.alpha >= 70 ? "text-green-400" : token.alpha >= 50 ? "text-yellow-400" : "text-red-400"}`}>
-                      {token.alpha}/100
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                    token.risk === "Low" ? "bg-green-500/20 text-green-400" :
-                    token.risk === "Medium" ? "bg-yellow-500/20 text-yellow-400" :
-                    token.risk === "High" ? "bg-orange-500/20 text-orange-400" :
-                    "bg-red-500/20 text-red-400"
-                  }`}>{token.risk} Risk</span>
-                  <div className="h-1.5 w-24 rounded-full bg-white/10">
-                    <div className={`h-1.5 rounded-full ${
-                      token.alpha >= 70 ? "bg-green-500" : token.alpha >= 50 ? "bg-yellow-500" : "bg-red-500"
-                    }`} style={{ width: `${token.alpha}%` }} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-400 text-sm">{error}</div>
         )}
 
-        {/* New Launches */}
-        {selectedTab === "new" && (
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold mb-2">🆕 New Launches (Last 24h)</h2>
-            {DEMO_NEW_LAUNCHES.map((token, i) => (
-              <div key={i} className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-lg">{token.name}</span>
-                      <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-xs text-orange-400">🆕 {token.age}</span>
-                    </div>
-                    <p className="text-sm text-white/40">${token.price}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-green-400">+{token.change}%</p>
-                    <p className="text-xs text-white/30">since launch</p>
-                  </div>
-                </div>
+        {brief && (
+          <div className="space-y-6">
 
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">Liquidity</p>
-                    <p className="text-xs font-semibold">${token.liquidity}</p>
-                  </div>
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">Holders</p>
-                    <p className="text-xs font-semibold">{token.holders}</p>
-                  </div>
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">Alpha</p>
-                    <p className={`text-xs font-bold ${token.alpha >= 50 ? "text-yellow-400" : "text-red-400"}`}>{token.alpha}/100</p>
-                  </div>
-                </div>
-
-                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                  token.risk === "Extreme" ? "bg-red-500/30 text-red-400" :
-                  token.risk === "Very High" ? "bg-red-500/20 text-red-400" :
-                  "bg-orange-500/20 text-orange-400"
-                }`}>⚠️ {token.risk} Risk</span>
+            {/* Market Overview */}
+            <div className="rounded-3xl border border-purple-500/30 bg-purple-500/5 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-white/40">{brief.analysis_date}</p>
+                <span className={`rounded-full px-3 py-1 text-sm font-bold ${
+                  brief.market_grade === "A" ? "bg-green-500/20 text-green-400" :
+                  brief.market_grade === "B" ? "bg-blue-500/20 text-blue-400" :
+                  brief.market_grade === "C" ? "bg-yellow-500/20 text-yellow-400" :
+                  "bg-red-500/20 text-red-400"
+                }`}>
+                  Market Grade: {brief.market_grade}
+                </span>
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* AI Watchlist */}
-        {selectedTab === "watchlist" && (
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold mb-2">👁️ AI Watchlist</h2>
-            <p className="text-sm text-white/40 mb-4">Tokens AI is monitoring for potential setups. Ranked by Alpha Score.</p>
-            {DEMO_TOKENS
-              .sort((a, b) => b.alpha - a.alpha)
-              .slice(0, 5)
-              .map((token, i) => (
-              <div key={i} className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-600 text-sm font-bold">{i + 1}</span>
-                    <div>
-                      <span className="font-bold">{token.name}</span>
-                      <span className="ml-2 text-sm text-white/40">${token.price}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-purple-400">{token.alpha}</p>
-                    <p className="text-xs text-white/30">Alpha Score</p>
-                  </div>
+              <div className="grid gap-3 sm:grid-cols-2 mb-4">
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
+                  <p className="text-xs text-white/40">Market Bias</p>
+                  <p className="text-sm font-semibold mt-1">{brief.market_bias}</p>
                 </div>
-                <div className="h-2 rounded-full bg-white/10">
-                  <div className={`h-2 rounded-full ${
-                    token.alpha >= 80 ? "bg-green-500" : token.alpha >= 60 ? "bg-purple-500" : "bg-yellow-500"
-                  }`} style={{ width: `${token.alpha}%` }} />
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
+                  <p className="text-xs text-white/40">Risk Level</p>
+                  <p className={`text-sm font-bold mt-1 ${
+                    brief.risk_level === "Low" ? "text-green-400" :
+                    brief.risk_level === "Medium" ? "text-yellow-400" :
+                    "text-red-400"
+                  }`}>{brief.risk_level}</p>
                 </div>
-                <p className="mt-2 text-xs text-white/50">
-                  {token.alpha >= 80 ? "Strong fundamentals, growing momentum, low risk relative to potential" :
-                   token.alpha >= 60 ? "Decent setup forming, monitor for entry confirmation" :
-                   "Watching for improvement in key metrics before recommending"}
-                </p>
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
+                  <p className="text-xs text-white/40">BTC Trend</p>
+                  <p className="text-sm mt-1">{brief.btc_trend}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
+                  <p className="text-xs text-white/40">SOL Trend</p>
+                  <p className="text-sm mt-1">{brief.sol_trend}</p>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* High Risk */}
-        {selectedTab === "risk" && (
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold mb-2">⚠️ High Risk Tokens</h2>
-            <p className="text-sm text-white/40 mb-4">Tokens with significant risk flags. Trade with extreme caution or avoid.</p>
-            {DEMO_HIGH_RISK.map((token, i) => (
-              <div key={i} className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-bold text-lg">{token.name}</span>
-                  <span className="rounded-full bg-red-500/30 px-3 py-1 text-xs font-bold text-red-400">
-                    {token.risk}
-                  </span>
-                </div>
-                <p className="text-sm text-white/60 mb-3">{token.reason}</p>
-                <div className="flex flex-wrap gap-2">
-                  {token.flags.map((flag, j) => (
-                    <span key={j} className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs text-red-400">
-                      🚩 {flag}
-                    </span>
+              <div className="rounded-2xl border border-purple-500/20 bg-black/30 p-4">
+                <p className="text-xs text-purple-400 font-semibold mb-2">🤖 AI Market Summary</p>
+                <p className="text-sm text-white/70 leading-relaxed">{brief.ai_market_summary}</p>
+              </div>
+            </div>
+
+            {/* Top Opportunities */}
+            {brief.top_opportunities?.length > 0 && (
+              <div>
+                <h2 className="mb-4 text-xl font-semibold">🎯 Today's Top Opportunities</h2>
+                <div className="space-y-3">
+                  {brief.top_opportunities.map((op, i) => (
+                    <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                      <button
+                        onClick={() => setExpandedToken(expandedToken === op.symbol ? null : op.symbol)}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-600 text-sm font-bold">{i + 1}</span>
+                            <div>
+                              <span className="font-bold text-lg">{op.symbol}</span>
+                              <span className="ml-2 text-sm text-white/40">{op.price}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                              op.ai_score >= 70 ? "bg-green-500/20 text-green-400" :
+                              op.ai_score >= 50 ? "bg-yellow-500/20 text-yellow-400" :
+                              "bg-red-500/20 text-red-400"
+                            }`}>AI {op.ai_score}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                              op.risk_score <= 40 ? "bg-green-500/20 text-green-400" :
+                              op.risk_score <= 65 ? "bg-yellow-500/20 text-yellow-400" :
+                              "bg-red-500/20 text-red-400"
+                            }`}>Risk {op.risk_score}</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-white/50">{op.reason}</p>
+                      </button>
+
+                      {expandedToken === op.symbol && (
+                        <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="rounded-xl bg-black/30 p-2 text-center">
+                              <p className="text-xs text-white/30">Entry Zone</p>
+                              <p className="text-xs font-semibold text-white">{op.entry_zone}</p>
+                            </div>
+                            <div className="rounded-xl bg-black/30 p-2 text-center">
+                              <p className="text-xs text-white/30">Stop Loss</p>
+                              <p className="text-xs font-semibold text-red-400">{op.stop_loss}</p>
+                            </div>
+                            <div className="rounded-xl bg-black/30 p-2 text-center">
+                              <p className="text-xs text-white/30">Take Profit</p>
+                              <p className="text-xs font-semibold text-green-400">{op.take_profit}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="rounded-xl bg-black/30 p-2 text-center">
+                              <p className="text-xs text-white/30">Market Cap</p>
+                              <p className="text-xs font-semibold">{op.market_cap}</p>
+                            </div>
+                            <div className="rounded-xl bg-black/30 p-2 text-center">
+                              <p className="text-xs text-white/30">Liquidity</p>
+                              <p className="text-xs font-semibold">{op.liquidity}</p>
+                            </div>
+                            <div className="rounded-xl bg-black/30 p-2 text-center">
+                              <p className="text-xs text-white/30">24h Volume</p>
+                              <p className="text-xs font-semibold">{op.volume_24h}</p>
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-purple-500/10 p-3">
+                            <p className="text-xs text-purple-300 font-semibold mb-1">Why these scores</p>
+                            <p className="text-xs text-white/60">{op.score_explanation}</p>
+                          </div>
+                          <p className="text-xs text-white/30">R:R {op.risk_reward} · Execute manually on Axiom or your DEX</p>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {/* Smart Wallets */}
-        {selectedTab === "wallets" && (
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold mb-2">🐋 Smart Wallet Activity</h2>
-            <p className="text-sm text-white/40 mb-4">Tracking profitable wallets, whales, and insider-like activity.</p>
-            {DEMO_WALLET_ACTIVITY.map((activity, i) => (
-              <div key={i} className={`rounded-2xl border p-4 ${
-                activity.action === "Bought" ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"
-              }`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{activity.action === "Bought" ? "🟢" : "🔴"}</span>
-                    <div>
-                      <p className="font-semibold text-sm">
-                        {activity.action} <span className="text-blue-400">{activity.token}</span>
-                      </p>
-                      <p className="text-xs text-white/30">{activity.wallet} · {activity.time}</p>
+            {/* High Risk Opportunities */}
+            {brief.high_risk_opportunities?.length > 0 && (
+              <div className="rounded-3xl border border-orange-500/20 bg-orange-500/5 p-6">
+                <h2 className="mb-4 text-xl font-semibold text-orange-400">⚠️ High-Risk Opportunities</h2>
+                <div className="space-y-2">
+                  {brief.high_risk_opportunities.map((h, i) => (
+                    <div key={i} className="rounded-2xl border border-orange-500/20 bg-black/30 p-3">
+                      <p className="font-bold text-orange-400">{h.symbol}</p>
+                      <p className="text-xs text-white/60">{h.reason}</p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-bold ${activity.action === "Bought" ? "text-green-400" : "text-red-400"}`}>
-                      {activity.amount}
-                    </p>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${
-                      activity.type === "Smart Wallet" ? "bg-purple-500/20 text-purple-400" :
-                      activity.type === "Whale" ? "bg-blue-500/20 text-blue-400" :
-                      activity.type === "Insider" ? "bg-yellow-500/20 text-yellow-400" :
-                      "bg-red-500/20 text-red-400"
-                    }`}>{activity.type}</span>
-                  </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
+
+            {/* Volume Breakouts */}
+            {brief.volume_breakouts?.length > 0 && (
+              <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
+                <h2 className="mb-4 text-xl font-semibold text-blue-400">📊 Volume Breakouts</h2>
+                <div className="space-y-2">
+                  {brief.volume_breakouts.map((v, i) => (
+                    <div key={i} className="rounded-2xl border border-blue-500/20 bg-black/30 p-3">
+                      <p className="font-bold text-blue-400">{v.symbol}</p>
+                      <p className="text-xs text-white/60">{v.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Coins to Avoid */}
+            {brief.coins_to_avoid?.length > 0 && (
+              <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
+                <h2 className="mb-4 text-xl font-semibold text-red-400">❌ Coins to Avoid</h2>
+                <div className="space-y-2">
+                  {brief.coins_to_avoid.map((c, i) => (
+                    <div key={i} className="rounded-2xl border border-red-500/20 bg-black/30 p-3">
+                      <p className="font-bold text-red-400">{c.symbol}</p>
+                      <p className="text-xs text-white/60">{c.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Rug Pull Warnings */}
+            {brief.rug_pull_warnings?.length > 0 && (
+              <div className="rounded-3xl border border-red-500/50 bg-red-500/10 p-6">
+                <h2 className="mb-4 text-xl font-semibold text-red-400">🚨 Rug Pull Warnings</h2>
+                <div className="space-y-2">
+                  {brief.rug_pull_warnings.map((r, i) => (
+                    <div key={i} className="rounded-2xl border border-red-500/30 bg-black/30 p-3">
+                      <p className="font-bold text-red-400">{r.symbol}</p>
+                      <p className="text-xs text-white/60">{r.warning}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Coming Soon */}
+            <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-6">
+              <h2 className="mb-2 text-lg font-semibold text-white/40">🔜 Coming in Phase B</h2>
+              <p className="text-sm text-white/30">
+                Smart wallet tracking, whale activity alerts, developer wallet behavior analysis, and holder growth data —
+                these require premium on-chain data providers and will be added once approved.
+              </p>
+            </div>
+
+            {/* Disclaimer */}
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+              <p className="text-xs text-white/20 text-center">
+                ⚠️ Research and risk-ranking only, not financial advice. Scores are not profit predictions.
+                Always verify data independently before trading. Never invest more than you can afford to lose.
+              </p>
+            </div>
+
           </div>
         )}
-
-        {/* Recently Reviewed */}
-        <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="mb-4 text-xl font-semibold">🕐 Recently Reviewed</h2>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {DEMO_TOKENS.slice(0, 3).map((token, i) => (
-              <div key={i} className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-bold">{token.name}</span>
-                  <span className={`text-sm font-bold ${token.alpha >= 70 ? "text-green-400" : "text-yellow-400"}`}>
-                    {token.alpha}/100
-                  </span>
-                </div>
-                <p className="text-xs text-white/40">${token.price} · {token.change >= 0 ? "+" : ""}{token.change}%</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Disclaimer */}
-        <div className="mt-8 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-          <p className="text-xs text-white/20 text-center">
-            ⚠️ PipTrak Alpha provides research data only. This is not financial advice. All scores are research rankings, not profit predictions.
-            Never invest more than you can afford to lose. Demo data shown — real data integration coming soon.
-          </p>
-        </div>
-
       </div>
     </AppShell>
   );
