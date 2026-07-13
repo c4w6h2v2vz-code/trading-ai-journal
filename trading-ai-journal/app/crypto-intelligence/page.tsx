@@ -9,13 +9,11 @@ type CoinWatch = {
   timeframe: string;
   direction: string;
   probability: number;
+  probability_reason: string;
   potential_gain: string;
   potential_loss: string;
   risk_level: string;
-  sentiment_score: number;
-  momentum_score: number;
   reason: string;
-  community_buzz: string;
   entry: string;
   target: string;
   stop_loss: string;
@@ -23,9 +21,11 @@ type CoinWatch = {
 };
 
 type Intelligence = {
+  analysis_date: string;
   market_overview: {
     sentiment: string;
-    fear_greed: string;
+    total_market_cap: string;
+    market_cap_change_24h: string;
     btc_dominance: string;
     market_trend: string;
   };
@@ -81,11 +81,11 @@ export default function CryptoIntelligencePage() {
             🪙 Crypto Intelligence
           </p>
           <h1 className="text-4xl font-bold">Crypto Market Intelligence</h1>
+          <p className="mt-1 text-sm text-blue-400">
+            📅 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Europe/Vienna" })}
+          </p>
           <p className="mt-2 text-white/40">
-            AI scans Reddit, Twitter, news, and whale movements to find the best crypto opportunities today.
-        </p>
-        <p className="mt-1 text-sm text-blue-400">
-          📅 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+            Real-time data from CoinGecko. AI analyzes today's actual gainers, losers, and news to find opportunities across all crypto — not just memecoins.
           </p>
         </div>
 
@@ -94,7 +94,7 @@ export default function CryptoIntelligencePage() {
           disabled={loading}
           className="mb-8 w-full rounded-2xl bg-yellow-600 py-4 text-lg font-semibold transition hover:bg-yellow-700 disabled:opacity-50"
         >
-          {loading ? "🤖 AI Scanning Communities & Markets..." : "🔍 Generate Crypto Intelligence Report"}
+          {loading ? "🤖 Scanning Real Market Data..." : "🔍 Generate Crypto Intelligence Report"}
         </button>
 
         {error && (
@@ -119,17 +119,24 @@ export default function CryptoIntelligencePage() {
                   }`}>{intelligence.market_overview.sentiment}</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                  <p className="text-sm text-white/40">Fear & Greed</p>
-                  <p className="text-xl font-bold mt-1 text-yellow-400">{intelligence.market_overview.fear_greed}</p>
+                  <p className="text-sm text-white/40">Total Market Cap</p>
+                  <p className="text-xl font-bold mt-1 text-blue-400">
+                    {intelligence.market_overview.total_market_cap}
+                    {intelligence.market_overview.market_cap_change_24h && (
+                      <span className={`ml-2 text-sm ${
+                        intelligence.market_overview.market_cap_change_24h.startsWith("-") ? "text-red-400" : "text-green-400"
+                      }`}>{intelligence.market_overview.market_cap_change_24h}%</span>
+                    )}
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
                   <p className="text-sm text-white/40">BTC Dominance</p>
                   <p className="text-xl font-bold mt-1 text-orange-400">{intelligence.market_overview.btc_dominance}</p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                  <p className="text-sm text-white/40">Market Trend</p>
-                  <p className="text-sm font-semibold mt-1 text-white/70">{intelligence.market_overview.market_trend}</p>
-                </div>
+              </div>
+              <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-4">
+                <p className="text-xs text-white/40 mb-1">Market Trend</p>
+                <p className="text-sm text-white/70">{intelligence.market_overview.market_trend}</p>
               </div>
             </div>
 
@@ -197,26 +204,14 @@ export default function CryptoIntelligencePage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <div>
-                        <p className="text-xs text-white/30 mb-1">Sentiment</p>
-                        <div className="h-1.5 rounded-full bg-white/10">
-                          <div className="h-1.5 rounded-full bg-blue-500" style={{ width: `${coin.sentiment_score}%` }} />
-                        </div>
-                        <p className="text-xs text-blue-400 mt-0.5">{coin.sentiment_score}/100</p>
+                    {coin.probability_reason && (
+                      <div className="mb-2 rounded-xl bg-blue-500/10 p-2">
+                        <p className="text-xs text-blue-400">🎯 Why {coin.probability}%: {coin.probability_reason}</p>
                       </div>
-                      <div>
-                        <p className="text-xs text-white/30 mb-1">Momentum</p>
-                        <div className="h-1.5 rounded-full bg-white/10">
-                          <div className="h-1.5 rounded-full bg-purple-500" style={{ width: `${coin.momentum_score}%` }} />
-                        </div>
-                        <p className="text-xs text-purple-400 mt-0.5">{coin.momentum_score}/100</p>
-                      </div>
-                    </div>
+                    )}
 
-                    <p className="text-xs text-white/60 mb-1">{coin.reason}</p>
-                    <p className="text-xs text-yellow-400">💬 {coin.community_buzz}</p>
-                    <div className="flex items-center justify-between mt-2">
+                    <p className="text-xs text-white/60 mb-2">{coin.reason}</p>
+                    <div className="flex items-center justify-between">
                       <span className="text-xs text-white/30">⏱ {coin.timeframe}</span>
                       <span className={`rounded-full px-2 py-0.5 text-xs ${
                         coin.risk_level === "High" ? "bg-red-500/20 text-red-400" :
