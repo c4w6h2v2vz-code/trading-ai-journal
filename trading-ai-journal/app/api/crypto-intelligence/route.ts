@@ -1,187 +1,189 @@
 import { NextResponse } from "next/server";
 
-async function scanCryptoNews() {
+async function getCryptoMarketData() {
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    const queries = [
-      "memecoin pump today",
-      "crypto trending today",
-      "bitcoin ethereum price today",
-      "crypto whale alert today",
-      "dogecoin shiba pepe news today",
-    ];
+    const response = await fetch(
+      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h",
+      { cache: "no-store" }
+    );
+    const data = await response.json();
+    if (!Array.isArray(data)) return { gainers: [], losers: [], top10: [], btc: null, eth: null };
 
-    const results: string[] = [];
+    const sorted = [...data].sort((a, b) => (b.price_change_percentage_24h || 0) - (a.price_change_percentage_24h || 0));
 
-    for (const q of queries) {
-      try {
-        const response = await fetch(
-          `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&from=${today}&sortBy=publishedAt&language=en&apiKey=${process.env.NEWS_API_KEY}&pageSize=5`,
-          { cache: "no-store" }
-        );
-        const data = await response.json();
-        if (data.articles) {
-          data.articles.forEach((a: any) => {
-            results.push(`- ${a.title} (${a.source.name})`);
-          });
-        }
-      } catch {
-        console.error(`Failed news fetch`);
-      }
-    }
+    const gainers = sorted.slice(0, 8).map((c: any) => ({
+      name: c.name, symbol: c.symbol.toUpperCase(), price: c.current_price,
+      change_24h: (c.price_change_percentage_24h || 0).toFixed(2),
+      volume: c.total_volume, market_cap: c.market_cap,
+    }));
 
-    return results.slice(0, 20).join("\n");
-  } catch {
-    return "";
+    const losers = sorted.slice(-8).reverse().map((c: any) => ({
+      name: c.name, symbol: c.symbol.toUpperCase(), price: c.current_price,
+      change_24h: (c.price_change_percentage_24h || 0).toFixed(2),
+      volume: c.total_volume, market_cap: c.market_cap,
+    }));
+
+    const top10 = data.slice(0, 10).map((c: any) => ({
+      name: c.name, symbol: c.symbol.toUpperCase(), price: c.current_price,
+      change_24h: (c.price_change_percentage_24h || 0).toFixed(2), market_cap: c.market_cap,
+    }));
+
+    const btc = data.find((c: any) => c.symbol === "btc");
+    const eth = data.find((c: any) => c.symbol === "eth");
+
+    return { gainers, losers, top10, btc, eth };
+  } catch (err) {
+    console.error("CoinGecko fetch failed:", err);
+    return { gainers: [], losers: [], top10: [], btc: null, eth: null };
   }
 }
 
-async function getCryptoPrices() {
+async function getGlobalMarketData() {
   try {
-    const coins = ["BTC", "ETH", "SOL", "DOGE", "XRP"];
-    const prices: Record<string, string> = {};
-    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
-
-    for (const coin of coins) {
-      try {
-        const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${coin}&to_currency=USD&apikey=${apiKey}`;
-        const response = await fetch(url, { cache: "no-store" });
-        const data = await response.json();
-        const rate = data["Realtime Currency Exchange Rate"];
-        if (rate) {
-          prices[coin] = parseFloat(rate["5. Exchange Rate"]).toFixed(
-            coin === "BTC" ? 0 : coin === "ETH" || coin === "SOL" ? 2 : 4
-          );
-        }
-      } catch {
-        console.error(`Failed to fetch ${coin}`);
-      }
-    }
-
-    return prices;
+    const response = await fetch("https://api.coingecko.com/api/v3/global", { cache: "no-store" });
+    const data = await response.json();
+    return {
+      total_market_cap: data?.data?.total_market_cap?.usd,
+      market_cap_change_24h: data?.data?.market_cap_change_percentage_24h_usd,
+      btc_dominance: data?.data?.market_cap_percentage?.btc,
+      eth_dominance: data?.data?.market_cap_percentage?.eth,
+    };
   } catch {
-    return {};
+    return null;
   }
 }
 
-export async function POST(request: Request) {
+async function getCryptoNews() {
+  const today = new Date().toISOString().slice(0, 10);
+  const allNews: string[] = [];
+
+  const queries = [
+    "bitcoin price today",
+    "ethereum crypto market today",
+    "memecoin pump today",
+    "crypto whale alert today",
+    "SEC crypto regulation today",
+  ];
+
+  for (const q of queries) {
+    try {
+      const response = await fetch(
+        `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&from=${today}&sortBy=publishedAt&language=en&apiKey=${process.env.NEWS_API_KEY}&pageSize=4`,
+        { cache: "no-store" }
+      );
+      const data = await response.json();
+      if (data.articles) {
+        data.articles.forEach((a: any) => allNews.push(`[Source: ${a.source.name}] ${a.title}`));
+      }
+    } catch {
+      console.error("News fetch failed for:", q);
+    }
+  }
+
+  return allNews.slice(0, 20).join("\n");
+}
+
+export async function POST() {
   try {
-    const today = new Date().toLocaleDateString("en-US", {
-      weekday: "long", year: "numeric", month: "long", day: "numeric",
+    const now = new Date();
+    const today = now.toLocaleDateString("en-US", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Europe/Vienna",
     });
 
-    const todayDate = new Date().toISOString().slice(0, 10);
-
-    const [newsHeadlines, prices] = await Promise.all([
-      scanCryptoNews(),
-      getCryptoPrices(),
+    const [marketData, globalData, news] = await Promise.all([
+      getCryptoMarketData(),
+      getGlobalMarketData(),
+      getCryptoNews(),
     ]);
 
-    const pricesText = Object.entries(prices).length > 0
-      ? Object.entries(prices).map(([coin, price]) => `${coin}: $${price}`).join("\n")
-      : "Prices temporarily unavailable";
+    const gainersText = marketData.gainers.map((g: any) => `${g.symbol} (${g.name}): $${g.price} (${g.change_24h}%) Vol: $${g.volume}`).join("\n");
+    const losersText = marketData.losers.map((l: any) => `${l.symbol} (${l.name}): $${l.price} (${l.change_24h}%) Vol: $${l.volume}`).join("\n");
+    const top10Text = marketData.top10.map((t: any) => `${t.symbol}: $${t.price} (${t.change_24h}%)`).join("\n");
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: `You are an elite crypto analyst. Today's date is ${today} (${todayDate}).
-You must provide REAL analysis based on actual market conditions RIGHT NOW.
-NEVER use placeholder or example data.
-All prices, percentages, and targets must be based on the REAL prices provided.
-Be specific about percentage moves - use ranges like "+8% to +15%".`,
+            content: `You are an elite crypto market analyst. Today is ${today}. Crypto trades 24/7 including weekends.
+CRITICAL RULE: Use ONLY the real prices and data provided — never invent numbers.
+CRITICAL RULE: Every claim must cite its source (news headlines are tagged [Source: NAME]). If no news supports a claim, say "based on price/volume data" instead of inventing a source.
+CRITICAL RULE: Give realistic probability percentages with an explanation of what specifically drives that probability (volume, momentum, news, or nothing significant).`,
           },
           {
             role: "user",
-            content: `Today is ${today}.
+            content: `Today: ${today}
 
-REAL CRYPTO PRICES RIGHT NOW:
-${pricesText}
+GLOBAL CRYPTO MARKET:
+Total Market Cap: $${globalData?.total_market_cap ? Math.round(globalData.total_market_cap / 1e9) + "B" : "unavailable"}
+24h Change: ${globalData?.market_cap_change_24h?.toFixed(2) || "unavailable"}%
+BTC Dominance: ${globalData?.btc_dominance?.toFixed(1) || "unavailable"}%
+ETH Dominance: ${globalData?.eth_dominance?.toFixed(1) || "unavailable"}%
 
-TODAY'S REAL NEWS HEADLINES:
-${newsHeadlines || "Use your knowledge of crypto market conditions as of ${todayDate}."}
+TOP 10 COINS BY MARKET CAP:
+${top10Text || "unavailable"}
 
-Based on REAL data above, analyze:
-1. Which coins are showing real momentum TODAY (${todayDate})?
-2. What are realistic percentage move targets based on current prices?
-3. What is actually happening in meme coin communities right now?
-4. Which coins do whales seem to be accumulating based on recent news?
-5. What should a trader do TODAY specifically?
+TOP GAINERS (24h, REAL DATA):
+${gainersText || "unavailable"}
 
-IMPORTANT RULES:
-- Use the REAL prices shown above for all calculations
-- Give SPECIFIC percentage targets (e.g. "+8% to +15%")
-- Base analysis on ${today} conditions
-- Never use fake example data
+TOP LOSERS (24h, REAL DATA):
+${losersText || "unavailable"}
 
-Return ONLY this JSON with REAL data:
+TODAY'S CRYPTO NEWS (with sources):
+${news || "No news available today - say so explicitly."}
+
+Analyze this real data and give a comprehensive crypto intelligence report. For each gainer/loser, explain WHY based on volume, momentum, or cited news - do not guess.
+
+Return ONLY this JSON:
 {
   "analysis_date": "${today}",
   "market_overview": {
-    "sentiment": "Bullish/Bearish/Neutral",
-    "fear_greed": "Number + label e.g. 68 - Greed",
-    "btc_dominance": "Real estimate e.g. 54%",
-    "market_trend": "What is actually happening in crypto right now on ${todayDate}"
+    "sentiment": "Bullish/Bearish/Neutral based on real data",
+    "total_market_cap": "real figure from data above",
+    "market_cap_change_24h": "real figure",
+    "btc_dominance": "real figure",
+    "market_trend": "What is actually happening based on real data and cited news"
   },
   "top_coins_to_watch": [
     {
-      "coin": "BTC",
-      "price": "Real price from above",
+      "coin": "REAL coin symbol from gainers data",
+      "price": "real price from data",
       "timeframe": "24-48 hours",
-      "direction": "Bullish",
+      "direction": "Bullish/Bearish",
       "probability": 65,
-      "potential_gain": "+5% to +8%",
-      "potential_loss": "-4%",
-      "risk_level": "Medium",
-      "sentiment_score": 72,
-      "momentum_score": 68,
-      "reason": "Real reason based on today's news",
-      "community_buzz": "Real community activity",
-      "entry": "Real entry based on current price",
-      "target": "Real target price",
-      "stop_loss": "Real stop loss",
-      "category": "Layer1"
+      "probability_reason": "Specific reason this probability was chosen - cite volume/momentum/news",
+      "potential_gain": "+X% to +X%",
+      "potential_loss": "-X%",
+      "risk_level": "Low/Medium/High",
+      "reason": "Real reason citing source or data",
+      "entry": "realistic entry based on current price",
+      "target": "realistic target",
+      "stop_loss": "realistic stop",
+      "category": "Layer1/Meme/DeFi/etc"
     }
   ],
   "meme_coins_alert": [
-    {
-      "coin": "Real memecoin",
-      "reason": "Real reason trending today",
-      "buzz_level": "High",
-      "risk": "High"
-    }
+    { "coin": "real memecoin only if genuinely in gainers/losers data", "reason": "Real reason with source", "buzz_level": "High/Medium/Low", "risk": "High" }
   ],
   "whale_alerts": [
-    {
-      "coin": "Real coin",
-      "action": "Real whale activity",
-      "impact": "Expected price impact"
-    }
+    { "coin": "real coin", "action": "Only include if news source mentions actual whale activity, otherwise omit this array entirely", "impact": "Expected impact" }
   ],
   "coins_to_avoid": [
-    {
-      "coin": "Real coin",
-      "reason": "Real reason to avoid today",
-      "risk": "High"
-    }
+    { "coin": "real coin from losers data", "reason": "Real reason citing data or news", "risk": "High/Medium" }
   ],
   "rug_pull_warnings": [],
   "best_trade_today": {
-    "coin": "Best coin for today",
-    "entry": "Real entry price",
-    "target": "Real target with percentage",
-    "stop_loss": "Real stop loss",
+    "coin": "Best coin from real data today",
+    "entry": "real entry price",
+    "target": "real target with % gain",
+    "stop_loss": "real stop loss",
     "timeframe": "24-48 hours",
-    "reason": "Real detailed reason for today ${todayDate}"
+    "reason": "Real detailed reason citing data/news for ${today}"
   },
-  "weekly_outlook": "Real weekly outlook for crypto this week starting ${todayDate}"
+  "weekly_outlook": "Real weekly outlook based on current real market conditions"
 }`,
           }
         ],
@@ -193,11 +195,13 @@ Return ONLY this JSON with REAL data:
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
     const parsed = JSON.parse(jsonMatch[0]);
-    parsed.real_prices = prices;
+    parsed.real_market_data = marketData;
+    parsed.global_data = globalData;
     parsed.generated_at = new Date().toISOString();
 
     return NextResponse.json(parsed);
   } catch (error) {
+    console.error("Crypto intelligence error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
