@@ -67,6 +67,12 @@ type VolatilityAnalysis = {
   news_impact: string;
   recommendation: string;
 };
+type HotPair = {
+  pair: string;
+  reason: string;
+  expected_pip_range: string;
+  direction: string;
+};
 type Analysis = {
   analysis_date: string;
   overall_bias: Record<string, PairBias>;
@@ -75,6 +81,7 @@ type Analysis = {
   best_pairs_to_trade: string[];
   pairs_to_avoid: string[];
   key_levels: Record<string, string>;
+  hot_pairs: HotPair[];
   market_context: string;
   crypto_analysis: CryptoAnalysis;
   dxy_analysis: string;
@@ -320,7 +327,28 @@ export default function MarketAnalysisPage() {
                 <p className="font-semibold text-yellow-400">⚠️ {analysis.warning}</p>
               </div>
             )}
-
+{/* Hot Pairs */}
+            {analysis.hot_pairs && analysis.hot_pairs.length > 0 && (
+              <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
+                <h2 className="mb-4 text-xl font-semibold text-red-400">🔥 Hottest Pairs Today</h2>
+                <div className="space-y-3">
+                  {analysis.hot_pairs.map((hp, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-2xl border border-red-500/20 bg-black/30 p-4">
+                      <div>
+                        <p className="font-bold text-lg">{hp.pair}</p>
+                        <p className="text-xs text-white/60">{hp.reason}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-bold ${hp.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
+                          {hp.direction === "Bullish" ? "↑" : "↓"} {hp.direction}
+                        </p>
+                        <p className="text-xs text-yellow-400">{hp.expected_pip_range}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Best/Avoid pairs */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-5">

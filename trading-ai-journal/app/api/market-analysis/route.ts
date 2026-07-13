@@ -82,7 +82,9 @@ async function getNews() {
       { cache: "no-store" }
     );
     const data = await response.json();
-    if (data.articles) return data.articles.map((a: any) => `[${a.source.name}] ${a.title}`).join("\n");
+    if (data.articles) {
+      return data.articles.map((a: any) => `[Source: ${a.source.name}] ${a.title}`).join("\n");
+    }
     return "";
   } catch {
     return "";
@@ -114,7 +116,7 @@ export async function POST(request: Request) {
 
     const pricesText = Object.entries(prices).length > 0
       ? Object.entries(prices).map(([p, v]) => `${p}: ${v}`).join(" | ")
-      : "Forex markets closed (weekend)";
+      : (isWeekend ? "Forex markets closed (weekend)" : "Forex prices temporarily unavailable");
 
     const moversText = movers.gainers.length > 0
       ? `BTC: $${movers.btc?.current_price} (${movers.btc?.price_change_percentage_24h?.toFixed(2)}%)\nETH: $${movers.eth?.current_price} (${movers.eth?.price_change_percentage_24h?.toFixed(2)}%)\n\nTop Gainers: ${movers.gainers.map((g: any) => `${g.symbol} ${g.change_24h}%`).join(", ")}\nTop Losers: ${movers.losers.map((l: any) => `${l.symbol} ${l.change_24h}%`).join(", ")}`
@@ -128,7 +130,10 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: `You are an elite institutional market analyst. Today is ${today}. Use ONLY real prices and news provided. Never use example data. Give specific price targets. ${isWeekend ? "Today is WEEKEND - forex is closed, focus on crypto only." : ""}`,
+            content: `You are an elite institutional market analyst. Today is ${today}. Use ONLY real prices and news provided — never invent data. ${isWeekend ? "Today is WEEKEND - forex is closed, focus on crypto only." : ""}
+CRITICAL RULE: Every claim about news or sentiment must cite which source said it (the news headlines are tagged with [Source: NAME]). Do not make vague claims like "market context suggests" — say "According to Reuters..." or "Bloomberg reported...".
+CRITICAL RULE: best_pairs_to_trade and pairs_to_avoid must be chosen dynamically based on which pairs actually have the strongest setups today — do not default to the same pairs every time.
+CRITICAL RULE: hot_pairs must reflect genuinely which pairs have real volatility today based on the news and events, with realistic pip-range estimates.`,
           },
           {
             role: "user",
@@ -143,45 +148,48 @@ ${moversText}
 
 ECONOMIC EVENTS: ${eventsText}
 
-TODAY'S NEWS:
-${news || "Use your knowledge of current market conditions."}
+TODAY'S NEWS (with sources):
+${news || "No news available - use general knowledge of current market conditions, and say so explicitly rather than inventing a source."}
 
-Provide institutional-level analysis using ONLY real data above.
+Provide institutional-level analysis using ONLY real data above. Cite the specific news source for every claim about why price is moving.
 
 Return ONLY this JSON:
 {
   "analysis_date": "${today}",
   "is_weekend": ${isWeekend},
-  "market_context": "What is happening in markets today - 2 sentences with real context",
-  "smart_money_summary": "What institutions are doing today based on news",
-  "dxy_analysis": "${isWeekend ? "Forex markets closed for the weekend." : "How DXY is affecting forex pairs today"}",
-  "institutional_flow": "Where smart money is flowing today",
+  "market_context": "What is happening in markets today - cite specific sources by name",
+  "smart_money_summary": "What institutions are doing today, cite sources where possible",
+  "dxy_analysis": "${isWeekend ? "Forex markets closed for the weekend." : "How DXY is affecting forex pairs today, cite sources"}",
+  "institutional_flow": "Where smart money is flowing today, cite sources",
   "warning": "Key risk for today",
-  "best_pairs_to_trade": ${isWeekend ? '["BTC", "ETH"]' : '["EURUSD", "XAUUSD"]'},
-  "pairs_to_avoid": ["USDJPY"],
+  "hot_pairs": [
+    { "pair": "Whichever pair genuinely has the most volatility today", "reason": "Why, citing the news source", "expected_pip_range": "XX-XX pips", "direction": "Bullish/Bearish" }
+  ],
+  "best_pairs_to_trade": ["Pick 1-2 pairs based on real strength today, do not default"],
+  "pairs_to_avoid": ["Pick 1-2 pairs based on real weakness/uncertainty today, do not default"],
   "overall_bias": {
-    "EURUSD": { "direction": "Bullish", "confidence": 65, "current_price": "${prices["EURUSD"] || "Price unavailable"}", "target": "calculate", "reason": "Real reason" },
-    "XAUUSD": { "direction": "Bullish", "confidence": 70, "current_price": "${prices["XAUUSD"] || "Price unavailable"}", "target": "calculate", "reason": "Real reason" }
+    "EURUSD": { "direction": "Bullish", "confidence": 65, "current_price": "${prices["EURUSD"] || "Price unavailable"}", "target": "calculate from current price", "reason": "Real reason citing source" },
+    "XAUUSD": { "direction": "Bullish", "confidence": 70, "current_price": "${prices["XAUUSD"] || "Price unavailable"}", "target": "calculate from current price", "reason": "Real reason citing source" }
   },
   "key_levels": {
     "EURUSD": "Support: X.XXXX Resistance: X.XXXX Current: ${prices["EURUSD"] || "Price unavailable"}",
     "XAUUSD": "Support: $XXXX Resistance: $XXXX Current: ${prices["XAUUSD"] || "Price unavailable"}"
   },
   "volatility_analysis": {
-    "overall_volatility": "Medium",
-    "vix_estimate": "18.5 - Normal",
-    "best_trading_window": "08:00-11:00 GMT",
-    "avoid_times": "12:00-14:00 GMT",
+    "overall_volatility": "Low/Medium/High",
+    "vix_estimate": "realistic estimate",
+    "best_trading_window": "XX:00-XX:00 GMT",
+    "avoid_times": "XX:00-XX:00 GMT",
     "pairs_volatility": {
-      "EURUSD": { "rating": "Medium", "score": 65, "expected_range": "60-80 pips", "best_time": "08:00-10:00 GMT" },
-      "XAUUSD": { "rating": "High", "score": 80, "expected_range": "$15-25", "best_time": "08:00-12:00 GMT" }
+      "EURUSD": { "rating": "Medium", "score": 65, "expected_range": "XX-XX pips", "best_time": "XX:00-XX:00 GMT" },
+      "XAUUSD": { "rating": "High", "score": 80, "expected_range": "$XX-$XX", "best_time": "XX:00-XX:00 GMT" }
     },
-    "news_impact": "Real news impact today",
+    "news_impact": "Real news impact today, cite source",
     "recommendation": "Real recommendation"
   },
   "event_analysis": [
     {
-      "event": "event name",
+      "event": "event name from real events list, or omit this array if no events today",
       "currency": "USD",
       "if_beats": { "direction": "USD Strong", "probability": 65, "avg_pips": 50, "pairs_affected": ["EURUSD down 40-60 pips"] },
       "if_misses": { "direction": "USD Weak", "probability": 60, "avg_pips": 45, "pairs_affected": ["EURUSD up 35-50 pips"] },
@@ -190,14 +198,14 @@ Return ONLY this JSON:
     }
   ],
   "crypto_analysis": {
-    "market_sentiment": "Bullish",
-    "fear_greed": "65 - Greed",
-    "btc_analysis": "Real BTC analysis using real price",
+    "market_sentiment": "Bullish/Bearish/Neutral",
+    "fear_greed": "realistic estimate - Label",
+    "btc_analysis": "Real BTC analysis using real price and news source if available",
     "best_coins_today": [
-      { "coin": "BTC", "current_price": "real price from data", "direction": "Bullish", "probability": 65, "target": "real target", "move_percent": "real %", "reason": "Real reason using real gainer/loser data", "community_buzz": "Current sentiment", "category": "Layer1" }
+      { "coin": "BTC", "current_price": "real price from data", "direction": "Bullish/Bearish", "probability": 65, "target": "real target", "move_percent": "real %", "reason": "Real reason using real gainer/loser data", "community_buzz": "Current sentiment", "category": "Layer1" }
     ],
-    "coins_to_avoid": ["real loser coin"],
-    "meme_coin_alert": "Real meme coin activity if in gainers list",
+    "coins_to_avoid": ["real loser coin from data"],
+    "meme_coin_alert": "Real meme coin activity if in gainers list, otherwise say none noted today",
     "crypto_trade_plan": "Best crypto trade today with real prices"
   }
 }`
