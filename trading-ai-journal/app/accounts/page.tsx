@@ -195,7 +195,14 @@ export default function AccountsPage() {
               <div className="space-y-2 text-sm text-white/60 mb-6">
                 <p className="font-semibold text-white/80">2️⃣ Install the TradingAIConnector</p>
                 <p>Press F4 to open MetaEditor → New → Expert Advisor (template) → name it TradingAIConnector</p>
-                <p>Paste in the PipTrak connector code, press F7 to compile (should say "0 errors")</p>
+                
+                  href="/downloads/TradingAIConnector.mq5"
+                  download
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                >
+                  ⬇️ Download TradingAIConnector.mq5
+                </a>
+                <p>Open the downloaded file, copy all its contents, paste into MetaEditor replacing the template code, then press F7 to compile (should say "0 errors")</p>
               </div>
 
               <div className="space-y-2 text-sm text-white/60 mb-4">
