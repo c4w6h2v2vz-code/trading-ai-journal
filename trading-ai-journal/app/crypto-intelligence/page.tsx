@@ -85,8 +85,15 @@ export default function CryptoIntelligencePage() {
             📅 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Europe/Vienna" })}
           </p>
           <p className="mt-2 text-white/40">
-            Real-time data from CoinGecko. AI analyzes today's actual gainers, losers, and news to find opportunities across all crypto — not just memecoins.
+            Real-time data from CoinGecko. AI analyzes today's actual gainers, losers, and news across major crypto markets.
           </p>
+          <div className="mt-3 rounded-2xl border border-blue-500/20 bg-blue-500/5 px-4 py-3">
+            <p className="text-xs text-blue-300">
+              ℹ️ This page covers <strong>major coins</strong> (BTC, ETH, DeFi, Layer1s) tradeable on exchanges or MT5 crypto CFDs.
+              Looking for <strong>Solana memecoins</strong> (pump.fun style, Axiom trading)? Use{" "}
+              <a href="/alpha" className="underline hover:text-blue-200">PipTrak Alpha</a> instead.
+            </p>
+          </div>
         </div>
 
         <button
@@ -122,12 +129,12 @@ export default function CryptoIntelligencePage() {
                   <p className="text-sm text-white/40">Total Market Cap</p>
                   <p className="text-xl font-bold mt-1 text-blue-400">
                     {intelligence.market_overview.total_market_cap}
-                    {intelligence.market_overview.market_cap_change_24h && (
-                      <span className={`ml-2 text-sm ${
-                        intelligence.market_overview.market_cap_change_24h.startsWith("-") ? "text-red-400" : "text-green-400"
-                      }`}>{intelligence.market_overview.market_cap_change_24h}%</span>
-                    )}
                   </p>
+                  {intelligence.market_overview.market_cap_change_24h && (
+                    <span className={`text-sm ${
+                      String(intelligence.market_overview.market_cap_change_24h).startsWith("-") ? "text-red-400" : "text-green-400"
+                    }`}>{intelligence.market_overview.market_cap_change_24h}% (24h)</span>
+                  )}
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
                   <p className="text-sm text-white/40">BTC Dominance</p>
