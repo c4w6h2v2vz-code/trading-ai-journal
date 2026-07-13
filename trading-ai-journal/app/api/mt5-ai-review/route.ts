@@ -16,6 +16,30 @@ export async function POST(request: Request) {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const { trade } = await request.json();
 
+    const userId = trade?.user_id;
+
+    if (userId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan, ai_reviews_used")
+        .eq("id", userId)
+        .single();
+
+      if (profile?.plan === "free" && (profile?.ai_reviews_used || 0) >= 10) {
+        return NextResponse.json(
+          { error: "Free plan limit reached. Upgrade to Pro for unlimited AI reviews." },
+          { status: 403 }
+        );
+      }
+
+      if (profile?.plan === "free") {
+        await supabase
+          .from("profiles")
+          .update({ ai_reviews_used: (profile?.ai_reviews_used || 0) + 1 })
+          .eq("id", userId);
+      }
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -66,11 +90,9 @@ Return this exact JSON:
     }
 
     const text = data.choices?.[0]?.message?.content || "";
-console.log("AI RAW RESPONSE:", text);
-console.log("FULL DATA:", JSON.stringify(data));
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-if (!jsonMatch) throw new Error("No JSON found in AI response");
-const parsed = JSON.parse(jsonMatch[0]);
+    if (!jsonMatch) throw new Error("No JSON found in AI response");
+    const parsed = JSON.parse(jsonMatch[0]);
 
     const { error } = await supabase
       .from("mt5_trades")
