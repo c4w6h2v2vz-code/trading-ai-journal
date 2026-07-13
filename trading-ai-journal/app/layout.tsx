@@ -16,8 +16,20 @@ export const metadata: Metadata = {
   title: "PipTrak — AI Trading Journal",
   description: "Your personal AI trading coach. Track trades, get AI coaching, and improve your performance.",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "PipTrak",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
 };
 
+export const viewport = {
+  themeColor: "#050505",
+};
 export default function RootLayout({
   children,
 }: Readonly<{
