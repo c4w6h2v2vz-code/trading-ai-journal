@@ -1,20 +1,50 @@
 import { NextResponse } from "next/server";
 
 async function getSolanaTrending() {
+  const EXCLUDED_SYMBOLS = new Set(["SOL", "WSOL", "USDC", "USDT", "USDH"]);
+
   try {
     const response = await fetch(
-      "https://api.dexscreener.com/latest/dex/search?q=solana",
+      "https://api.dexscreener.com/token-boosts/top/v1",
       { cache: "no-store" }
     );
-    const data = await response.json();
-    if (!data.pairs) return [];
+    const boosted = await response.json();
 
-    const solanaPairs = data.pairs
-      .filter((p: any) => p.chainId === "solana" && p.liquidity?.usd > 5000)
+    const solanaBoosted = Array.isArray(boosted)
+      ? boosted.filter((t: any) => t.chainId === "solana").slice(0, 30)
+      : [];
+
+    if (solanaBoosted.length === 0) return [];
+
+    const addresses = solanaBoosted.map((t: any) => t.tokenAddress).filter(Boolean);
+    const uniqueAddresses = [...new Set(addresses)].slice(0, 30);
+
+    const pairsResponse = await fetch(
+      `https://api.dexscreener.com/latest/dex/tokens/${uniqueAddresses.join(",")}`,
+      { cache: "no-store" }
+    );
+    const pairsData = await pairsResponse.json();
+
+    if (!pairsData.pairs) return [];
+
+    const bestPairPerToken = new Map<string, any>();
+    for (const p of pairsData.pairs) {
+      if (p.chainId !== "solana") continue;
+      if (!p.baseToken?.symbol || EXCLUDED_SYMBOLS.has(p.baseToken.symbol.toUpperCase())) continue;
+      if (!p.liquidity?.usd || p.liquidity.usd < 5000) continue;
+
+      const addr = p.baseToken.address;
+      const existing = bestPairPerToken.get(addr);
+      if (!existing || (p.liquidity?.usd || 0) > (existing.liquidity?.usd || 0)) {
+        bestPairPerToken.set(addr, p);
+      }
+    }
+
+    const uniqueTokens = Array.from(bestPairPerToken.values())
       .sort((a: any, b: any) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
-      .slice(0, 30);
+      .slice(0, 20);
 
-    return solanaPairs.map((p: any) => ({
+    return uniqueTokens.map((p: any) => ({
       address: p.baseToken?.address,
       name: p.baseToken?.name,
       symbol: p.baseToken?.symbol,
