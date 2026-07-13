@@ -6,6 +6,8 @@ import AppShell from "@/components/AppShell";
 type CoinWatch = {
   coin: string;
   price: string;
+  trading_pair: string;
+  exchange: string;
   timeframe: string;
   direction: string;
   probability: number;
@@ -18,6 +20,12 @@ type CoinWatch = {
   target: string;
   stop_loss: string;
   category: string;
+};
+
+type NewsItem = {
+  source: string;
+  title: string;
+  url: string;
 };
 
 type Intelligence = {
@@ -36,12 +44,16 @@ type Intelligence = {
   rug_pull_warnings: { coin: string; warning: string }[];
   best_trade_today: {
     coin: string;
+    trading_pair: string;
+    exchange: string;
     entry: string;
     target: string;
     stop_loss: string;
     timeframe: string;
     reason: string;
   };
+  sources_used: string[];
+  news_items: NewsItem[];
   weekly_outlook: string;
 };
 
@@ -113,7 +125,6 @@ export default function CryptoIntelligencePage() {
         {intelligence && (
           <div className="space-y-6">
 
-            {/* Market Overview */}
             <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-6">
               <h2 className="mb-4 text-xl font-semibold">📊 Market Overview</h2>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -147,10 +158,19 @@ export default function CryptoIntelligencePage() {
               </div>
             </div>
 
-            {/* Best Trade Today */}
             {intelligence.best_trade_today && (
               <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-green-400">⭐ Best Trade Today</h2>
+
+                {(intelligence.best_trade_today.trading_pair || intelligence.best_trade_today.exchange) && (
+                  <div className="mb-4 rounded-2xl border border-green-500/20 bg-black/30 p-3">
+                    <p className="text-xs text-white/40">Where to trade</p>
+                    <p className="text-sm font-semibold text-green-300">
+                      {intelligence.best_trade_today.trading_pair || "Pair unavailable"} on {intelligence.best_trade_today.exchange || "exchange unavailable"}
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid gap-3 sm:grid-cols-3 mb-4">
                   <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
                     <p className="text-xs text-white/40">Entry</p>
@@ -174,7 +194,6 @@ export default function CryptoIntelligencePage() {
               </div>
             )}
 
-            {/* Top Coins to Watch */}
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
               <h2 className="mb-4 text-xl font-semibold">🔭 Top Coins to Watch</h2>
               <div className="space-y-4">
@@ -195,6 +214,15 @@ export default function CryptoIntelligencePage() {
                         <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{coin.probability}%</span>
                       </div>
                     </div>
+
+                    {(coin.trading_pair || coin.exchange) && (
+                      <div className="mb-3 rounded-xl bg-white/5 px-3 py-2">
+                        <p className="text-xs text-white/40">Where to trade</p>
+                        <p className="text-sm font-semibold text-white/80">
+                          {coin.trading_pair || "Pair unavailable"} on {coin.exchange || "exchange unavailable"}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-3 gap-2 mb-3">
                       <div className="rounded-xl bg-black/30 p-2 text-center">
@@ -231,7 +259,6 @@ export default function CryptoIntelligencePage() {
               </div>
             </div>
 
-            {/* Meme Coin Alerts */}
             {intelligence.meme_coins_alert?.length > 0 && (
               <div className="rounded-3xl border border-orange-500/20 bg-orange-500/5 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-orange-400">🔥 Meme Coin Alerts</h2>
@@ -254,7 +281,6 @@ export default function CryptoIntelligencePage() {
               </div>
             )}
 
-            {/* Whale Alerts */}
             {intelligence.whale_alerts?.length > 0 && (
               <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-blue-400">🐋 Whale Alerts</h2>
@@ -270,7 +296,6 @@ export default function CryptoIntelligencePage() {
               </div>
             )}
 
-            {/* Coins to Avoid */}
             {intelligence.coins_to_avoid?.length > 0 && (
               <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-red-400">❌ Coins to Avoid</h2>
@@ -288,7 +313,6 @@ export default function CryptoIntelligencePage() {
               </div>
             )}
 
-            {/* Rug Pull Warnings */}
             {intelligence.rug_pull_warnings?.length > 0 && (
               <div className="rounded-3xl border border-red-500/50 bg-red-500/10 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-red-400">⚠️ Rug Pull Warnings</h2>
@@ -303,7 +327,27 @@ export default function CryptoIntelligencePage() {
               </div>
             )}
 
-            {/* Weekly Outlook */}
+            {intelligence.news_items?.length > 0 && (
+              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+                <h2 className="mb-2 text-xl font-semibold">📰 News Sources Used Today</h2>
+                {intelligence.sources_used?.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {intelligence.sources_used.map((s, i) => (
+                      <span key={i} className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">{s}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {intelligence.news_items.map((item, i) => (
+                    <a key={i} href={item.url} target="_blank" rel="noopener noreferrer" className="block rounded-2xl border border-white/10 bg-black/30 p-3 hover:border-white/20 transition">
+                      <p className="text-xs text-blue-400 mb-1">{item.source}</p>
+                      <p className="text-sm text-white/70">{item.title}</p>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {intelligence.weekly_outlook && (
               <div className="rounded-3xl border border-purple-500/20 bg-purple-500/5 p-6">
                 <h2 className="mb-3 text-xl font-semibold text-purple-400">📅 Weekly Outlook</h2>
