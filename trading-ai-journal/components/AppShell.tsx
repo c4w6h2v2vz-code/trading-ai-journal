@@ -43,6 +43,7 @@ const navGroups = [
       { name: "Reports", href: "/reports" },
       { name: "Profile", href: "/profile" },
       { name: "Settings", href: "/settings" },
+      { name: "Support", href: "/support" },
     ],
   },
 ];
