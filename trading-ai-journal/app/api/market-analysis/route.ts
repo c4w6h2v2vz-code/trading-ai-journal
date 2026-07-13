@@ -1,40 +1,51 @@
 import { NextResponse } from "next/server";
 
+async function getGoldPrice() {
+  try {
+    const response = await fetch("https://data-asg.goldprice.org/dbXRates/USD", { cache: "no-store" });
+    const data = await response.json();
+    const xauPrice = data?.items?.[0]?.xauPrice;
+    if (xauPrice && !isNaN(xauPrice)) {
+      return Number(xauPrice).toFixed(2);
+    }
+    return null;
+  } catch (err) {
+    console.error("Gold price fetch failed:", err);
+    return null;
+  }
+}
+
 async function getForexPrices() {
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
   const prices: Record<string, string> = {};
 
-  const pairs = [
-    { from: "EUR", to: "USD", name: "EURUSD" },
-    { from: "XAU", to: "USD", name: "XAUUSD" },
-  ];
+  try {
+    const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=EUR&to_currency=USD&apikey=${apiKey}`;
+    const response = await fetch(url, { cache: "no-store" });
+    const data = await response.json();
 
-  for (const pair of pairs) {
-    try {
-      const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${pair.from}&to_currency=${pair.to}&apikey=${apiKey}`;
-      const response = await fetch(url, { cache: "no-store" });
-      const data = await response.json();
-
-      if (data["Note"] || data["Information"]) {
-        console.error(`Alpha Vantage rate limit hit for ${pair.name}:`, data["Note"] || data["Information"]);
-        continue;
-      }
-
+    if (data["Note"] || data["Information"]) {
+      console.error("Alpha Vantage rate limit hit for EURUSD:", data["Note"] || data["Information"]);
+    } else {
       const rate = data["Realtime Currency Exchange Rate"];
       if (rate && rate["5. Exchange Rate"]) {
         const price = parseFloat(rate["5. Exchange Rate"]);
         if (!isNaN(price) && price > 0) {
-          prices[pair.name] = pair.name === "XAUUSD" ? price.toFixed(2) : price.toFixed(5);
+          prices["EURUSD"] = price.toFixed(5);
         }
       } else {
-        console.error(`No rate data for ${pair.name}:`, JSON.stringify(data).slice(0, 300));
+        console.error("No rate data for EURUSD:", JSON.stringify(data).slice(0, 300));
       }
-
-      await new Promise(resolve => setTimeout(resolve, 1200));
-    } catch (err) {
-      console.error(`Failed ${pair.name}:`, err);
     }
+  } catch (err) {
+    console.error("Failed EURUSD:", err);
   }
+
+  const goldPrice = await getGoldPrice();
+  if (goldPrice) {
+    prices["XAUUSD"] = goldPrice;
+  }
+
   return prices;
 }
 
