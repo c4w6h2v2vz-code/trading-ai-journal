@@ -37,6 +37,7 @@ const navGroups = [
   {
     label: "Account",
     links: [
+      { name: "Connect Broker", href: "/connect-mt5" },
       { name: "Accounts", href: "/accounts" },
       { name: "Import", href: "/import" },
       { name: "Reports", href: "/reports" },
