@@ -25,6 +25,7 @@ export default function AccountsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState<string | null>(null);
   const [form, setForm] = useState({
     account_number: "",
     account_name: "",
@@ -71,21 +72,30 @@ export default function AccountsPage() {
 
     if (error) {
       setMessage("Error: " + error.message);
-    } else {
-      setAccounts([data, ...accounts]);
-      setShowForm(false);
-      setMessage("Account added ✅");
-      setForm({
-        account_number: "",
-        account_name: "",
-        platform: "MT5",
-        broker: "",
-        account_size: 10000,
-        is_prop_firm: false,
-        prop_firm_name: "",
-        challenge_phase: "Phase 1",
-      });
+      setSaving(false);
+      return;
     }
+
+    setAccounts([data, ...accounts]);
+    setShowForm(false);
+
+    if (form.platform === "MT5" || form.platform === "MT4") {
+      setShowInstallGuide(form.platform);
+      setMessage("Account saved ✅ Follow the steps below to connect your terminal.");
+    } else {
+      setMessage("Account added ✅ Use CSV Import to bring in your trade history.");
+    }
+
+    setForm({
+      account_number: "",
+      account_name: "",
+      platform: "MT5",
+      broker: "",
+      account_size: 10000,
+      is_prop_firm: false,
+      prop_firm_name: "",
+      challenge_phase: "Phase 1",
+    });
     setSaving(false);
   }
 
@@ -138,7 +148,7 @@ export default function AccountsPage() {
     <AppShell>
       <div className="mx-auto max-w-3xl px-6 py-8">
         <div className="space-y-4">
-          {[1,2].map(i => (
+          {[1, 2].map(i => (
             <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-32 animate-pulse" />
           ))}
         </div>
@@ -155,13 +165,55 @@ export default function AccountsPage() {
           </p>
           <h1 className="text-4xl font-bold">My Accounts</h1>
           <p className="mt-2 text-white/40">
-            Manage multiple trading accounts. Switch between them to see each account's trades.
+            Add and connect your trading accounts. MT4/MT5 sync automatically once connected; other platforms use CSV import.
           </p>
         </div>
 
         {message && (
           <div className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 px-5 py-4 text-green-300">
             {message}
+          </div>
+        )}
+
+        {/* Install Guide (shown right after saving MT4/MT5 account) */}
+        {showInstallGuide && (
+          <div className="mb-6 space-y-4">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Connect {showInstallGuide} — 3 Steps</h3>
+                <button onClick={() => setShowInstallGuide(null)} className="text-white/30 hover:text-white text-sm">✕</button>
+              </div>
+
+              <div className="space-y-2 text-sm text-white/60 mb-6">
+                <p className="font-semibold text-white/80">1️⃣ Allow PipTrak in {showInstallGuide}</p>
+                <p>Open {showInstallGuide} → Tools → Options → Expert Advisors tab</p>
+                <p>Check "Allow WebRequest for listed URL" and add:{" "}
+                  <code className="rounded bg-black/50 px-2 py-1 text-blue-400">https://piptrak.com</code>
+                </p>
+              </div>
+
+              <div className="space-y-2 text-sm text-white/60 mb-6">
+                <p className="font-semibold text-white/80">2️⃣ Install the TradingAIConnector</p>
+                <p>Press F4 to open MetaEditor → New → Expert Advisor (template) → name it TradingAIConnector</p>
+                <p>Paste in the PipTrak connector code, press F7 to compile (should say "0 errors")</p>
+              </div>
+
+              <div className="space-y-2 text-sm text-white/60 mb-4">
+                <p className="font-semibold text-white/80">3️⃣ Attach it to a chart</p>
+                <p>Drag TradingAIConnector onto any chart (e.g. EURUSD) and set:</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-xs text-white/70 space-y-1">
+                <p>ApiUrl = https://piptrak.com/api/mt5</p>
+                <p>SecretKey = (shown in your Settings page)</p>
+                <p>DailyLossLimitPercent = 3.0</p>
+                <p>DailyProfitTargetPercent = 3.0</p>
+                <p>EnableAutoClose = true</p>
+                <p>SignalCheckInterval = 30</p>
+              </div>
+              <p className="text-sm text-white/60 mt-4">
+                Make sure the <strong>Algo Trading</strong> button is enabled (green). Check the "Experts" tab for "TradingAIConnector started with Risk Guardian" to confirm it's working.
+              </p>
+            </div>
           </div>
         )}
 
@@ -183,7 +235,7 @@ export default function AccountsPage() {
                   <label className="text-sm text-white/40 mb-1 block">Account Number</label>
                   <input
                     value={form.account_number}
-                    onChange={e => setForm({...form, account_number: e.target.value})}
+                    onChange={e => setForm({ ...form, account_number: e.target.value })}
                     placeholder="e.g. 521091015"
                     className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
                   />
@@ -192,7 +244,7 @@ export default function AccountsPage() {
                   <label className="text-sm text-white/40 mb-1 block">Account Name</label>
                   <input
                     value={form.account_name}
-                    onChange={e => setForm({...form, account_name: e.target.value})}
+                    onChange={e => setForm({ ...form, account_name: e.target.value })}
                     placeholder="e.g. FTMO Live"
                     className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
                   />
@@ -204,7 +256,7 @@ export default function AccountsPage() {
                   <label className="text-sm text-white/40 mb-1 block">Platform</label>
                   <select
                     value={form.platform}
-                    onChange={e => setForm({...form, platform: e.target.value})}
+                    onChange={e => setForm({ ...form, platform: e.target.value })}
                     className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
                   >
                     <option>MT5</option>
@@ -214,12 +266,17 @@ export default function AccountsPage() {
                     <option>Match-Trader</option>
                     <option>Other</option>
                   </select>
+                  {(form.platform !== "MT5" && form.platform !== "MT4") && (
+                    <p className="mt-1 text-xs text-yellow-400">
+                      💡 This platform needs manual sync — use CSV Import after saving.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm text-white/40 mb-1 block">Broker/Firm</label>
                   <input
                     value={form.broker}
-                    onChange={e => setForm({...form, broker: e.target.value})}
+                    onChange={e => setForm({ ...form, broker: e.target.value })}
                     placeholder="e.g. FTMO, MyForexFunds"
                     className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
                   />
@@ -231,14 +288,14 @@ export default function AccountsPage() {
                 <input
                   type="number"
                   value={form.account_size}
-                  onChange={e => setForm({...form, account_size: Number(e.target.value)})}
+                  onChange={e => setForm({ ...form, account_size: Number(e.target.value) })}
                   className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
                 />
               </div>
 
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setForm({...form, is_prop_firm: !form.is_prop_firm})}
+                  onClick={() => setForm({ ...form, is_prop_firm: !form.is_prop_firm })}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${form.is_prop_firm ? "bg-blue-600" : "bg-white/20"}`}
                 >
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${form.is_prop_firm ? "translate-x-6" : "translate-x-1"}`} />
@@ -252,7 +309,7 @@ export default function AccountsPage() {
                     <label className="text-sm text-white/40 mb-1 block">Prop Firm Name</label>
                     <select
                       value={form.prop_firm_name}
-                      onChange={e => setForm({...form, prop_firm_name: e.target.value})}
+                      onChange={e => setForm({ ...form, prop_firm_name: e.target.value })}
                       className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
                     >
                       <option>FTMO</option>
@@ -268,7 +325,7 @@ export default function AccountsPage() {
                     <label className="text-sm text-white/40 mb-1 block">Challenge Phase</label>
                     <select
                       value={form.challenge_phase}
-                      onChange={e => setForm({...form, challenge_phase: e.target.value})}
+                      onChange={e => setForm({ ...form, challenge_phase: e.target.value })}
                       className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
                     >
                       <option>Phase 1</option>
@@ -322,7 +379,15 @@ export default function AccountsPage() {
                     </div>
                     <p className="text-sm text-white/40">#{account.account_number}</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    {(account.platform === "MT5" || account.platform === "MT4") && (
+                      <button
+                        onClick={() => setShowInstallGuide(account.platform)}
+                        className="rounded-xl bg-white/5 px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/10 transition"
+                      >
+                        Setup Guide
+                      </button>
+                    )}
                     {!account.is_active && (
                       <button
                         onClick={() => setActive(account.id)}
