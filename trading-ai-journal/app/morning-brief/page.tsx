@@ -432,7 +432,7 @@ export default function MorningBriefPage() {
                               <span className="text-sm text-white/40">{g.price}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-green-400 font-bold">{g.change_24h}%</span>
+                              <span className="text-green-400 font-bold">{String(g.change_24h).replace('%', '')}%</span>
                               <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
                                 {g.continue_probability}% continue
                               </span>
@@ -459,7 +459,7 @@ export default function MorningBriefPage() {
                               <span className="text-sm text-white/40">{l.price}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-red-400 font-bold">{l.change_24h}%</span>
+                              <span className="text-red-400 font-bold">{String(l.change_24h).replace('%', '')}%</span>
                               <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-400">
                                 {l.bounce_probability}% bounce
                               </span>
