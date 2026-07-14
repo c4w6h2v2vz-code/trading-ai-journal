@@ -458,6 +458,8 @@ ${isWeekend ? '"forex_closed": "Forex markets closed until Monday. No trading si
       "previous": "XX",
       "expected_move": "XX pips",
       "historical_note": "Based on general knowledge of how this type of event has historically moved markets, 2-3 sentences. State clearly this is a historical tendency, not a guarantee. If you have no reliable historical knowledge for this specific event, say so explicitly instead of guessing.",
+      "bias_direction": "The general historical directional tendency for the event's currency when this event is notable, e.g. 'Bullish USD', 'Bearish USD', 'Mixed'. Base this on general knowledge only.",
+      "bias_strength": "How reliable this tendency generally is: 'Strong tendency', 'Moderate tendency', or 'Weak/Mixed'. Never imply certainty.",
       "if_beats_forecast": "Typical historical market reaction if actual comes in above forecast - which pairs move and roughly how, framed as tendency not certainty",
       "if_misses_forecast": "Typical historical market reaction if actual comes in below forecast - which pairs move and roughly how, framed as tendency not certainty"
     }
