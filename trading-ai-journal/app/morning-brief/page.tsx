@@ -60,6 +60,8 @@ type EventToday = {
   previous: string;
   expected_move: string;
   historical_note?: string;
+  bias_direction?: string;
+  bias_strength?: string;
   if_beats_forecast?: string;
   if_misses_forecast?: string;
 };
@@ -310,10 +312,27 @@ export default function MorningBriefPage() {
                         </div>
                         <span className="text-xs text-white/40">{evt.expected_move}</span>
                       </div>
+                      {evt.bias_direction && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                            evt.bias_direction.toLowerCase().includes("bull") ? "bg-green-500/20 text-green-400" :
+                            evt.bias_direction.toLowerCase().includes("bear") ? "bg-red-500/20 text-red-400" :
+                            "bg-yellow-500/20 text-yellow-400"
+                          }`}>
+                            📊 Bias: {evt.bias_direction}
+                          </span>
+                          {evt.bias_strength && (
+                            <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/50">
+                              {evt.bias_strength}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {evt.historical_note && (
                         <div className="mt-2 rounded-xl bg-black/30 p-3">
                           <p className="text-xs text-purple-400 font-semibold mb-1">📚 Historically</p>
                           <p className="text-xs text-white/60">{evt.historical_note}</p>
+                          <p className="text-[10px] text-white/30 mt-2">General historical tendency, not a prediction or guarantee.</p>
                         </div>
                       )}
                       {(evt.if_beats_forecast || evt.if_misses_forecast) && (
