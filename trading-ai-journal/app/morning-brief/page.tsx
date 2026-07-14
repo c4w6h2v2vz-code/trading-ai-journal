@@ -51,6 +51,19 @@ type HotPair = {
   direction: string;
 };
 
+type EventToday = {
+  time: string;
+  currency: string;
+  event: string;
+  impact: string;
+  forecast: string;
+  previous: string;
+  expected_move: string;
+  historical_note?: string;
+  if_beats_forecast?: string;
+  if_misses_forecast?: string;
+};
+
 type Brief = {
   brief_date: string;
   brief_time: string;
@@ -83,7 +96,7 @@ type Brief = {
   };
   correlations: { assets: string; value: string; meaning: string; action: string }[];
   economic_surprises: { event: string; result: string; impact: string }[];
-  events_today: { time: string; currency: string; event: string; impact: string; forecast: string; previous: string; expected_move: string }[];
+  events_today: EventToday[];
   best_trades: BestTrade[];
   volatility_overview: {
     overall: string;
@@ -281,20 +294,44 @@ export default function MorningBriefPage() {
             {brief.events_today && brief.events_today.length > 0 && (
               <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
                 <h2 className="mb-4 text-xl font-semibold">📅 Today's Events (CET)</h2>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {brief.events_today.map((evt, i) => (
-                    <div key={i} className={`flex items-center justify-between rounded-2xl border p-3 ${
+                    <div key={i} className={`rounded-2xl border p-3 ${
                       evt.impact === "High" ? "border-red-500/20 bg-red-500/5" : "border-yellow-500/20 bg-yellow-500/5"
                     }`}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                          evt.impact === "High" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"
-                        }`}>{evt.impact}</span>
-                        <span className="text-sm font-semibold">{evt.time}</span>
-                        <span className="text-sm text-blue-400">{evt.currency}</span>
-                        <span className="text-sm">{evt.event}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                            evt.impact === "High" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"
+                          }`}>{evt.impact}</span>
+                          <span className="text-sm font-semibold">{evt.time}</span>
+                          <span className="text-sm text-blue-400">{evt.currency}</span>
+                          <span className="text-sm">{evt.event}</span>
+                        </div>
+                        <span className="text-xs text-white/40">{evt.expected_move}</span>
                       </div>
-                      <span className="text-xs text-white/40">{evt.expected_move}</span>
+                      {evt.historical_note && (
+                        <div className="mt-2 rounded-xl bg-black/30 p-3">
+                          <p className="text-xs text-purple-400 font-semibold mb-1">📚 Historically</p>
+                          <p className="text-xs text-white/60">{evt.historical_note}</p>
+                        </div>
+                      )}
+                      {(evt.if_beats_forecast || evt.if_misses_forecast) && (
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {evt.if_beats_forecast && (
+                            <div className="rounded-xl bg-green-500/5 border border-green-500/10 p-3">
+                              <p className="text-xs text-green-400 font-semibold mb-1">If beats forecast</p>
+                              <p className="text-xs text-white/60">{evt.if_beats_forecast}</p>
+                            </div>
+                          )}
+                          {evt.if_misses_forecast && (
+                            <div className="rounded-xl bg-red-500/5 border border-red-500/10 p-3">
+                              <p className="text-xs text-red-400 font-semibold mb-1">If misses forecast</p>
+                              <p className="text-xs text-white/60">{evt.if_misses_forecast}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -377,7 +414,8 @@ export default function MorningBriefPage() {
                 )}
               </div>
             )}
-{/* Top Movers */}
+
+            {/* Top Movers */}
             {brief.top_movers && (
               <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-green-400">🚀 Top Movers (24h Real Data)</h2>
@@ -442,6 +480,7 @@ export default function MorningBriefPage() {
                 )}
               </div>
             )}
+
             {/* Crypto Analysis */}
             {brief.crypto_analysis && (
               <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-6">
