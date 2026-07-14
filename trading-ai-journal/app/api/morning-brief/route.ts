@@ -235,7 +235,8 @@ RULES:
 - Identify which pairs have the HIGHEST volatility today
 - Think like Goldman Sachs and JPMorgan combined
 - For crypto: Analyze the TOP GAINERS shown. For each gainer, give probability of continuing to pump in next 24 hours
-- Also identify which LOSERS might bounce back`,
+- Also identify which LOSERS might bounce back
+- For each economic event today, add historical context: how has this TYPE of event historically moved markets. Always frame this as a historical tendency, never as a guarantee or prediction of today's outcome. Never state a market WILL move a certain way - only that it HAS HISTORICALLY tended to.`,
           },
           {
             role: "user",
@@ -448,7 +449,18 @@ ${isWeekend ? '"forex_closed": "Forex markets closed until Monday. No trading si
   ],
 
   "events_today": [
-    { "time": "CET time", "currency": "USD", "event": "Name", "impact": "High", "forecast": "XX", "previous": "XX", "expected_move": "XX pips" }
+    {
+      "time": "CET time",
+      "currency": "USD",
+      "event": "Name",
+      "impact": "High",
+      "forecast": "XX",
+      "previous": "XX",
+      "expected_move": "XX pips",
+      "historical_note": "Based on general knowledge of how this type of event has historically moved markets, 2-3 sentences. State clearly this is a historical tendency, not a guarantee. If you have no reliable historical knowledge for this specific event, say so explicitly instead of guessing.",
+      "if_beats_forecast": "Typical historical market reaction if actual comes in above forecast - which pairs move and roughly how, framed as tendency not certainty",
+      "if_misses_forecast": "Typical historical market reaction if actual comes in below forecast - which pairs move and roughly how, framed as tendency not certainty"
+    }
   ],
 
   "best_trades": [
