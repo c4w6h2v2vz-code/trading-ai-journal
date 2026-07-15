@@ -16,6 +16,8 @@ type Account = {
   is_prop_firm: boolean;
   prop_firm_name: string;
   challenge_phase: string;
+  daily_loss_limit_percent: number;
+  risk_guardian_enabled: boolean;
 };
 
 export default function AccountsPage() {
@@ -26,6 +28,40 @@ export default function AccountsPage() {
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showInstallGuide, setShowInstallGuide] = useState<string | null>(null);
+  const [editingRisk, setEditingRisk] = useState<string | null>(null);
+  const [riskValue, setRiskValue] = useState(3.0);
+
+  async function saveRiskLimit(accountId: string) {
+    const { error } = await supabase
+      .from("trading_accounts")
+      .update({ daily_loss_limit_percent: riskValue })
+      .eq("id", accountId);
+
+    if (error) {
+      setMessage("Error: " + error.message);
+      return;
+    }
+
+    setAccounts(accounts.map(a => a.id === accountId ? { ...a, daily_loss_limit_percent: riskValue } : a));
+    setEditingRisk(null);
+    setMessage(`Daily loss limit set to ${riskValue}% ✅ Your EA will pick this up within 30 seconds.`);
+  }
+
+  async function toggleGuardian(account: Account) {
+    const newValue = !account.risk_guardian_enabled;
+    const { error } = await supabase
+      .from("trading_accounts")
+      .update({ risk_guardian_enabled: newValue })
+      .eq("id", account.id);
+
+    if (error) {
+      setMessage("Error: " + error.message);
+      return;
+    }
+
+    setAccounts(accounts.map(a => a.id === account.id ? { ...a, risk_guardian_enabled: newValue } : a));
+    setMessage(newValue ? "Risk Guardian enabled ✅" : "Risk Guardian disabled ⚠️ Your account is no longer protected.");
+  }
   const [form, setForm] = useState({
     account_number: "",
     account_name: "",
@@ -406,7 +442,58 @@ export default function AccountsPage() {
                     </button>
                   </div>
                 </div>
+{(account.platform === "MT5" || account.platform === "MT4") && (
+                  <div className={`mb-3 rounded-2xl border p-4 ${
+                    account.risk_guardian_enabled ? "border-red-500/20 bg-red-500/5" : "border-white/10 bg-white/[0.02]"
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">🛡 Risk Guardian</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                          account.risk_guardian_enabled ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/40"
+                        }`}>
+                          {account.risk_guardian_enabled ? "Active" : "Off"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => toggleGuardian(account)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${account.risk_guardian_enabled ? "bg-green-600" : "bg-white/20"}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${account.risk_guardian_enabled ? "translate-x-6" : "translate-x-1"}`} />
+                      </button>
+                    </div>
 
+                    {editingRisk === account.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0.5"
+                          max="20"
+                          value={riskValue}
+                          onChange={e => setRiskValue(Number(e.target.value))}
+                          className="w-24 rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500"
+                        />
+                        <span className="text-sm text-white/40">% daily loss</span>
+                        <button onClick={() => saveRiskLimit(account.id)} className="rounded-xl bg-green-600 px-3 py-2 text-xs font-semibold hover:bg-green-700">Save</button>
+                        <button onClick={() => setEditingRisk(null)} className="rounded-xl bg-white/5 px-3 py-2 text-xs hover:bg-white/10">Cancel</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-white/60">
+                          Closes all trades at <span className="font-bold text-red-400">{account.daily_loss_limit_percent ?? 3}%</span> daily loss
+                          <span className="text-white/30"> (${((account.account_size * (account.daily_loss_limit_percent ?? 3)) / 100).toFixed(0)})</span>
+                        </p>
+                        <button
+                          onClick={() => { setEditingRisk(account.id); setRiskValue(account.daily_loss_limit_percent ?? 3); }}
+                          className="rounded-xl bg-white/5 px-3 py-1.5 text-xs font-semibold hover:bg-white/10"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="grid gap-3 sm:grid-cols-4">
                   <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
                     <p className="text-xs text-white/40">Platform</p>
