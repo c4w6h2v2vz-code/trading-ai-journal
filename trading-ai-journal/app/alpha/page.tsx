@@ -4,6 +4,7 @@ import { useState } from "react";
 import AppShell from "@/components/AppShell";
 
 type Opportunity = {
+  address?: string;
   symbol: string;
   name: string;
   price: string;
@@ -206,6 +207,9 @@ export default function AlphaPage() {
                             <p className="text-xs text-white/60">{op.score_explanation}</p>
                           </div>
                           <p className="text-xs text-white/30">R:R {op.risk_reward} · Execute manually on Axiom or your DEX</p>
+                          {op.address && (
+                            <button onClick={() => window.location.href = `/alpha/token/${op.address}`} className="w-full rounded-xl bg-purple-600 py-2.5 text-sm font-semibold hover:bg-purple-700 transition">🔍 Full Analysis →</button>
+                          )}
                         </div>
                       )}
                     </div>

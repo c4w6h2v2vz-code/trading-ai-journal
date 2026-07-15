@@ -138,7 +138,7 @@ export async function POST() {
     }));
 
     const tokensText = enrichedTokens.map((t: any) =>
-      `${t.symbol} (${t.name}) | Price: $${t.price} | 24h: ${t.change_24h}% | Volume: $${Math.round(t.volume_24h)} | Liquidity: $${Math.round(t.liquidity)} | MCap: $${Math.round(t.market_cap)} | RugCheck: ${t.rug_check ? `Score ${t.rug_check.score}, Risks: ${t.rug_check.risks.join(", ") || "None flagged"}` : "Not available"}`
+      `${t.symbol} (${t.name}) | Address: ${t.address} | Price: $${t.price} | 24h: ${t.change_24h}% | Volume: $${Math.round(t.volume_24h)} | Liquidity: $${Math.round(t.liquidity)} | MCap: $${Math.round(t.market_cap)} | RugCheck: ${t.rug_check ? `Score ${t.rug_check.score}, Risks: ${t.rug_check.risks.join(", ") || "None flagged"}` : "Not available"}`
     ).join("\n");
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -185,6 +185,7 @@ Return ONLY this JSON:
   "ai_market_summary": "3-4 sentences summarizing today's real opportunities and risks, citing specific token symbols and numbers from the data",
   "top_opportunities": [
     {
+      "address": "The exact token contract address from the data provided for this token",
       "symbol": "REAL symbol from data",
       "name": "REAL name from data",
       "price": "real price",
