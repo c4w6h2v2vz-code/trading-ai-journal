@@ -8,128 +8,106 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen bg-[#050505] text-white">
       {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b border-white/5 bg-black/80 px-6 py-4 backdrop-blur-xl">
-        <span className="text-lg font-bold tracking-tight">PipTrak</span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/login")} className="rounded-xl px-4 py-2 text-sm text-white/60 hover:text-white transition">
-            Login
-          </button>
-          <button onClick={() => router.push("/register")} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-700 transition">
-            Start Free
-          </button>
+      <nav className="border-b border-white/5 px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <span className="text-xl font-bold">PipTrak</span>
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.push("/login")} className="text-sm text-white/50 hover:text-white transition">Sign In</button>
+            <button onClick={() => router.push("/register")} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-700 transition">Get Started</button>
+          </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="flex min-h-screen flex-col items-center justify-center px-6 pt-20 text-center">
-        <div className="mb-6 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-sm text-blue-300">
-          Built for All Traders Worldwide
+      <section className="px-6 py-24">
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="mb-6 inline-block rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-sm text-blue-300">
+            Built for prop firm traders
+          </p>
+          <h1 className="text-5xl font-bold leading-tight md:text-6xl">
+            Don't blow your challenge.
+            <br />
+            <span className="text-blue-400">Know what's worth trading.</span>
+          </h1>
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-white/50">
+            Most journals tell you what you did wrong yesterday. PipTrak stops you from blowing your account today —
+            and gives you institutional-grade market intelligence before you open a single chart.
+          </p>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            <button onClick={() => router.push("/register")} className="rounded-2xl bg-blue-600 px-8 py-4 font-semibold hover:bg-blue-700 transition">
+              Start Free →
+            </button>
+            <button onClick={() => router.push("/login")} className="rounded-2xl border border-white/10 bg-white/5 px-8 py-4 font-semibold hover:bg-white/10 transition">
+              Sign In
+            </button>
+          </div>
+          <p className="mt-4 text-sm text-white/30">No credit card required · Free forever plan</p>
+
+          <div className="mt-20 grid gap-8 sm:grid-cols-3">
+            <Stat number="3%" label="Auto-close at your daily loss limit" />
+            <Stat number="24/7" label="Real market intelligence, every morning" />
+            <Stat number="AI" label="Every trade reviewed and scored" />
+          </div>
         </div>
+      </section>
 
-        <h1 className="max-w-4xl text-5xl font-bold leading-tight tracking-tight md:text-7xl">
-          The AI Trading System
-          <br />
-          <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            That Trades For You
-          </span>
-        </h1>
-
-        <p className="mt-6 max-w-2xl text-lg text-white/50 md:text-xl">
-          PipTrak connects to your trading account, analyzes the market with AI, executes trades automatically, and closes everything when you hit your daily limit. The only trading journal that actually protects your account.
-        </p>
-
-        <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
-          <button
-            onClick={() => router.push("/register")}
-            className="rounded-2xl bg-blue-600 px-8 py-4 text-lg font-semibold transition hover:bg-blue-700"
-          >
-            Start for Free →
-          </button>
-          <button
-            onClick={() => router.push("/login")}
-            className="rounded-2xl border border-white/10 bg-white/5 px-8 py-4 text-lg font-semibold transition hover:bg-white/10"
-          >
-            Sign In
-          </button>
-        </div>
-
-        <p className="mt-4 text-sm text-white/30">No credit card required · Free forever plan</p>
-
-        <div className="mt-20 grid gap-8 sm:grid-cols-3">
-          <Stat number="AI" label="Auto trade execution" />
-          <Stat number="3%" label="Daily loss protection" />
-          <Stat number="MT5" label="Direct broker connection" />
+      {/* The killer feature */}
+      <section className="border-t border-white/5 px-6 py-24">
+        <div className="mx-auto max-w-4xl">
+          <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-10">
+            <p className="mb-3 inline-block rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs text-red-300">
+              Risk Guardian
+            </p>
+            <h2 className="text-3xl font-bold mb-4">One bad day shouldn't cost you a funded account.</h2>
+            <p className="text-white/50 mb-6 leading-relaxed">
+              PipTrak's Expert Advisor sits inside your MT4/MT5 terminal and hard-closes every open position
+              the moment you hit your daily loss limit. Not a notification. Not a warning. It actually closes them.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <MiniCard title="Automatic" text="Runs in your terminal, no manual input" />
+              <MiniCard title="Configurable" text="Set your own daily loss %" />
+              <MiniCard title="No profit cap" text="Let winners run, only losses are capped" />
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Features */}
-      <section className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
-          <p className="mb-4 text-center text-sm text-blue-400">Everything you need</p>
-          <h2 className="mb-16 text-center text-4xl font-bold md:text-5xl">
-            Built for serious traders
-          </h2>
+      <section className="border-t border-white/5 px-6 py-24">
+        <div className="mx-auto max-w-5xl">
+          <h2 className="text-center text-4xl font-bold mb-4">Everything a serious trader needs</h2>
+          <p className="text-center text-white/40 mb-16">One platform. No spreadsheets.</p>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <FeatureCard
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <Feature
+              icon="🌅"
+              title="Morning Brief"
+              text="Real forex prices, COT institutional positioning, correlations, volatility by pair. Every claim cites its actual news source."
+            />
+            <Feature
               icon="🤖"
-              title="AI Trade Coach"
-              description="Every trade gets an AI score, execution rating, psychology score, and personalized coaching feedback."
+              title="AI Trade Review"
+              text="Every trade scored on execution, risk, and psychology. Upload your chart screenshot and AI analyses the entry."
             />
-            <FeatureCard
-              icon="📸"
-              title="Screenshot Analysis"
-              description="Upload your TradingView chart. AI analyzes market structure, entry quality, stop loss, and risk/reward."
+            <Feature
+              icon="📋"
+              title="Your Rules, Enforced"
+              text="Set your own trading rules. AI checks every trade against them and tells you exactly when you broke one."
             />
-            <FeatureCard
-              icon="📊"
-              title="Advanced Analytics"
-              description="Win rate, profit factor, expectancy, best pairs, best sessions, drawdown, and more — all calculated automatically."
+            <Feature
+              icon="🔌"
+              title="MT4/MT5 Auto-Sync"
+              text="Trades appear in your journal automatically as you close them. No manual entry, ever."
             />
-            <FeatureCard
-              icon="🧠"
-              title="Psychology Tracking"
-              description="AI detects revenge trading, FOMO, greed, and repeated mistakes. Get coached on your mental game."
-            />
-            <FeatureCard
-              icon="🔗"
-              title="MT5 Auto Import"
-              description="Connect your FTMO MT5 account. Trades import automatically. No manual entry needed."
-            />
-            <FeatureCard
-              icon="⚡"
-              title="Auto Trade Execution"
-              description="AI analyzes the market and executes trades automatically in MT5. Set your risk and let AI trade for you."
-            />
-            <FeatureCard
-              icon="🛡️"
-              title="Risk Guardian"
-              description="Automatically closes all trades when you hit your daily loss or profit target. Never blow your account again."
-            />
-            <FeatureCard
-              icon="📈"
-              title="Weekly AI Reports"
-              description="Every week, AI generates a full performance report with lessons, mistakes, and goals for next week."
-            />
-            <FeatureCard
-              icon="🎯"
-              title="Goals & Targets"
-              description="Set daily, weekly, and monthly profit targets. AI tracks your progress and warns you when you're off track."
-            />
-            <FeatureCard
-              icon="📅"
-              title="Trade Calendar"
-              description="See your performance mapped to a calendar. Identify your best and worst trading days instantly."
-            />
-            <FeatureCard
-              icon="📰"
-              title="AI Market Analysis"
-              description="AI analyzes today's news events using 10 years of historical data and gives you trade probabilities."
-            />
-            <FeatureCard
+            <Feature
               icon="🏦"
-              title="Prop Firm Ready"
-              description="Built for FTMO, MyForexFunds, FundedNext traders. Track drawdown, daily limits, and consistency rules."
+              title="Prop Firm Tracker"
+              text="Track drawdown, profit target, and days remaining per account. Know exactly where you stand."
+            />
+            <Feature
+              icon="⚡"
+              title="Alpha (Solana)"
+              text="Real Solana token research with RugCheck risk flags. Know what to avoid before you ape in."
             />
           </div>
         </div>
@@ -137,16 +115,12 @@ export default function LandingPage() {
 
       {/* How it works */}
       <section className="border-t border-white/5 px-6 py-24">
-        <div className="mx-auto max-w-4xl">
-          <p className="mb-4 text-center text-sm text-purple-400">Simple process</p>
-          <h2 className="mb-16 text-center text-4xl font-bold">How it works</h2>
-
-          <div className="space-y-6">
-            <Step number="1" title="Connect your MT5" description="Install our EA on MetaTrader 5. Trades sync automatically to PipTrak in real time." />
-            <Step number="2" title="AI reviews every trade" description="Our AI scores your execution, risk management, and psychology. It checks your chart and trading rules." />
-            <Step number="3" title="Get AI market analysis" description="Every day AI analyzes news events and gives you trade probabilities based on 10 years of historical data." />
-            <Step number="4" title="Auto execute trades" description="Click one button and AI executes the trade plan in MT5 automatically with your risk settings." />
-            <Step number="5" title="Risk Guardian protects you" description="Hit your daily loss limit? All trades close automatically. Your prop firm account stays safe." />
+        <div className="mx-auto max-w-3xl">
+          <h2 className="text-center text-4xl font-bold mb-16">How it works</h2>
+          <div className="space-y-8">
+            <Step num="1" title="Connect your account" text="Download the PipTrak connector, drop it on a chart. Takes 3 minutes. Or import a CSV from any platform." />
+            <Step num="2" title="Trade normally" text="Your trades sync automatically. Risk Guardian watches your daily loss limit in the background." />
+            <Step num="3" title="Get coached" text="AI reviews every trade, checks your rules, and shows you the patterns costing you money." />
           </div>
         </div>
       </section>
@@ -154,123 +128,69 @@ export default function LandingPage() {
       {/* Pricing */}
       <section className="border-t border-white/5 px-6 py-24">
         <div className="mx-auto max-w-5xl">
-          <p className="mb-4 text-center text-sm text-green-400">Simple pricing</p>
-          <h2 className="mb-4 text-center text-4xl font-bold">Start free. Scale when ready.</h2>
-          <p className="mb-16 text-center text-white/40">No credit card required to start.</p>
+          <h2 className="text-center text-4xl font-bold mb-4">Simple pricing</h2>
+          <p className="text-center text-white/40 mb-16">Start free. Upgrade when it pays for itself.</p>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            <PricingCard
+          <div className="grid gap-6 lg:grid-cols-3">
+            <PriceCard
               name="Free"
               price="€0"
-              period="forever"
-              description="Perfect to get started"
-              features={[
-                "Manual trade journal",
-                "Basic AI review",
-                "Dashboard & analytics",
-                "10 AI reviews/month",
-              ]}
+              desc="Test the habit"
+              features={["Manual trade journal", "10 AI reviews / month", "Daily journal", "Trading rules", "Basic analytics"]}
               cta="Start Free"
               onClick={() => router.push("/register")}
-              highlighted={false}
             />
-            <PricingCard
+            <PriceCard
               name="Pro"
-              price="€9.99"
-              period="per month"
-              description="For active traders"
-              features={[
-                "Everything in Free",
-                "Unlimited AI reviews",
-                "Screenshot AI analysis",
-                "Weekly AI reports",
-                "Psychology coaching",
-                "Advanced analytics",
-                "AI Market Analysis",
-                "Daily Journal",
-              ]}
-              cta="Start Pro"
-              onClick={() => router.push("/register")}
-              highlighted={true}
-            />
-            <PricingCard
-              name="Elite"
               price="€19.99"
-              period="per month"
-              description="For prop firm traders"
-              features={[
-                "Everything in Pro",
-                "MT5 auto import",
-                "Auto trade execution",
-                "Risk Guardian",
-                "Prop firm tracker",
-                "Priority AI coaching",
-                "Custom trading rules",
-                "Monthly AI reports",
-              ]}
-              cta="Start Elite"
+              desc="For serious traders"
+              features={["Unlimited AI reviews", "Screenshot analysis", "Morning Brief", "Market Analysis", "Crypto Intelligence", "CSV import", "Prop firm tracker"]}
+              cta="Go Pro"
+              highlight
               onClick={() => router.push("/register")}
-              highlighted={false}
             />
-          </div>
-        </div>
-      </section>
-
-      {/* vs competitors */}
-      <section className="border-t border-white/5 px-6 py-24">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="mb-16 text-center text-4xl font-bold">Why not TradeZella or Edgewonk?</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <CompareCard
-              title="Others"
-              points={[
-                "Manual data entry only",
-                "No chart screenshot AI",
-                "No psychology coaching",
-                "No MT5 auto import",
-                "No auto trade execution",
-                "No risk protection",
-                "Expensive with no AI",
-              ]}
-              positive={false}
-            />
-            <CompareCard
-              title="PipTrak"
-              points={[
-                "MT5 auto import",
-                "Auto trade execution",
-                "Risk Guardian protection",
-                "Chart screenshot AI analysis",
-                "Personal AI trading coach",
-                "Psychology & emotion tracking",
-                "AI Market Analysis with probabilities",
-              ]}
-              positive={true}
+            <PriceCard
+              name="Elite"
+              price="€39.99"
+              desc="Full protection + automation"
+              features={["Everything in Pro", "🛡 Risk Guardian auto-close", "MT4/MT5 auto-sync", "Auto trade execution", "PipTrak Alpha (Solana)", "Multi-account", "Priority support"]}
+              cta="Go Elite"
+              onClick={() => router.push("/register")}
             />
           </div>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="border-t border-white/5 px-6 py-24 text-center">
-        <h2 className="mb-4 text-4xl font-bold md:text-5xl">
-          Ready to trade smarter?
-        </h2>
-        <p className="mb-10 text-white/40 text-lg">
-          Join traders already using AI to improve their performance.
-        </p>
-        <button
-          onClick={() => router.push("/register")}
-          className="rounded-2xl bg-blue-600 px-10 py-5 text-xl font-semibold transition hover:bg-blue-700"
-        >
-          Start for Free →
-        </button>
-        <p className="mt-4 text-sm text-white/30">Free forever plan · No credit card needed</p>
+      <section className="border-t border-white/5 px-6 py-24">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-4xl font-bold mb-4">Protect your account. Trade smarter.</h2>
+          <p className="text-white/50 mb-8">Free forever plan. No credit card. Install as an app on your phone.</p>
+          <button onClick={() => router.push("/register")} className="rounded-2xl bg-blue-600 px-10 py-4 font-semibold hover:bg-blue-700 transition">
+            Create Free Account →
+          </button>
+        </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/5 px-6 py-8 text-center text-sm text-white/20">
-        <p>© 2026 PipTrak. Built for traders, by traders.</p>
+      <footer className="border-t border-white/5 px-6 py-10">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <span className="font-bold">PipTrak</span>
+            <div className="flex flex-wrap gap-4 text-sm text-white/30">
+              <a href="/support" className="hover:text-white transition">Support</a>
+              <a href="/privacy" className="hover:text-white transition">Privacy</a>
+              <a href="/terms" className="hover:text-white transition">Terms</a>
+              <a href="/risk-disclaimer" className="hover:text-white transition">Risk Disclaimer</a>
+            </div>
+          </div>
+          <p className="mt-6 text-xs text-white/20 leading-relaxed">
+            ⚠️ Trading forex, CFDs, and cryptocurrencies carries substantial risk and is not suitable for everyone.
+            PipTrak provides research and journaling tools only. Nothing on this platform is financial advice.
+            AI-generated analysis may be incorrect. Past performance does not indicate future results.
+            Never risk more than you can afford to lose.
+          </p>
+        </div>
       </footer>
     </main>
   );
@@ -278,88 +198,63 @@ export default function LandingPage() {
 
 function Stat({ number, label }: { number: string; label: string }) {
   return (
-    <div className="text-center">
+    <div>
       <p className="text-4xl font-bold text-blue-400">{number}</p>
-      <p className="mt-1 text-sm text-white/40">{label}</p>
+      <p className="mt-2 text-sm text-white/40">{label}</p>
     </div>
   );
 }
 
-function FeatureCard({ icon, title, description }: { icon: string; title: string; description: string }) {
+function MiniCard({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-white/20 hover:bg-white/[0.05]">
-      <div className="mb-4 text-3xl">{icon}</div>
-      <h3 className="mb-2 text-lg font-semibold">{title}</h3>
-      <p className="text-sm text-white/50">{description}</p>
+    <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+      <p className="text-sm font-semibold mb-1">{title}</p>
+      <p className="text-xs text-white/40">{text}</p>
     </div>
   );
 }
 
-function Step({ number, title, description }: { number: string; title: string; description: string }) {
+function Feature({ icon, title, text }: { icon: string; title: string; text: string }) {
   return (
-    <div className="flex gap-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-lg font-bold">
-        {number}
-      </div>
+    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+      <p className="text-3xl mb-3">{icon}</p>
+      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <p className="text-sm text-white/40 leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
+function Step({ num, title, text }: { num: string; title: string; text: string }) {
+  return (
+    <div className="flex gap-5">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold">{num}</span>
       <div>
-        <h3 className="mb-1 text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-white/50">{description}</p>
+        <h3 className="text-lg font-semibold mb-1">{title}</h3>
+        <p className="text-sm text-white/40">{text}</p>
       </div>
     </div>
   );
 }
 
-function PricingCard({ name, price, period, description, features, cta, onClick, highlighted }: {
-  name: string;
-  price: string;
-  period: string;
-  description: string;
-  features: string[];
-  cta: string;
-  onClick: () => void;
-  highlighted: boolean;
+function PriceCard({ name, price, desc, features, cta, highlight, onClick }: {
+  name: string; price: string; desc: string; features: string[]; cta: string; highlight?: boolean; onClick: () => void;
 }) {
   return (
-    <div className={`rounded-3xl border p-6 ${highlighted ? "border-blue-500/50 bg-blue-500/10" : "border-white/10 bg-white/[0.03]"}`}>
-      <p className="text-sm text-white/40">{name}</p>
-      <p className="mt-2 text-4xl font-bold">{price}</p>
-      <p className="text-sm text-white/40">{period}</p>
-      <p className="mt-2 text-sm text-white/60">{description}</p>
-      <ul className="mt-6 space-y-3">
+    <div className={`rounded-3xl border p-8 ${highlight ? "border-blue-500/50 bg-blue-500/5" : "border-white/10 bg-white/[0.04]"}`}>
+      {highlight && (
+        <p className="mb-3 inline-block rounded-full bg-blue-500/20 px-3 py-1 text-xs font-bold text-blue-400">Most popular</p>
+      )}
+      <h3 className="text-xl font-bold">{name}</h3>
+      <p className="text-sm text-white/40 mb-4">{desc}</p>
+      <p className="text-4xl font-bold mb-6">{price}<span className="text-base font-normal text-white/30">/mo</span></p>
+      <div className="space-y-2 mb-8">
         {features.map((f, i) => (
-          <li key={i} className="flex items-center gap-2 text-sm text-white/70">
-            <span className="text-green-400">✓</span> {f}
-          </li>
+          <p key={i} className="text-sm text-white/60">✓ {f}</p>
         ))}
-      </ul>
-      <button
-        onClick={onClick}
-        className={`mt-8 w-full rounded-2xl py-3 font-semibold transition ${
-          highlighted
-            ? "bg-blue-600 hover:bg-blue-700"
-            : "border border-white/10 bg-white/5 hover:bg-white/10"
-        }`}
-      >
+      </div>
+      <button onClick={onClick} className={`w-full rounded-2xl py-3 font-semibold transition ${highlight ? "bg-blue-600 hover:bg-blue-700" : "border border-white/10 bg-white/5 hover:bg-white/10"}`}>
         {cta}
       </button>
-    </div>
-  );
-}
-
-function CompareCard({ title, points, positive }: { title: string; points: string[]; positive: boolean }) {
-  return (
-    <div className={`rounded-3xl border p-6 ${positive ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"}`}>
-      <h3 className={`mb-4 text-lg font-semibold ${positive ? "text-green-400" : "text-red-400"}`}>{title}</h3>
-      <ul className="space-y-3">
-        {points.map((p, i) => (
-          <li key={i} className="flex items-center gap-2 text-sm text-white/70">
-            <span className={positive ? "text-green-400" : "text-red-400"}>
-              {positive ? "✓" : "✗"}
-            </span>
-            {p}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
