@@ -75,7 +75,8 @@ export default function PropFirmPage() {
       const { data: manual } = await supabase
         .from("trades")
         .select("profit_loss, created_at")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("trade_source", "Live");
 
       const { data: mt5 } = await supabase
         .from("mt5_trades")
