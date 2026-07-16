@@ -76,29 +76,37 @@ function dayName(iso: string) {
 
 export async function POST(request: Request) {
   try {
-    const { userId, accountNumber } = await request.json();
+    const { userId, accountNumber, source } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 });
     }
 
-    // Manual trades
-    const { data: manual } = await supabase
+    let manualQuery = supabase
       .from("trades")
-      .select("pair, session, strategy, direction, grade, emotion, mistake, risk_reward, profit_loss, result, created_at")
+      .select("pair, session, strategy, direction, grade, emotion, mistake, risk_reward, profit_loss, result, created_at, trade_source")
       .eq("user_id", userId);
 
-    // MT5 synced trades, mapped into the same shape
-    let mt5Query = supabase
-      .from("mt5_trades")
-      .select("symbol, trade_type, profit, created_at, account")
-      .eq("user_id", userId);
+    if (source && source !== "All") {
+      manualQuery = manualQuery.eq("trade_source", source);
+    }
 
-    if (accountNumber) mt5Query = mt5Query.eq("account", accountNumber);
+    const { data: manual } = await manualQuery;
 
-    const { data: mt5 } = await mt5Query;
+    let mt5: any[] = [];
+    if (!source || source === "All" || source === "Live") {
+      let mt5Query = supabase
+        .from("mt5_trades")
+        .select("symbol, trade_type, profit, created_at, account")
+        .eq("user_id", userId);
 
-    const mt5Mapped: Trade[] = (mt5 || []).map((t: any) => ({
+      if (accountNumber) mt5Query = mt5Query.eq("account", accountNumber);
+
+      const { data } = await mt5Query;
+      mt5 = data || [];
+    }
+
+    const mt5Mapped: Trade[] = mt5.map((t: any) => ({
       pair: t.symbol,
       session: null,
       strategy: "MT5 Synced",
@@ -115,7 +123,7 @@ export async function POST(request: Request) {
     const allTrades: Trade[] = [...((manual || []) as Trade[]), ...mt5Mapped];
 
     if (allTrades.length === 0) {
-      return NextResponse.json({ error: "No trades found. Log or import trades first." }, { status: 400 });
+      return NextResponse.json({ error: "No trades found for this filter. Log or import trades first." }, { status: 400 });
     }
 
     const overall = stats(allTrades)!;
@@ -129,14 +137,12 @@ export async function POST(request: Request) {
     const byHour = groupBy(allTrades, t => hourCET(t.created_at) + ":00 CET");
     const byDay = groupBy(allTrades, t => dayName(t.created_at));
 
-    // Mistake cost ranking
     const mistakeGroups = groupBy(allTrades, t => t.mistake);
     const mistakeCost = mistakeGroups
       .filter(m => m.total_pl < 0)
       .sort((a, b) => a.total_pl - b.total_pl)
       .slice(0, 5);
 
-    // R:R reality — planned vs actual
     const withRR = allTrades.filter(t => t.risk_reward && Number(t.risk_reward) > 0);
     const avgPlannedRR = withRR.length
       ? Number((withRR.reduce((s, t) => s + Number(t.risk_reward), 0) / withRR.length).toFixed(2))
@@ -152,6 +158,8 @@ export async function POST(request: Request) {
       ).join("\n");
 
     const dataText = `
+DATA SOURCE FILTER: ${source || "All"}
+
 OVERALL (${overall.trades} trades):
 Win rate ${overall.win_rate}% | Total P/L ${overall.total_pl} | Expectancy ${overall.expectancy} per trade
 Avg win ${overall.avg_win} | Avg loss ${overall.avg_loss} | Profit factor ${overall.profit_factor}
@@ -192,11 +200,12 @@ ${mistakeCost.length > 0 ? "MOST COSTLY MISTAKES:\n" + mistakeCost.map(m => `  $
 
 ABSOLUTE RULES:
 1. Every number you cite MUST come from the data provided. Never invent a statistic.
-2. SAMPLE SIZE IS CRITICAL. Any segment with fewer than 20 trades is NOT statistically meaningful — you MUST say so explicitly every time you mention it. Fewer than 10 trades is essentially noise and must be labelled as such.
+2. SAMPLE SIZE IS CRITICAL. Any segment with fewer than 20 trades is NOT statistically meaningful — say so explicitly every time you mention it. Fewer than 10 trades is noise and must be labelled as such.
 3. Never tell the user to automate or scale up a pattern found in a small sample. Warn them against it.
-4. Be direct and honest. If the data shows they are losing money, say it plainly. Do not soften it.
-5. Do not use the word "guaranteed". Never promise future results. Past performance is not predictive.
-6. If overall sample is under 30 trades, lead by saying the whole analysis is preliminary.`,
+4. Be direct and honest. If the data shows they are losing money, say it plainly.
+5. Never use the word "guaranteed". Never promise future results.
+6. If the overall sample is under 30 trades, lead by saying the analysis is preliminary.
+7. If the data source filter is "Backtest", note that backtest results measure the setup, not real trading psychology, since the trader knew no real money was at risk.`,
           },
           {
             role: "user",
@@ -206,10 +215,10 @@ ${dataText}
 
 Return ONLY this JSON:
 {
-  "sample_warning": "If total trades < 30, a clear warning that this analysis is preliminary. If >= 100, say the sample is reasonably solid. Otherwise state the caveat honestly.",
+  "sample_warning": "If total trades < 30, a clear warning this is preliminary. If >= 100, say the sample is reasonably solid. Otherwise state the caveat honestly. Mention the source filter if it is Backtest or Demo.",
   "headline": "One blunt sentence summarizing their trading right now",
   "your_edge": {
-    "finding": "The single strongest genuine pattern in the data, citing real numbers AND its sample size",
+    "finding": "The single strongest genuine pattern, citing real numbers AND its sample size",
     "sample_size": 0,
     "is_significant": true,
     "caveat": "If sample < 20, explain plainly why this may be noise"
@@ -221,10 +230,10 @@ Return ONLY this JSON:
     "fix": "One concrete action"
   },
   "stop_doing": ["2-3 specific things the data says they should stop, each citing a real number and sample size"],
-  "rr_reality": "Compare their planned R:R vs actually achieved R:R. If they plan 1:2 but achieve 1:0.8, say plainly they are cutting winners or letting losers run.",
-  "session_insight": "What the session data actually shows, with sample sizes. Say if samples are too small.",
+  "rr_reality": "Compare planned R:R vs actually achieved. If they plan 1:2 but achieve 1:0.8, say plainly they are cutting winners or letting losers run.",
+  "session_insight": "What the session data shows, with sample sizes. Say if samples are too small.",
   "pair_insight": "Which pairs genuinely make or lose money, with sample sizes",
-  "time_insight": "Best/worst hours and days, but explicitly warn if these slices are small samples — hour-of-day slicing usually creates tiny samples and false patterns",
+  "time_insight": "Best/worst hours and days, explicitly warning that hour-of-day slicing usually creates tiny samples and false patterns",
   "psychology_insight": "What the emotion data shows, if logged. If not logged, say so and recommend logging it.",
   "next_steps": ["3 concrete, honest actions based on the real data"],
   "overfitting_warning": "A direct warning about the danger of over-interpreting small slices of this dataset"
@@ -252,6 +261,7 @@ Return ONLY this JSON:
     parsed.mistake_cost = mistakeCost;
     parsed.avg_planned_rr = avgPlannedRR;
     parsed.actual_rr = actualRR;
+    parsed.source_filter = source || "All";
     parsed.generated_at = new Date().toISOString();
 
     return NextResponse.json(parsed);

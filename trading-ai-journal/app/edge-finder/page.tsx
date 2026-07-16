@@ -43,6 +43,7 @@ type Analysis = {
   mistake_cost: Segment[];
   avg_planned_rr: number | null;
   actual_rr: number | null;
+  source_filter: string;
 };
 
 export default function EdgeFinderPage() {
@@ -52,6 +53,7 @@ export default function EdgeFinderPage() {
   const [error, setError] = useState("");
   const [activeAccount, setActiveAccount] = useState<any>(null);
   const [tab, setTab] = useState("session");
+  const [source, setSource] = useState("All");
 
   useEffect(() => {
     const saved = localStorage.getItem("active_account");
@@ -72,6 +74,7 @@ export default function EdgeFinderPage() {
         body: JSON.stringify({
           userId: user.id,
           accountNumber: activeAccount?.account_number || null,
+          source,
         }),
       });
       const data = await response.json();
@@ -116,9 +119,23 @@ export default function EdgeFinderPage() {
           </p>
           {activeAccount && (
             <p className="mt-2 text-sm text-blue-400">
-              Analyzing: {activeAccount.account_name} #{activeAccount.account_number}
+              Account: {activeAccount.account_name} #{activeAccount.account_number}
             </p>
           )}
+        </div>
+
+        <div className="mb-4 flex flex-wrap gap-2">
+          {["All", "Live", "Backtest", "Demo"].map(s => (
+            <button
+              key={s}
+              onClick={() => setSource(s)}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                source === s ? "bg-purple-600 text-white" : "bg-white/5 text-white/40 hover:bg-white/10"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
 
         <button
@@ -126,7 +143,7 @@ export default function EdgeFinderPage() {
           disabled={loading}
           className="mb-8 w-full rounded-2xl bg-purple-600 py-4 text-lg font-semibold transition hover:bg-purple-700 disabled:opacity-50"
         >
-          {loading ? "🤖 Analyzing your trades..." : "🔍 Analyze My Trading"}
+          {loading ? "🤖 Analyzing your trades..." : `🔍 Analyze ${source === "All" ? "All" : source} Trades`}
         </button>
 
         {error && (
@@ -136,19 +153,19 @@ export default function EdgeFinderPage() {
         {analysis && (
           <div className="space-y-6">
 
-            {/* Sample warning */}
             {analysis.sample_warning && (
               <div className="rounded-3xl border border-orange-500/30 bg-orange-500/5 p-5">
                 <p className="text-sm text-orange-300">📏 {analysis.sample_warning}</p>
               </div>
             )}
 
-            {/* Headline */}
             <div className="rounded-3xl border border-purple-500/30 bg-purple-500/5 p-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/50">{analysis.source_filter} trades</span>
+              </div>
               <h2 className="text-2xl font-bold">{analysis.headline}</h2>
             </div>
 
-            {/* Overall stats */}
             <div className="grid gap-3 sm:grid-cols-3">
               <Stat label="Total Trades" value={String(analysis.overall.trades)} />
               <Stat label="Win Rate" value={`${analysis.overall.win_rate}%`} color={analysis.overall.win_rate >= 50 ? "text-green-400" : "text-red-400"} />
@@ -158,7 +175,6 @@ export default function EdgeFinderPage() {
               <Stat label="Avg Win / Avg Loss" value={`${analysis.overall.avg_win} / ${analysis.overall.avg_loss}`} />
             </div>
 
-            {/* Your Edge */}
             <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
               <div className="flex items-center gap-3 mb-3">
                 <h2 className="text-xl font-semibold text-green-400">✅ Your Edge</h2>
@@ -177,7 +193,6 @@ export default function EdgeFinderPage() {
               )}
             </div>
 
-            {/* Your Leak */}
             <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
               <div className="flex items-center gap-3 mb-3">
                 <h2 className="text-xl font-semibold text-red-400">🩸 Your Biggest Leak</h2>
@@ -196,7 +211,6 @@ export default function EdgeFinderPage() {
               </div>
             </div>
 
-            {/* R:R Reality */}
             <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
               <h2 className="mb-3 text-xl font-semibold text-blue-400">🎯 R:R Reality Check</h2>
               <div className="grid gap-3 sm:grid-cols-2 mb-3">
@@ -215,7 +229,6 @@ export default function EdgeFinderPage() {
               <p className="text-sm text-white/60">{analysis.rr_reality}</p>
             </div>
 
-            {/* Stop Doing */}
             {analysis.stop_doing?.length > 0 && (
               <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-red-400">🛑 Stop Doing This</h2>
@@ -227,7 +240,6 @@ export default function EdgeFinderPage() {
               </div>
             )}
 
-            {/* Breakdown tabs */}
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
               <h2 className="mb-4 text-xl font-semibold">📊 Breakdown</h2>
               <div className="mb-4 flex flex-wrap gap-2">
@@ -288,7 +300,6 @@ export default function EdgeFinderPage() {
               )}
             </div>
 
-            {/* Insights */}
             <div className="space-y-3">
               <Insight title="Session insight" text={analysis.session_insight} />
               <Insight title="Pair insight" text={analysis.pair_insight} />
@@ -296,7 +307,6 @@ export default function EdgeFinderPage() {
               <Insight title="Psychology insight" text={analysis.psychology_insight} />
             </div>
 
-            {/* Mistake cost */}
             {analysis.mistake_cost?.length > 0 && (
               <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-red-400">💸 What Your Mistakes Cost</h2>
@@ -314,7 +324,6 @@ export default function EdgeFinderPage() {
               </div>
             )}
 
-            {/* Next steps */}
             {analysis.next_steps?.length > 0 && (
               <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-blue-400">✅ Next Steps</h2>
@@ -329,7 +338,6 @@ export default function EdgeFinderPage() {
               </div>
             )}
 
-            {/* Overfitting warning */}
             {analysis.overfitting_warning && (
               <div className="rounded-3xl border border-yellow-500/30 bg-yellow-500/5 p-6">
                 <h2 className="mb-2 text-sm font-semibold text-yellow-400">⚠️ Read This Before You Act</h2>
