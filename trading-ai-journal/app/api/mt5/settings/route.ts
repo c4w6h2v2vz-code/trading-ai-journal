@@ -9,7 +9,7 @@ const supabase = createClient(
 export async function GET(request: Request) {
   try {
     const secret = request.headers.get("x-mt5-secret");
-    if (secret !== process.env.MT5_SECRET_KEY) {
+    if (secret !== "jama-ftmo-mt5-2026") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
