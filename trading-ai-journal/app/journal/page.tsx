@@ -8,6 +8,7 @@ import AppShell from "@/components/AppShell";
 type Trade = {
   id: string;
   user_id: string;
+  trade_source: string;
   pair: string;
   session: string;
   strategy: string | null;
@@ -65,6 +66,7 @@ export default function JournalPage() {
   const [resultFilter, setResultFilter] = useState("All");
   const [strategyFilter, setStrategyFilter] = useState("All");
   const [gradeFilter, setGradeFilter] = useState("All");
+  const [sourceFilter, setSourceFilter] = useState("All");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   async function getCurrentUser() {
@@ -155,6 +157,7 @@ export default function JournalPage() {
 
       const tradeData = {
         user_id: user.id,
+        trade_source: String(formData.get("trade_source") || "Live"),
         pair: String(formData.get("pair") || ""),
         session: String(formData.get("session") || ""),
         strategy: String(formData.get("strategy") || ""),
@@ -297,10 +300,11 @@ export default function JournalPage() {
   async function reviewMt5WithAI(trade: MT5Trade) {
     setMessage("Sending to AI review...");
     try {
+      const user = await getCurrentUser();
       const response = await fetch("/api/mt5-ai-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trade }),
+        body: JSON.stringify({ trade: { ...trade, user_id: user?.id } }),
       });
 
       if (response.status === 403) {
@@ -345,7 +349,8 @@ export default function JournalPage() {
     const matchesResult = resultFilter === "All" || trade.result === resultFilter;
     const matchesStrategy = strategyFilter === "All" || trade.strategy === strategyFilter;
     const matchesGrade = gradeFilter === "All" || trade.grade === gradeFilter;
-    return matchesPair && matchesResult && matchesStrategy && matchesGrade;
+    const matchesSource = sourceFilter === "All" || (trade.trade_source || "Live") === sourceFilter;
+    return matchesPair && matchesResult && matchesStrategy && matchesGrade && matchesSource;
   });
 
   if (loading) return (
@@ -375,6 +380,7 @@ export default function JournalPage() {
           <h1 className="text-4xl font-bold tracking-tight md:text-5xl">Trading Journal</h1>
           <p className="mt-3 text-white/50">
             Track strategy, direction, emotion, mistakes, grade, risk/reward, screenshots, and AI review.
+            Tag trades as Live, Backtest, or Demo to keep your stats clean.
           </p>
         </div>
 
@@ -454,21 +460,29 @@ export default function JournalPage() {
                     </p>
                   )}
 
-                  {trade.ai_score ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {trade.ai_score ? (
+                      <button
+                        onClick={() => router.push(`/journal/mt5-trade/${trade.id}`)}
+                        className="rounded-xl bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 hover:bg-green-500/20"
+                      >
+                        AI Reviewed ✅
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => reviewMt5WithAI(trade)}
+                        className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
+                      >
+                        Review with AI
+                      </button>
+                    )}
                     <button
-                      onClick={() => router.push(`/journal/mt5-trade/${trade.id}`)}
-                      className="mt-4 rounded-xl bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 hover:bg-green-500/20"
+                      onClick={() => fillFormFromMt5(trade)}
+                      className="rounded-xl bg-white/5 px-4 py-2 text-sm font-semibold text-white/60 hover:bg-white/10"
                     >
-                      AI Reviewed ✅
+                      Add Context
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => reviewMt5WithAI(trade)}
-                      className="mt-4 rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
-                    >
-                      Review with AI
-                    </button>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -481,6 +495,7 @@ export default function JournalPage() {
           </h2>
 
           <form onSubmit={saveTrade} className="mt-6 grid gap-4 md:grid-cols-2">
+            <Select name="trade_source" defaultValue={editingTrade?.trade_source || "Live"} options={["Live", "Backtest", "Demo"]} />
             <Input name="pair" placeholder="Pair e.g. EURUSD" defaultValue={editingTrade?.pair || ""} />
             <Select name="direction" defaultValue={editingTrade?.direction || "Buy"} options={["Buy", "Sell"]} />
             <Input name="strategy" placeholder="Strategy e.g. SMC, Breakout" defaultValue={editingTrade?.strategy || ""} />
@@ -534,7 +549,14 @@ export default function JournalPage() {
           <h2 className="text-2xl font-semibold">Trade History</h2>
           <p className="mb-6 text-sm text-white/40">Your latest private trades and execution data.</p>
 
-          <div className="mb-6 grid gap-3 md:grid-cols-4">
+          <div className="mb-6 grid gap-3 md:grid-cols-5">
+            <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
+              <option>All</option>
+              <option>Live</option>
+              <option>Backtest</option>
+              <option>Demo</option>
+            </select>
+
             <input
               value={pairFilter}
               onChange={(e) => setPairFilter(e.target.value)}
@@ -581,6 +603,7 @@ export default function JournalPage() {
                       <Badge text={trade.strategy || "No strategy"} />
                       <Badge text={trade.grade || "No grade"} />
                       <Badge text={trade.result} />
+                      <Badge text={trade.trade_source || "Live"} />
                       <Badge text={`AI ${trade.ai_score ?? "N/A"}`} />
                     </div>
 
