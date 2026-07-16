@@ -34,6 +34,7 @@ export default function DashboardPage() {
 
       const { data: manualTrades } = await supabase
         .from("trades").select("*").eq("user_id", user.id)
+        .eq("trade_source", "Live")
         .order("created_at", { ascending: true });
 
       let mt5Query = supabase
