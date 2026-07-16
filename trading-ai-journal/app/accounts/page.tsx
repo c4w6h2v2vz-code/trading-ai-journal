@@ -169,15 +169,35 @@ export default function AccountsPage() {
   }
 
   async function deleteAccount(accountId: string) {
-    if (!confirm("Delete this account?")) return;
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return;
 
+    if (!confirm(`Delete "${account.account_name}" and ALL its synced trades? This cannot be undone.`)) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Delete the synced trades for this account first
+    await supabase
+      .from("mt5_trades")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("account", account.account_number);
+
+    // Then delete the account itself
     await supabase
       .from("trading_accounts")
       .delete()
       .eq("id", accountId);
 
+    // Clear stale localStorage if this was the active account
+    const saved = localStorage.getItem("active_account");
+    if (saved && JSON.parse(saved).id === accountId) {
+      localStorage.removeItem("active_account");
+    }
+
     setAccounts(accounts.filter(a => a.id !== accountId));
-    setMessage("Account deleted ✅");
+    setMessage("Account and its trades deleted ✅");
   }
 
   if (loading) return (
