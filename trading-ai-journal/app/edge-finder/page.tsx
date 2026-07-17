@@ -40,6 +40,7 @@ type Analysis = {
   by_direction: Segment[];
   by_hour: Segment[];
   by_day: Segment[];
+  by_timeframe: Segment[];
   mistake_cost: Segment[];
   avg_planned_rr: number | null;
   actual_rr: number | null;
@@ -96,6 +97,7 @@ export default function EdgeFinderPage() {
     { id: "direction", label: "Direction", data: analysis?.by_direction },
     { id: "hour", label: "Hour", data: analysis?.by_hour },
     { id: "day", label: "Day", data: analysis?.by_day },
+    { id: "timeframe", label: "Timeframe", data: analysis?.by_timeframe },
   ];
 
   const activeData = tabs.find(t => t.id === tab)?.data || [];
