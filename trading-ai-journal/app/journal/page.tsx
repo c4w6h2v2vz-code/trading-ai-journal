@@ -9,6 +9,8 @@ type Trade = {
   id: string;
   user_id: string;
   trade_source: string;
+  trade_date: string | null;
+  timeframe: string | null;
   pair: string;
   session: string;
   strategy: string | null;
@@ -23,6 +25,8 @@ type Trade = {
   result: string;
   notes: string;
   image_url: string | null;
+  image_url_before: string | null;
+  image_url_after: string | null;
   created_at: string;
   ai_score: number | null;
   ai_risk_score: number | null;
@@ -45,11 +49,7 @@ type MT5Trade = {
   open_time: string;
   close_time: string;
   ai_score: number | null;
-  ai_risk_score: number | null;
-  ai_psychology_score: number | null;
-  ai_execution_score: number | null;
   ai_feedback: string | null;
-  reviewed_at: string | null;
 };
 
 export default function JournalPage() {
@@ -59,7 +59,8 @@ export default function JournalPage() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [mt5Trades, setMt5Trades] = useState<MT5Trade[]>([]);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
-  const [image, setImage] = useState<File | null>(null);
+  const [imageBefore, setImageBefore] = useState<File | null>(null);
+  const [imageAfter, setImageAfter] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pairFilter, setPairFilter] = useState("");
@@ -71,10 +72,7 @@ export default function JournalPage() {
 
   async function getCurrentUser() {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return null;
-    }
+    if (!user) { router.push("/login"); return null; }
     return user;
   }
 
@@ -100,28 +98,25 @@ export default function JournalPage() {
     const activeAccount = localStorage.getItem("active_account");
     const activeAccountNumber = activeAccount ? JSON.parse(activeAccount).account_number : null;
 
-    let query = supabase
-      .from("mt5_trades")
-      .select("*")
-      .eq("user_id", user.id);
-
-    if (activeAccountNumber) {
-      query = query.eq("account", activeAccountNumber);
-    }
+    let query = supabase.from("mt5_trades").select("*").eq("user_id", user.id);
+    if (activeAccountNumber) query = query.eq("account", activeAccountNumber);
 
     const { data, error } = await query.order("created_at", { ascending: false });
-
-    if (error) {
-      setMessage("Error loading imported trades: " + error.message);
-    } else {
-      setMt5Trades(data || []);
-    }
+    if (error) setMessage("Error loading imported trades: " + error.message);
+    else setMt5Trades(data || []);
   }
 
   useEffect(() => {
     loadTrades();
     loadMt5Trades();
   }, []);
+
+  async function uploadImage(file: File, userId: string) {
+    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+    const { error } = await supabase.storage.from("trade-screenshots").upload(fileName, file);
+    if (error) throw new Error("Image upload failed: " + error.message);
+    return supabase.storage.from("trade-screenshots").getPublicUrl(fileName).data.publicUrl;
+  }
 
   async function saveTrade(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -135,29 +130,20 @@ export default function JournalPage() {
       const form = event.target as HTMLFormElement;
       const formData = new FormData(form);
 
-      let imageUrl = editingTrade?.image_url || "";
+      let beforeUrl = editingTrade?.image_url_before || "";
+      let afterUrl = editingTrade?.image_url_after || "";
 
-      if (image) {
-        const fileName = `${user.id}/${Date.now()}-${image.name}`;
+      if (imageBefore) beforeUrl = await uploadImage(imageBefore, user.id);
+      if (imageAfter) afterUrl = await uploadImage(imageAfter, user.id);
 
-        const { error: uploadError } = await supabase.storage
-          .from("trade-screenshots")
-          .upload(fileName, image);
-
-        if (uploadError) {
-          setMessage("Image upload error: " + uploadError.message);
-          setSaving(false);
-          return;
-        }
-
-        imageUrl = supabase.storage
-          .from("trade-screenshots")
-          .getPublicUrl(fileName).data.publicUrl;
-      }
+      const dateInput = String(formData.get("trade_date") || "");
+      const tradeDate = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
 
       const tradeData = {
         user_id: user.id,
         trade_source: String(formData.get("trade_source") || "Live"),
+        trade_date: tradeDate,
+        timeframe: String(formData.get("timeframe") || ""),
         pair: String(formData.get("pair") || ""),
         session: String(formData.get("session") || ""),
         strategy: String(formData.get("strategy") || ""),
@@ -171,17 +157,13 @@ export default function JournalPage() {
         profit_loss: Number(formData.get("profit_loss") || 0),
         result: String(formData.get("result") || "Win"),
         notes: String(formData.get("notes") || ""),
-        image_url: imageUrl,
+        image_url_before: beforeUrl,
+        image_url_after: afterUrl,
+        image_url: beforeUrl,
       };
 
       const { data, error } = editingTrade
-        ? await supabase
-            .from("trades")
-            .update(tradeData)
-            .eq("id", editingTrade.id)
-            .eq("user_id", user.id)
-            .select()
-            .single()
+        ? await supabase.from("trades").update(tradeData).eq("id", editingTrade.id).eq("user_id", user.id).select().single()
         : await supabase.from("trades").insert([tradeData]).select().single();
 
       if (error) {
@@ -193,25 +175,19 @@ export default function JournalPage() {
       let finalTrade = data as Trade;
 
       try {
-        setMessage("Trade saved. Loading trading rules...");
+        setMessage("Trade saved. Generating AI review...");
 
         const { data: tradingRules } = await supabase
           .from("trading_rules")
           .select("title, description")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: true });
-
-        setMessage("Trade saved. Generating AI review with your rules...");
+          .eq("user_id", user.id);
 
         let imageBase64 = null;
-        if (image) {
+        if (imageBefore) {
           const reader = new FileReader();
           imageBase64 = await new Promise<string>((resolve) => {
-            reader.onload = () => {
-              const result = reader.result as string;
-              resolve(result.split(",")[1]);
-            };
-            reader.readAsDataURL(image);
+            reader.onload = () => resolve((reader.result as string).split(",")[1]);
+            reader.readAsDataURL(imageBefore);
           });
         }
 
@@ -229,11 +205,11 @@ export default function JournalPage() {
 
         if (aiResponse.status === 403) {
           setShowUpgradeModal(true);
-          setMessage("Trade saved ✅ (AI review requires a Pro upgrade — you've used your free reviews this month).");
+          setMessage("Trade saved ✅ (AI review needs Pro — free limit reached)");
         } else if (!aiResponse.ok || aiData.error) {
-          throw new Error(aiData.details || aiData.error || "AI failed");
+          throw new Error(aiData.error || "AI failed");
         } else {
-          const { data: updatedTrade, error: updateError } = await supabase
+          const { data: updated } = await supabase
             .from("trades")
             .update({
               ai_score: aiData.ai_score,
@@ -243,13 +219,10 @@ export default function JournalPage() {
               ai_feedback: aiData.ai_feedback,
             })
             .eq("id", finalTrade.id)
-            .eq("user_id", user.id)
             .select()
             .single();
-
-          if (!updateError && updatedTrade) {
-            finalTrade = updatedTrade as Trade;
-          }
+          if (updated) finalTrade = updated as Trade;
+          setMessage("Trade saved with AI review ✅");
         }
       } catch (aiError) {
         console.error(aiError);
@@ -257,17 +230,14 @@ export default function JournalPage() {
       }
 
       if (editingTrade) {
-        setTrades((oldTrades) =>
-          oldTrades.map((trade) => (trade.id === finalTrade.id ? finalTrade : trade))
-        );
-        if (!message.includes("Upgrade")) setMessage("Trade updated successfully ✅");
+        setTrades(old => old.map(t => (t.id === finalTrade.id ? finalTrade : t)));
       } else {
-        setTrades((oldTrades) => [finalTrade, ...oldTrades]);
-        if (!message.includes("Upgrade")) setMessage("Trade saved with AI review ✅");
+        setTrades(old => [finalTrade, ...old]);
       }
 
       setEditingTrade(null);
-      setImage(null);
+      setImageBefore(null);
+      setImageAfter(null);
       form.reset();
     } catch (err) {
       console.error(err);
@@ -278,22 +248,15 @@ export default function JournalPage() {
   }
 
   async function deleteTrade(id: string) {
-    if (!confirm("Are you sure you want to delete this trade?")) return;
-
+    if (!confirm("Delete this trade?")) return;
     const user = await getCurrentUser();
     if (!user) return;
 
-    const { error } = await supabase
-      .from("trades")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    if (error) {
-      setMessage("Error deleting trade: " + error.message);
-    } else {
-      setTrades((oldTrades) => oldTrades.filter((trade) => trade.id !== id));
-      setMessage("Trade deleted successfully ✅");
+    const { error } = await supabase.from("trades").delete().eq("id", id).eq("user_id", user.id);
+    if (error) setMessage("Error: " + error.message);
+    else {
+      setTrades(old => old.filter(t => t.id !== id));
+      setMessage("Trade deleted ✅");
     }
   }
 
@@ -309,7 +272,7 @@ export default function JournalPage() {
 
       if (response.status === 403) {
         setShowUpgradeModal(true);
-        setMessage("Upgrade to Pro to review more trades this month.");
+        setMessage("Upgrade to Pro for more AI reviews.");
         return;
       }
 
@@ -322,45 +285,18 @@ export default function JournalPage() {
     }
   }
 
-  function fillFormFromMt5(trade: MT5Trade) {
-    const setValue = (name: string, value: string | number) => {
-      const input = document.querySelector(
-        `[name="${name}"]`
-      ) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
-      if (input) input.value = String(value);
-    };
-
-    setValue("pair", trade.symbol);
-    setValue("direction", trade.trade_type === "SELL" ? "Sell" : "Buy");
-    setValue("entry_price", trade.entry_price);
-    setValue("exit_price", trade.exit_price);
-    setValue("profit_loss", trade.profit);
-    setValue("strategy", "Imported");
-    setValue("session", "");
-    setValue("risk_reward", 0);
-    setValue("result", trade.profit > 0 ? "Win" : trade.profit < 0 ? "Loss" : "Break Even");
-
-    setMessage("Trade loaded into the form ✅ Add emotion, mistake, notes, then save.");
-    document.getElementById("manual-trade-form")?.scrollIntoView({ behavior: "smooth" });
-  }
-
-  const filteredTrades = trades.filter((trade) => {
-    const matchesPair = pairFilter === "" || trade.pair.toLowerCase().includes(pairFilter.toLowerCase());
-    const matchesResult = resultFilter === "All" || trade.result === resultFilter;
-    const matchesStrategy = strategyFilter === "All" || trade.strategy === strategyFilter;
-    const matchesGrade = gradeFilter === "All" || trade.grade === gradeFilter;
-    const matchesSource = sourceFilter === "All" || (trade.trade_source || "Live") === sourceFilter;
+  const filteredTrades = trades.filter((t) => {
+    const matchesPair = pairFilter === "" || t.pair.toLowerCase().includes(pairFilter.toLowerCase());
+    const matchesResult = resultFilter === "All" || t.result === resultFilter;
+    const matchesStrategy = strategyFilter === "All" || t.strategy === strategyFilter;
+    const matchesGrade = gradeFilter === "All" || t.grade === gradeFilter;
+    const matchesSource = sourceFilter === "All" || (t.trade_source || "Live") === sourceFilter;
     return matchesPair && matchesResult && matchesStrategy && matchesGrade && matchesSource;
   });
 
   if (loading) return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-10">
-          <div className="h-4 w-32 rounded-full bg-white/10 animate-pulse mb-4" />
-          <div className="h-10 w-64 rounded-2xl bg-white/10 animate-pulse mb-3" />
-          <div className="h-4 w-96 rounded-full bg-white/10 animate-pulse" />
-        </div>
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
             <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-40 animate-pulse" />
@@ -379,8 +315,7 @@ export default function JournalPage() {
           </p>
           <h1 className="text-4xl font-bold tracking-tight md:text-5xl">Trading Journal</h1>
           <p className="mt-3 text-white/50">
-            Track strategy, direction, emotion, mistakes, grade, risk/reward, screenshots, and AI review.
-            Tag trades as Live, Backtest, or Demo to keep your stats clean.
+            Log live trades and backtests. Before/after screenshots, real trade dates, and AI review on every entry.
           </p>
         </div>
 
@@ -390,44 +325,31 @@ export default function JournalPage() {
           </div>
         )}
 
-        {/* Upgrade Modal */}
         {showUpgradeModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-6">
             <div className="w-full max-w-md rounded-3xl border border-blue-500/30 bg-[#0a0a0a] p-8 text-center">
               <p className="text-4xl mb-4">🚀</p>
-              <h2 className="text-2xl font-bold mb-2">You've used your free AI reviews</h2>
-              <p className="text-white/50 mb-6">
-                Upgrade to Pro for unlimited AI trade reviews, screenshot analysis, and weekly coaching reports.
-              </p>
+              <h2 className="text-2xl font-bold mb-2">Free AI reviews used up</h2>
+              <p className="text-white/50 mb-6">Upgrade to Pro for unlimited AI reviews and screenshot analysis.</p>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowUpgradeModal(false)}
-                  className="flex-1 rounded-2xl border border-white/10 bg-white/5 py-3 font-semibold hover:bg-white/10 transition"
-                >
-                  Maybe Later
+                <button onClick={() => setShowUpgradeModal(false)} className="flex-1 rounded-2xl border border-white/10 bg-white/5 py-3 font-semibold hover:bg-white/10">
+                  Later
                 </button>
-                <button
-                  onClick={() => router.push("/pricing")}
-                  className="flex-1 rounded-2xl bg-blue-600 py-3 font-semibold hover:bg-blue-700 transition"
-                >
-                  Upgrade Now
+                <button onClick={() => router.push("/pricing")} className="flex-1 rounded-2xl bg-blue-600 py-3 font-semibold hover:bg-blue-700">
+                  Upgrade
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        <div
-          id="manual-trade-form"
-          className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40"
-        >
+        {/* Imported */}
+        <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="text-2xl font-semibold">Imported Trades</h2>
-          <p className="mb-6 text-sm text-white/40">
-            Trades imported from your trading platform (MT4, MT5, cTrader, DXtrade, CSV).
-          </p>
+          <p className="mb-6 text-sm text-white/40">Auto-synced from MT4/MT5, or imported via CSV.</p>
 
           {mt5Trades.length === 0 ? (
-            <p className="text-white/40">No trades imported yet. Connect MT5 or import CSV from any platform.</p>
+            <p className="text-white/40">No trades imported yet.</p>
           ) : (
             <div className="space-y-4">
               {mt5Trades.map((trade) => (
@@ -435,109 +357,153 @@ export default function JournalPage() {
                   <div className="flex flex-wrap items-center gap-3">
                     <h3 className="text-xl font-bold">{trade.symbol}</h3>
                     <Badge text={trade.trade_type || "N/A"} />
-                    <Badge text={`Ticket ${trade.ticket}`} />
                     <Badge text={`Lot ${trade.lot_size}`} />
                     {trade.ai_score !== null && <Badge text={`AI ${trade.ai_score}`} />}
                   </div>
-
                   <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
                     <p>Entry: <span className="text-white">{trade.entry_price}</span></p>
                     <p>Exit: <span className="text-white">{trade.exit_price}</span></p>
-                    <p>
-                      P/L:{" "}
-                      <span className={trade.profit >= 0 ? "text-green-400" : "text-red-400"}>
-                        {trade.profit}
-                      </span>
-                    </p>
-                    <p>Account: <span className="text-white">{trade.account}</span></p>
-                    <p>Server: <span className="text-white">{trade.server}</span></p>
-                    <p>Closed: <span className="text-white">{trade.close_time}</span></p>
+                    <p>P/L: <span className={trade.profit >= 0 ? "text-green-400" : "text-red-400"}>{trade.profit}</span></p>
                   </div>
-
                   {trade.ai_feedback && (
-                    <p className="mt-4 rounded-2xl bg-blue-500/10 p-3 text-sm text-blue-300">
-                      AI: {trade.ai_feedback}
-                    </p>
+                    <p className="mt-4 rounded-2xl bg-blue-500/10 p-3 text-sm text-blue-300">AI: {trade.ai_feedback}</p>
                   )}
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {trade.ai_score ? (
-                      <button
-                        onClick={() => router.push(`/journal/mt5-trade/${trade.id}`)}
-                        className="rounded-xl bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 hover:bg-green-500/20"
-                      >
-                        AI Reviewed ✅
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => reviewMt5WithAI(trade)}
-                        className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20"
-                      >
-                        Review with AI
-                      </button>
-                    )}
-                    <button
-                      onClick={() => fillFormFromMt5(trade)}
-                      className="rounded-xl bg-white/5 px-4 py-2 text-sm font-semibold text-white/60 hover:bg-white/10"
-                    >
-                      Add Context
+                  {trade.ai_score ? (
+                    <button onClick={() => router.push(`/journal/mt5-trade/${trade.id}`)} className="mt-4 rounded-xl bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 hover:bg-green-500/20">
+                      AI Reviewed ✅
                     </button>
-                  </div>
+                  ) : (
+                    <button onClick={() => reviewMt5WithAI(trade)} className="mt-4 rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">
+                      Review with AI
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
-          <h2 className="mb-2 text-2xl font-semibold">
-            {editingTrade ? "Edit Trade" : "Add New Trade"}
-          </h2>
+        {/* Form */}
+        <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+          <h2 className="mb-2 text-2xl font-semibold">{editingTrade ? "Edit Trade" : "Add New Trade"}</h2>
+          <p className="mb-6 text-sm text-white/40">
+            For backtests, set the real trade date — otherwise your session and time analysis will be wrong.
+          </p>
 
-          <form onSubmit={saveTrade} className="mt-6 grid gap-4 md:grid-cols-2">
-            <Select name="trade_source" defaultValue={editingTrade?.trade_source || "Live"} options={["Live", "Backtest", "Demo"]} />
-            <Input name="pair" placeholder="Pair e.g. EURUSD" defaultValue={editingTrade?.pair || ""} />
-            <Select name="direction" defaultValue={editingTrade?.direction || "Buy"} options={["Buy", "Sell"]} />
-            <Input name="strategy" placeholder="Strategy e.g. SMC, Breakout" defaultValue={editingTrade?.strategy || ""} />
-            <Input name="session" placeholder="Session e.g. London" defaultValue={editingTrade?.session || ""} />
-            <Input name="entry_price" placeholder="Entry price" defaultValue={editingTrade?.entry_price || ""} />
-            <Input name="exit_price" placeholder="Exit price" defaultValue={editingTrade?.exit_price || ""} />
-            <Input name="profit_loss" placeholder="Profit / Loss" defaultValue={editingTrade?.profit_loss || ""} />
-            <Input name="risk_reward" placeholder="Risk Reward e.g. 2.5" defaultValue={editingTrade?.risk_reward || ""} />
+          <form onSubmit={saveTrade} className="grid gap-4 md:grid-cols-2">
+            <Field label="Trade type">
+              <Select name="trade_source" defaultValue={editingTrade?.trade_source || "Live"} options={["Live", "Backtest", "Demo"]} />
+            </Field>
 
-            <Select name="result" defaultValue={editingTrade?.result || "Win"} options={["Win", "Loss", "Break Even"]} />
-            <Select name="grade" defaultValue={editingTrade?.grade || "A"} options={["A+", "A", "B", "C", "D"]} />
-            <Select name="emotion" defaultValue={editingTrade?.emotion || "Calm"} options={["Calm", "Confident", "Fear", "Greed", "FOMO", "Revenge"]} />
-            <Input name="mistake" placeholder="Mistake e.g. Early entry" defaultValue={editingTrade?.mistake || ""} />
+            <Field label="When did this trade happen?">
+              <input
+                type="datetime-local"
+                name="trade_date"
+                defaultValue={editingTrade?.trade_date ? new Date(editingTrade.trade_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16)}
+                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
+              />
+            </Field>
 
-            <textarea
-              name="notes"
-              defaultValue={editingTrade?.notes || ""}
-              className="md:col-span-2 rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-              placeholder="Trade notes, mistakes, psychology..."
-              rows={5}
-            />
+            <Field label="Pair">
+              <Input name="pair" placeholder="e.g. EURUSD" defaultValue={editingTrade?.pair || ""} />
+            </Field>
 
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImage(e.target.files?.[0] || null)}
-              className="md:col-span-2 rounded-2xl border border-white/10 bg-black/50 p-4 text-white"
-            />
+            <Field label="Timeframe">
+              <Select name="timeframe" defaultValue={editingTrade?.timeframe || "H1"} options={["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]} />
+            </Field>
+
+            <Field label="Direction">
+              <Select name="direction" defaultValue={editingTrade?.direction || "Buy"} options={["Buy", "Sell"]} />
+            </Field>
+
+            <Field label="Session">
+              <Select name="session" defaultValue={editingTrade?.session || "London"} options={["Asia", "London", "New York", "London-NY Overlap", "Other"]} />
+            </Field>
+
+            <Field label="Strategy">
+              <Input name="strategy" placeholder="e.g. SMC, Breakout" defaultValue={editingTrade?.strategy || ""} />
+            </Field>
+
+            <Field label="Risk : Reward planned">
+              <Input name="risk_reward" placeholder="e.g. 2.5" defaultValue={editingTrade?.risk_reward || ""} />
+            </Field>
+
+            <Field label="Entry price">
+              <Input name="entry_price" placeholder="Entry" defaultValue={editingTrade?.entry_price || ""} />
+            </Field>
+
+            <Field label="Exit price">
+              <Input name="exit_price" placeholder="Exit" defaultValue={editingTrade?.exit_price || ""} />
+            </Field>
+
+            <Field label="Profit / Loss">
+              <Input name="profit_loss" placeholder="e.g. 150 or -80" defaultValue={editingTrade?.profit_loss || ""} />
+            </Field>
+
+            <Field label="Result">
+              <Select name="result" defaultValue={editingTrade?.result || "Win"} options={["Win", "Loss", "Break Even"]} />
+            </Field>
+
+            <Field label="Grade">
+              <Select name="grade" defaultValue={editingTrade?.grade || "A"} options={["A+", "A", "B", "C", "D"]} />
+            </Field>
+
+            <Field label="Emotion">
+              <Select name="emotion" defaultValue={editingTrade?.emotion || "Calm"} options={["Calm", "Confident", "Fear", "Greed", "FOMO", "Revenge", "Impatient"]} />
+            </Field>
+
+            <Field label="Mistake (if any)">
+              <Input name="mistake" placeholder="e.g. Early entry" defaultValue={editingTrade?.mistake || ""} />
+            </Field>
+
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-xs font-semibold text-white/50">Notes</label>
+              <textarea
+                name="notes"
+                defaultValue={editingTrade?.notes || ""}
+                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
+                placeholder="What was your reasoning? What did you see?"
+                rows={4}
+              />
+            </div>
+
+            <Field label="📸 Before entry screenshot">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageBefore(e.target.files?.[0] || null)}
+                className="w-full rounded-2xl border border-white/10 bg-black/50 p-3 text-sm text-white"
+              />
+              {editingTrade?.image_url_before && !imageBefore && (
+                <p className="mt-1 text-xs text-white/30">Current image kept unless you pick a new one</p>
+              )}
+            </Field>
+
+            <Field label="📸 After exit screenshot">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageAfter(e.target.files?.[0] || null)}
+                className="w-full rounded-2xl border border-white/10 bg-black/50 p-3 text-sm text-white"
+              />
+              {editingTrade?.image_url_after && !imageAfter && (
+                <p className="mt-1 text-xs text-white/30">Current image kept unless you pick a new one</p>
+              )}
+            </Field>
 
             <button
               type="submit"
               disabled={saving}
               className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700 disabled:opacity-50"
             >
-              {saving ? "Saving + AI..." : editingTrade ? "Update Trade" : "Save Trade"}
+              {saving ? "Saving + AI review..." : editingTrade ? "Update Trade" : "Save Trade"}
             </button>
 
             {editingTrade && (
               <button
                 type="button"
-                onClick={() => setEditingTrade(null)}
-                className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold transition hover:bg-white/20"
+                onClick={() => { setEditingTrade(null); setImageBefore(null); setImageAfter(null); }}
+                className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold hover:bg-white/20"
               >
                 Cancel Edit
               </button>
@@ -545,118 +511,100 @@ export default function JournalPage() {
           </form>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40">
+        {/* History */}
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="text-2xl font-semibold">Trade History</h2>
-          <p className="mb-6 text-sm text-white/40">Your latest private trades and execution data.</p>
+          <p className="mb-6 text-sm text-white/40">{filteredTrades.length} of {trades.length} trades shown</p>
 
           <div className="mb-6 grid gap-3 md:grid-cols-5">
             <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
-              <option>All</option>
-              <option>Live</option>
-              <option>Backtest</option>
-              <option>Demo</option>
+              <option>All</option><option>Live</option><option>Backtest</option><option>Demo</option>
             </select>
-
-            <input
-              value={pairFilter}
-              onChange={(e) => setPairFilter(e.target.value)}
-              placeholder="Search pair..."
-              className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500"
-            />
-
+            <input value={pairFilter} onChange={(e) => setPairFilter(e.target.value)} placeholder="Search pair..." className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500" />
             <select value={resultFilter} onChange={(e) => setResultFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
-              <option>All</option>
-              <option>Win</option>
-              <option>Loss</option>
-              <option>Break Even</option>
+              <option>All</option><option>Win</option><option>Loss</option><option>Break Even</option>
             </select>
-
             <select value={strategyFilter} onChange={(e) => setStrategyFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
-              <option>All</option>
-              <option>SMC</option>
-              <option>Breakout</option>
-              <option>Scalping</option>
+              <option>All</option><option>SMC</option><option>Breakout</option><option>Scalping</option>
             </select>
-
             <select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
-              <option>All</option>
-              <option>A+</option>
-              <option>A</option>
-              <option>B</option>
-              <option>C</option>
-              <option>D</option>
+              <option>All</option><option>A+</option><option>A</option><option>B</option><option>C</option><option>D</option>
             </select>
           </div>
 
-          {trades.length === 0 ? (
-            <p className="text-white/40">No trades saved yet.</p>
-          ) : filteredTrades.length === 0 ? (
+          {filteredTrades.length === 0 ? (
             <p className="text-white/40">No trades match your filters.</p>
           ) : (
             <div className="space-y-4">
               {filteredTrades.map((trade) => (
-                <div key={trade.id} className="grid gap-4 rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20 lg:grid-cols-[1fr_150px_220px]">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-xl font-bold">{trade.pair}</h3>
-                      <Badge text={trade.direction || "N/A"} />
-                      <Badge text={trade.strategy || "No strategy"} />
-                      <Badge text={trade.grade || "No grade"} />
-                      <Badge text={trade.result} />
-                      <Badge text={trade.trade_source || "Live"} />
-                      <Badge text={`AI ${trade.ai_score ?? "N/A"}`} />
-                    </div>
-
-                    <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
-                      <p>Session: <span className="text-white">{trade.session}</span></p>
-                      <p>Entry: <span className="text-white">{trade.entry_price}</span></p>
-                      <p>Exit: <span className="text-white">{trade.exit_price}</span></p>
-                      <p>P/L: <span className={trade.profit_loss >= 0 ? "text-green-400" : "text-red-400"}>{trade.profit_loss}</span></p>
-                      <p>R:R: <span className="text-white">{trade.risk_reward || "N/A"}</span></p>
-                      <p>Emotion: <span className="text-white">{trade.emotion || "N/A"}</span></p>
-                    </div>
-
-                    {trade.ai_feedback && (
-                      <p className="mt-4 rounded-2xl bg-blue-500/10 p-3 text-sm text-blue-300">
-                        AI: {trade.ai_feedback}
-                      </p>
-                    )}
-
-                    {trade.mistake && (
-                      <p className="mt-4 rounded-2xl bg-red-500/10 p-3 text-sm text-red-300">
-                        Mistake: {trade.mistake}
-                      </p>
-                    )}
-
-                    {trade.notes && (
-                      <p className="mt-4 rounded-2xl bg-white/[0.03] p-3 text-sm text-white/50">
-                        {trade.notes}
-                      </p>
-                    )}
+                <div key={trade.id} className="rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20">
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <h3 className="text-xl font-bold">{trade.pair}</h3>
+                    <Badge text={trade.direction || "N/A"} />
+                    <Badge text={trade.timeframe || "—"} />
+                    <Badge text={trade.strategy || "No strategy"} />
+                    <Badge text={trade.grade || "No grade"} />
+                    <Badge text={trade.result} />
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      trade.trade_source === "Backtest" ? "bg-purple-500/20 text-purple-400" :
+                      trade.trade_source === "Demo" ? "bg-yellow-500/20 text-yellow-400" :
+                      "bg-green-500/20 text-green-400"
+                    }`}>{trade.trade_source || "Live"}</span>
+                    <Badge text={`AI ${trade.ai_score ?? "N/A"}`} />
                   </div>
 
-                  <div>
-                    {trade.image_url ? (
-                      <a href={trade.image_url} target="_blank" rel="noopener noreferrer">
-                        <img src={trade.image_url} alt="Trade screenshot" className="h-28 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80" />
-                      </a>
-                    ) : (
-                      <div className="flex h-28 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-sm text-white/30">
-                        No image
-                      </div>
-                    )}
+                  <p className="mb-3 text-xs text-white/30">
+                    {trade.trade_date
+                      ? new Date(trade.trade_date).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Vienna" }) + " CET"
+                      : "No date set"}
+                  </p>
+
+                  <div className="mb-3 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
+                    <p>Session: <span className="text-white">{trade.session}</span></p>
+                    <p>Entry: <span className="text-white">{trade.entry_price}</span></p>
+                    <p>Exit: <span className="text-white">{trade.exit_price}</span></p>
+                    <p>P/L: <span className={trade.profit_loss >= 0 ? "text-green-400" : "text-red-400"}>{trade.profit_loss}</span></p>
+                    <p>R:R: <span className="text-white">{trade.risk_reward || "N/A"}</span></p>
+                    <p>Emotion: <span className="text-white">{trade.emotion || "N/A"}</span></p>
                   </div>
 
-                  <div className="flex items-center gap-2 lg:justify-end">
-                    <button onClick={() => router.push(`/journal/trade/${trade.id}`)} className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">
-                      View
-                    </button>
-                    <button onClick={() => setEditingTrade(trade)} className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-400 hover:bg-yellow-500/20">
-                      Edit
-                    </button>
-                    <button onClick={() => deleteTrade(trade.id)} className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20">
-                      Delete
-                    </button>
+                  {(trade.image_url_before || trade.image_url_after) && (
+                    <div className="mb-3 grid gap-3 sm:grid-cols-2">
+                      {trade.image_url_before && (
+                        <div>
+                          <p className="mb-1 text-xs text-white/40">Before entry</p>
+                          <a href={trade.image_url_before} target="_blank" rel="noopener noreferrer">
+                            <img src={trade.image_url_before} alt="Before" className="h-40 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80" />
+                          </a>
+                        </div>
+                      )}
+                      {trade.image_url_after && (
+                        <div>
+                          <p className="mb-1 text-xs text-white/40">After exit</p>
+                          <a href={trade.image_url_after} target="_blank" rel="noopener noreferrer">
+                            <img src={trade.image_url_after} alt="After" className="h-40 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {trade.ai_feedback && (
+                    <p className="mb-3 rounded-2xl bg-blue-500/10 p-3 text-sm text-blue-300">AI: {trade.ai_feedback}</p>
+                  )}
+
+                  {trade.mistake && (
+                    <p className="mb-3 rounded-2xl bg-red-500/10 p-3 text-sm text-red-300">Mistake: {trade.mistake}</p>
+                  )}
+
+                  {trade.notes && (
+                    <p className="mb-3 rounded-2xl bg-white/[0.03] p-3 text-sm text-white/50">{trade.notes}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => router.push(`/journal/trade/${trade.id}`)} className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">View</button>
+                    <button onClick={() => { setEditingTrade(trade); window.scrollTo({ top: 400, behavior: "smooth" }); }} className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-400 hover:bg-yellow-500/20">Edit</button>
+                    <button onClick={() => deleteTrade(trade.id)} className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20">Delete</button>
                   </div>
                 </div>
               ))}
@@ -668,16 +616,23 @@ export default function JournalPage() {
   );
 }
 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-2 block text-xs font-semibold text-white/50">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 function Input({ name, placeholder, defaultValue }: { name: string; placeholder: string; defaultValue: string | number }) {
-  return <input name={name} defaultValue={defaultValue} className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500" placeholder={placeholder} />;
+  return <input name={name} defaultValue={defaultValue} className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500" placeholder={placeholder} />;
 }
 
 function Select({ name, defaultValue, options }: { name: string; defaultValue: string; options: string[] }) {
   return (
-    <select name={name} defaultValue={defaultValue} className="rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500">
-      {options.map((option) => (
-        <option key={option}>{option}</option>
-      ))}
+    <select name={name} defaultValue={defaultValue} className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500">
+      {options.map((o) => <option key={o}>{o}</option>)}
     </select>
   );
 }
