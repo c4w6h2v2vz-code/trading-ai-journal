@@ -390,7 +390,7 @@ export default function JournalPage() {
             For backtests, set the real trade date — otherwise your session and time analysis will be wrong.
           </p>
 
-          <form onSubmit={saveTrade} className="grid gap-4 md:grid-cols-2">
+          <form key={editingTrade?.id || "new"} onSubmit={saveTrade} className="grid gap-4 md:grid-cols-2">
             <Field label="Trade type">
               <Select name="trade_source" defaultValue={editingTrade?.trade_source || "Live"} options={["Live", "Backtest", "Demo"]} />
             </Field>
