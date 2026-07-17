@@ -20,6 +20,8 @@ type Trade = {
   profit_loss: number;
   result: string;
   created_at: string;
+  trade_date?: string | null;
+  timeframe?: string | null;
 };
 
 function stats(trades: Trade[]) {
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
 
     let manualQuery = supabase
       .from("trades")
-      .select("pair, session, strategy, direction, grade, emotion, mistake, risk_reward, profit_loss, result, created_at, trade_source")
+      .select("pair, session, strategy, direction, grade, emotion, mistake, risk_reward, profit_loss, result, created_at, trade_date, timeframe, trade_source")
       .eq("user_id", userId);
 
     if (source && source !== "All") {
@@ -118,6 +120,8 @@ export async function POST(request: Request) {
       profit_loss: Number(t.profit),
       result: Number(t.profit) > 0 ? "Win" : Number(t.profit) < 0 ? "Loss" : "Break Even",
       created_at: t.created_at,
+      trade_date: t.created_at,
+      timeframe: null,
     }));
 
     const allTrades: Trade[] = [...((manual || []) as Trade[]), ...mt5Mapped];
@@ -134,8 +138,9 @@ export async function POST(request: Request) {
     const byEmotion = groupBy(allTrades, t => t.emotion);
     const byGrade = groupBy(allTrades, t => t.grade);
     const byDirection = groupBy(allTrades, t => t.direction);
-    const byHour = groupBy(allTrades, t => hourCET(t.created_at) + ":00 CET");
-    const byDay = groupBy(allTrades, t => dayName(t.created_at));
+    const byHour = groupBy(allTrades, t => hourCET(t.trade_date || t.created_at) + ":00 CET");
+    const byDay = groupBy(allTrades, t => dayName(t.trade_date || t.created_at));
+    const byTimeframe = groupBy(allTrades, t => t.timeframe || null);
 
     const mistakeGroups = groupBy(allTrades, t => t.mistake);
     const mistakeCost = mistakeGroups
@@ -184,6 +189,8 @@ ${fmt("BY DIRECTION", byDirection)}
 ${fmt("BY HOUR (CET)", byHour)}
 
 ${fmt("BY DAY OF WEEK", byDay)}
+
+${fmt("BY TIMEFRAME", byTimeframe)}
 
 ${mistakeCost.length > 0 ? "MOST COSTLY MISTAKES:\n" + mistakeCost.map(m => `  ${m.key} — ${m.trades} trades, cost ${m.total_pl}`).join("\n") : "MISTAKES: none logged"}
 `.trim();
@@ -258,6 +265,7 @@ Return ONLY this JSON:
     parsed.by_direction = byDirection;
     parsed.by_hour = byHour;
     parsed.by_day = byDay;
+    parsed.by_timeframe = byTimeframe;
     parsed.mistake_cost = mistakeCost;
     parsed.avg_planned_rr = avgPlannedRR;
     parsed.actual_rr = actualRR;
