@@ -19,21 +19,26 @@ export async function POST(request: Request) {
 
     if (body.event === "closed_trade") {
       // Find user by account number
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("mt5_account", body.account)
-        .single();
+      // Find which user owns this MT5 account number
+      const { data: account, error: accountError } = await supabase
+        .from("trading_accounts")
+        .select("user_id")
+        .eq("account_number", String(body.account))
+        .maybeSingle();
 
-      // If no profile found by account, use the first user (for single user setup)
-      let userId = profile?.id;
+      if (accountError) {
+        console.error("Account lookup error:", accountError);
+        return NextResponse.json({ error: accountError.message }, { status: 500 });
+      }
+
+      const userId = account?.user_id;
+
       if (!userId) {
-        const { data: users } = await supabase
-          .from("profiles")
-          .select("id")
-          .limit(1)
-          .single();
-        userId = users?.id;
+        console.error("No PipTrak account found for MT5 account:", body.account);
+        return NextResponse.json(
+          { error: `Account ${body.account} is not registered in PipTrak. Add it on the Accounts page first.` },
+          { status: 404 }
+        );
       }
 
       if (!userId) {
