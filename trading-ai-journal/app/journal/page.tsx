@@ -19,8 +19,8 @@ type Trade = {
   emotion: string | null;
   mistake: string | null;
   risk_reward: number | null;
-  entry_price: number;
-  exit_price: number;
+  entry_price: number | null;
+  exit_price: number | null;
   profit_loss: number;
   result: string;
   notes: string;
@@ -139,6 +139,11 @@ export default function JournalPage() {
       const dateInput = String(formData.get("trade_date") || "");
       const tradeDate = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
 
+      const entryVal = parseFloat(String(formData.get("entry_price") || ""));
+      const exitVal = parseFloat(String(formData.get("exit_price") || ""));
+      const rrVal = parseFloat(String(formData.get("risk_reward") || ""));
+      const plVal = parseFloat(String(formData.get("profit_loss") || ""));
+
       const tradeData = {
         user_id: user.id,
         trade_source: String(formData.get("trade_source") || "Live"),
@@ -151,10 +156,10 @@ export default function JournalPage() {
         grade: String(formData.get("grade") || ""),
         emotion: String(formData.get("emotion") || ""),
         mistake: String(formData.get("mistake") || ""),
-        risk_reward: Number(formData.get("risk_reward") || 0),
-        entry_price: Number(formData.get("entry_price") || 0),
-        exit_price: Number(formData.get("exit_price") || 0),
-        profit_loss: Number(formData.get("profit_loss") || 0),
+        risk_reward: isNaN(rrVal) ? null : rrVal,
+        entry_price: isNaN(entryVal) ? null : entryVal,
+        exit_price: isNaN(exitVal) ? null : exitVal,
+        profit_loss: isNaN(plVal) ? 0 : plVal,
         result: String(formData.get("result") || "Win"),
         notes: String(formData.get("notes") || ""),
         image_url_before: beforeUrl,
@@ -343,7 +348,6 @@ export default function JournalPage() {
           </div>
         )}
 
-        {/* Imported */}
         <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="text-2xl font-semibold">Imported Trades</h2>
           <p className="mb-6 text-sm text-white/40">Auto-synced from MT4/MT5, or imported via CSV.</p>
@@ -383,7 +387,6 @@ export default function JournalPage() {
           )}
         </div>
 
-        {/* Form */}
         <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="mb-2 text-2xl font-semibold">{editingTrade ? "Edit Trade" : "Add New Trade"}</h2>
           <p className="mb-6 text-sm text-white/40">
@@ -405,7 +408,7 @@ export default function JournalPage() {
             </Field>
 
             <Field label="Pair">
-              <Input name="pair" placeholder="e.g. EURUSD" defaultValue={editingTrade?.pair || ""} />
+              <Input name="pair" placeholder="e.g. GBPUSD" defaultValue={editingTrade?.pair || ""} />
             </Field>
 
             <Field label="Timeframe">
@@ -458,7 +461,14 @@ export default function JournalPage() {
             </Field>
 
             <Field label="Profit / Loss">
-              <Input name="profit_loss" placeholder="e.g. 150 or -80" defaultValue={editingTrade?.profit_loss || ""} />
+              <input
+                type="number"
+                step="any"
+                name="profit_loss"
+                placeholder="e.g. 150 or -80"
+                defaultValue={editingTrade?.profit_loss ?? ""}
+                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
+              />
             </Field>
 
             <Field label="Result">
@@ -532,7 +542,6 @@ export default function JournalPage() {
           </form>
         </div>
 
-        {/* History */}
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <h2 className="text-2xl font-semibold">Trade History</h2>
           <p className="mb-6 text-sm text-white/40">{filteredTrades.length} of {trades.length} trades shown</p>
@@ -582,10 +591,10 @@ export default function JournalPage() {
 
                   <div className="mb-3 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
                     <p>Session: <span className="text-white">{trade.session}</span></p>
-                    <p>Entry: <span className="text-white">{trade.entry_price}</span></p>
-                    <p>Exit: <span className="text-white">{trade.exit_price}</span></p>
+                    <p>Entry: <span className="text-white">{trade.entry_price ?? "—"}</span></p>
+                    <p>Exit: <span className="text-white">{trade.exit_price ?? "—"}</span></p>
                     <p>P/L: <span className={trade.profit_loss >= 0 ? "text-green-400" : "text-red-400"}>{trade.profit_loss}</span></p>
-                    <p>R:R: <span className="text-white">{trade.risk_reward || "N/A"}</span></p>
+                    <p>R:R: <span className="text-white">{trade.risk_reward ?? "N/A"}</span></p>
                     <p>Emotion: <span className="text-white">{trade.emotion || "N/A"}</span></p>
                   </div>
 
