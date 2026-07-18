@@ -138,7 +138,11 @@ export default function JournalPage() {
 
       const dateInput = String(formData.get("trade_date") || "");
       const tradeDate = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
-
+console.log("RAW FORM:", {
+        entry: formData.get("entry_price"),
+        exit: formData.get("exit_price"),
+        rr: formData.get("risk_reward"),
+      });
       const tradeData = {
         user_id: user.id,
         trade_source: String(formData.get("trade_source") || "Live"),
