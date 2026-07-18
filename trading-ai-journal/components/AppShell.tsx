@@ -9,6 +9,7 @@ const navGroups = [
     links: [
       { name: "Dashboard", href: "/dashboard" },
       { name: "Trade Journal", href: "/journal" },
+      { name: "Backtest Lab", href: "/backtest" },
       { name: "Daily Journal", href: "/daily-journal" },
       { name: "Calendar", href: "/calendar" },
     ],
