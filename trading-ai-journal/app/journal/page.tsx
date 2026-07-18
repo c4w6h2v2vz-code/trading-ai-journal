@@ -138,11 +138,7 @@ export default function JournalPage() {
 
       const dateInput = String(formData.get("trade_date") || "");
       const tradeDate = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
-console.log("RAW FORM:", {
-        entry: formData.get("entry_price"),
-        exit: formData.get("exit_price"),
-        rr: formData.get("risk_reward"),
-      });
+
       const tradeData = {
         user_id: user.id,
         trade_source: String(formData.get("trade_source") || "Live"),
@@ -429,15 +425,36 @@ console.log("RAW FORM:", {
             </Field>
 
             <Field label="Risk : Reward planned">
-              <Input name="risk_reward" placeholder="e.g. 2.5" defaultValue={editingTrade?.risk_reward || ""} />
+              <input
+                type="number"
+                step="any"
+                name="risk_reward"
+                placeholder="e.g. 2.5"
+                defaultValue={editingTrade?.risk_reward ?? ""}
+                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
+              />
             </Field>
 
             <Field label="Entry price">
-              <Input name="entry_price" placeholder="Entry" defaultValue={editingTrade?.entry_price || ""} />
+              <input
+                type="number"
+                step="any"
+                name="entry_price"
+                placeholder="e.g. 1.26500"
+                defaultValue={editingTrade?.entry_price ?? ""}
+                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
+              />
             </Field>
 
             <Field label="Exit price">
-              <Input name="exit_price" placeholder="Exit" defaultValue={editingTrade?.exit_price || ""} />
+              <input
+                type="number"
+                step="any"
+                name="exit_price"
+                placeholder="e.g. 1.27000"
+                defaultValue={editingTrade?.exit_price ?? ""}
+                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
+              />
             </Field>
 
             <Field label="Profit / Loss">
