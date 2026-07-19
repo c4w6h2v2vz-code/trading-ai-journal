@@ -39,7 +39,6 @@ const emptyRow = {
   exit_price: "",
   risk_reward: "",
   profit_loss: "",
-  result: "Win",
   grade: "A",
   notes: "",
 };
@@ -91,6 +90,9 @@ export default function BacktestPage() {
       const rr = parseFloat(row.risk_reward);
       const pl = parseFloat(row.profit_loss);
 
+      const plValue = isNaN(pl) ? 0 : pl;
+      const derivedResult = plValue > 0 ? "Win" : plValue < 0 ? "Loss" : "Break Even";
+
       const tradeData = {
         user_id: user.id,
         trade_source: "Backtest",
@@ -102,8 +104,8 @@ export default function BacktestPage() {
         entry_price: isNaN(entry) ? null : entry,
         exit_price: isNaN(exit) ? null : exit,
         risk_reward: isNaN(rr) ? null : rr,
-        profit_loss: isNaN(pl) ? 0 : pl,
-        result: row.result,
+        profit_loss: plValue,
+        result: derivedResult,
         grade: row.grade,
         notes: row.notes || "",
       };
@@ -173,7 +175,11 @@ export default function BacktestPage() {
 
   const filtered = trades
     .filter(t => pairFilter === "" || t.pair.toLowerCase().includes(pairFilter.toLowerCase()))
-    .filter(t => resultFilter === "All" || t.result === resultFilter)
+    .filter(t => {
+      if (resultFilter === "All") return true;
+      const derived = t.profit_loss > 0 ? "Win" : t.profit_loss < 0 ? "Loss" : "Break Even";
+      return derived === resultFilter;
+    })
     .sort((a, b) => {
       if (sortBy === "pl") return b.profit_loss - a.profit_loss;
       if (sortBy === "pair") return a.pair.localeCompare(b.pair);
@@ -204,7 +210,7 @@ export default function BacktestPage() {
           </div>
           <h1 className="text-4xl font-bold">Backtest Lab</h1>
           <p className="mt-2 text-white/40">
-            Log backtests fast in a table. These stay separate from your live stats.
+            Log backtests fast in a table. Win/Loss is set automatically from your P/L. These stay separate from your live stats.
             Analyze the whole set in <button onClick={() => router.push("/edge-finder")} className="text-purple-400 underline">Edge Finder</button>.
           </p>
         </div>
@@ -223,6 +229,7 @@ export default function BacktestPage() {
 
         <div className="mb-6 rounded-3xl border border-purple-500/20 bg-purple-500/5 p-4">
           <p className="mb-3 text-sm font-semibold text-purple-300">➕ Add a trade</p>
+          <p className="mb-3 text-xs text-white/30">Use a negative P/L for losses (e.g. -80). Win or Loss is decided automatically.</p>
           <div className="grid gap-2 md:grid-cols-6">
             <input type="datetime-local" value={row.trade_date} onChange={e => setRow({ ...row, trade_date: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-xs text-white outline-none focus:border-purple-500" />
             <input placeholder="Pair" value={row.pair} onChange={e => setRow({ ...row, pair: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
@@ -241,10 +248,7 @@ export default function BacktestPage() {
             <input type="number" step="any" placeholder="Entry" value={row.entry_price} onChange={e => setRow({ ...row, entry_price: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
             <input type="number" step="any" placeholder="Exit" value={row.exit_price} onChange={e => setRow({ ...row, exit_price: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
             <input type="number" step="any" placeholder="R:R" value={row.risk_reward} onChange={e => setRow({ ...row, risk_reward: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
-            <input type="number" step="any" placeholder="P/L" value={row.profit_loss} onChange={e => setRow({ ...row, profit_loss: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
-            <select value={row.result} onChange={e => setRow({ ...row, result: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500">
-              <option>Win</option><option>Loss</option><option>Break Even</option>
-            </select>
+            <input type="number" step="any" placeholder="P/L (- for loss)" value={row.profit_loss} onChange={e => setRow({ ...row, profit_loss: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
             <button onClick={addRow} disabled={saving} className="rounded-xl bg-purple-600 p-2 text-sm font-semibold hover:bg-purple-700 disabled:opacity-50">
               {saving ? "..." : "Add +"}
             </button>
@@ -279,7 +283,7 @@ export default function BacktestPage() {
         ) : filtered.length === 0 ? (
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-10 text-center">
             <p className="text-4xl mb-3">🧪</p>
-            <p className="text-white/40">No backtest trades yet. Add your first one above.</p>
+            <p className="text-white/40">No backtest trades match. Add one above.</p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-3xl border border-white/10 bg-white/[0.04]">
@@ -295,6 +299,7 @@ export default function BacktestPage() {
                   <th className="p-3">Exit</th>
                   <th className="p-3">R:R</th>
                   <th className="p-3">Grade</th>
+                  <th className="p-3">Result</th>
                   <th className="p-3 text-right">P/L</th>
                   <th className="p-3"></th>
                 </tr>
@@ -318,6 +323,15 @@ export default function BacktestPage() {
                       <td className="p-3">
                         <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{t.grade || "—"}</span>
                       </td>
+                      <td className="p-3">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          t.profit_loss > 0 ? "bg-green-500/20 text-green-400" :
+                          t.profit_loss < 0 ? "bg-red-500/20 text-red-400" :
+                          "bg-white/10 text-white/50"
+                        }`}>
+                          {t.profit_loss > 0 ? "Win" : t.profit_loss < 0 ? "Loss" : "BE"}
+                        </span>
+                      </td>
                       <td className={`p-3 text-right font-bold ${t.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                         {t.profit_loss >= 0 ? "+" : ""}{t.profit_loss}
                       </td>
@@ -327,7 +341,7 @@ export default function BacktestPage() {
                     </tr>
                     {expandedId === t.id && (
                       <tr key={t.id + "-exp"} className="border-b border-white/5 bg-black/30">
-                        <td colSpan={11} className="p-4">
+                        <td colSpan={12} className="p-4">
                           {t.notes && <p className="mb-3 text-sm text-white/60">📝 {t.notes}</p>}
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div>
