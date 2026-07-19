@@ -12,7 +12,7 @@ type Trade = {
   trade_date: string | null;
   timeframe: string | null;
   pair: string;
-  session: string;
+  session: string | null;
   strategy: string | null;
   direction: string | null;
   grade: string | null;
@@ -23,650 +23,421 @@ type Trade = {
   exit_price: number | null;
   profit_loss: number;
   result: string;
-  notes: string;
-  image_url: string | null;
+  notes: string | null;
   image_url_before: string | null;
   image_url_after: string | null;
   created_at: string;
-  ai_score: number | null;
-  ai_risk_score: number | null;
-  ai_psychology_score: number | null;
-  ai_execution_score: number | null;
-  ai_feedback: string | null;
 };
 
 type MT5Trade = {
   id: number;
   ticket: number;
   account: string;
-  server: string;
   symbol: string;
   trade_type: string;
   lot_size: number;
   entry_price: number;
   exit_price: number;
   profit: number;
-  open_time: string;
   close_time: string;
-  ai_score: number | null;
-  ai_feedback: string | null;
+  created_at: string;
+};
+
+const emptyRow = {
+  trade_date: new Date().toISOString().slice(0, 16),
+  pair: "",
+  direction: "Buy",
+  session: "London",
+  timeframe: "H1",
+  entry_price: "",
+  exit_price: "",
+  risk_reward: "",
+  profit_loss: "",
+  grade: "A",
+  emotion: "Calm",
+  mistake: "",
+  notes: "",
 };
 
 export default function JournalPage() {
   const router = useRouter();
-
-  const [message, setMessage] = useState("");
   const [trades, setTrades] = useState<Trade[]>([]);
   const [mt5Trades, setMt5Trades] = useState<MT5Trade[]>([]);
-  const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
-  const [imageBefore, setImageBefore] = useState<File | null>(null);
-  const [imageAfter, setImageAfter] = useState<File | null>(null);
-  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [row, setRow] = useState({ ...emptyRow });
+  const [newBefore, setNewBefore] = useState<File | null>(null);
+  const [newAfter, setNewAfter] = useState<File | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [pairFilter, setPairFilter] = useState("");
   const [resultFilter, setResultFilter] = useState("All");
-  const [strategyFilter, setStrategyFilter] = useState("All");
-  const [gradeFilter, setGradeFilter] = useState("All");
-  const [sourceFilter, setSourceFilter] = useState("All");
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [sortBy, setSortBy] = useState<"date" | "pl" | "pair">("date");
 
-  async function getCurrentUser() {
+  async function load() {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/login"); return null; }
-    return user;
-  }
-
-  async function loadTrades() {
-    const user = await getCurrentUser();
-    if (!user) return;
+    if (!user) { router.push("/login"); return; }
 
     const { data, error } = await supabase
       .from("trades")
       .select("*")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .eq("trade_source", "Live")
+      .order("trade_date", { ascending: false });
 
-    if (error) setMessage("Error loading trades: " + error.message);
+    if (error) setMessage("Load error: " + error.message);
     else setTrades(data || []);
+
+    const activeAccount = localStorage.getItem("active_account");
+    const acctNum = activeAccount ? JSON.parse(activeAccount).account_number : null;
+    let q = supabase.from("mt5_trades").select("*").eq("user_id", user.id);
+    if (acctNum) q = q.eq("account", acctNum);
+    const { data: mt5 } = await q.order("created_at", { ascending: false });
+    setMt5Trades(mt5 || []);
+
     setLoading(false);
   }
 
-  async function loadMt5Trades() {
-    const user = await getCurrentUser();
-    if (!user) return;
+  useEffect(() => { load(); }, []);
 
-    const activeAccount = localStorage.getItem("active_account");
-    const activeAccountNumber = activeAccount ? JSON.parse(activeAccount).account_number : null;
-
-    let query = supabase.from("mt5_trades").select("*").eq("user_id", user.id);
-    if (activeAccountNumber) query = query.eq("account", activeAccountNumber);
-
-    const { data, error } = await query.order("created_at", { ascending: false });
-    if (error) setMessage("Error loading imported trades: " + error.message);
-    else setMt5Trades(data || []);
-  }
-
-  useEffect(() => {
-    loadTrades();
-    loadMt5Trades();
-  }, []);
-
-  async function uploadImage(file: File, userId: string) {
-    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
-    const { error } = await supabase.storage.from("trade-screenshots").upload(fileName, file);
-    if (error) throw new Error("Image upload failed: " + error.message);
-    return supabase.storage.from("trade-screenshots").getPublicUrl(fileName).data.publicUrl;
-  }
-
-  async function saveTrade(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function addRow() {
+    if (!row.pair.trim()) { setMessage("Enter a pair first."); return; }
     setSaving(true);
     setMessage("");
 
     try {
-      const user = await getCurrentUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const form = event.target as HTMLFormElement;
-      const formData = new FormData(form);
-
-      let beforeUrl = editingTrade?.image_url_before || "";
-      let afterUrl = editingTrade?.image_url_after || "";
-
-      if (imageBefore) beforeUrl = await uploadImage(imageBefore, user.id);
-      if (imageAfter) afterUrl = await uploadImage(imageAfter, user.id);
-
-      const dateInput = String(formData.get("trade_date") || "");
-      const tradeDate = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
-
-      const entryVal = parseFloat(String(formData.get("entry_price") || ""));
-      const exitVal = parseFloat(String(formData.get("exit_price") || ""));
-      const rrVal = parseFloat(String(formData.get("risk_reward") || ""));
-      const plVal = parseFloat(String(formData.get("profit_loss") || ""));
+      const entry = parseFloat(row.entry_price);
+      const exit = parseFloat(row.exit_price);
+      const rr = parseFloat(row.risk_reward);
+      const pl = parseFloat(row.profit_loss);
+      const plValue = isNaN(pl) ? 0 : pl;
+      const derivedResult = plValue > 0 ? "Win" : plValue < 0 ? "Loss" : "Break Even";
 
       const tradeData = {
         user_id: user.id,
-        trade_source: String(formData.get("trade_source") || "Live"),
-        trade_date: tradeDate,
-        timeframe: String(formData.get("timeframe") || ""),
-        pair: String(formData.get("pair") || ""),
-        session: String(formData.get("session") || ""),
-        strategy: String(formData.get("strategy") || ""),
-        direction: String(formData.get("direction") || ""),
-        grade: String(formData.get("grade") || ""),
-        emotion: String(formData.get("emotion") || ""),
-        mistake: String(formData.get("mistake") || ""),
-        risk_reward: isNaN(rrVal) ? null : rrVal,
-        entry_price: isNaN(entryVal) ? null : entryVal,
-        exit_price: isNaN(exitVal) ? null : exitVal,
-        profit_loss: isNaN(plVal) ? 0 : plVal,
-        result: String(formData.get("result") || "Win"),
-        notes: String(formData.get("notes") || ""),
-        image_url_before: beforeUrl,
-        image_url_after: afterUrl,
-        image_url: beforeUrl,
+        trade_source: "Live",
+        trade_date: row.trade_date ? new Date(row.trade_date).toISOString() : new Date().toISOString(),
+        pair: row.pair.toUpperCase().trim(),
+        direction: row.direction,
+        session: row.session,
+        timeframe: row.timeframe,
+        entry_price: isNaN(entry) ? null : entry,
+        exit_price: isNaN(exit) ? null : exit,
+        risk_reward: isNaN(rr) ? null : rr,
+        profit_loss: plValue,
+        result: derivedResult,
+        grade: row.grade,
+        emotion: row.emotion,
+        mistake: row.mistake || "",
+        notes: row.notes || "",
       };
 
-      const { data, error } = editingTrade
-        ? await supabase.from("trades").update(tradeData).eq("id", editingTrade.id).eq("user_id", user.id).select().single()
-        : await supabase.from("trades").insert([tradeData]).select().single();
-
-      if (error) {
-        setMessage("Save error: " + error.message);
-        setSaving(false);
-        return;
+      let beforeUrl = "";
+      let afterUrl = "";
+      if (newBefore) {
+        const fn = `${user.id}/${Date.now()}-b-${newBefore.name}`;
+        const { error: e1 } = await supabase.storage.from("trade-screenshots").upload(fn, newBefore);
+        if (!e1) beforeUrl = supabase.storage.from("trade-screenshots").getPublicUrl(fn).data.publicUrl;
+      }
+      if (newAfter) {
+        const fn = `${user.id}/${Date.now()}-a-${newAfter.name}`;
+        const { error: e2 } = await supabase.storage.from("trade-screenshots").upload(fn, newAfter);
+        if (!e2) afterUrl = supabase.storage.from("trade-screenshots").getPublicUrl(fn).data.publicUrl;
       }
 
-      let finalTrade = data as Trade;
+      const full = { ...tradeData, image_url_before: beforeUrl, image_url_after: afterUrl };
+      const { data, error } = await supabase.from("trades").insert([full]).select().single();
+      if (error) { setMessage("Save error: " + error.message); setSaving(false); return; }
 
-      try {
-        setMessage("Trade saved. Generating AI review...");
-
-        const { data: tradingRules } = await supabase
-          .from("trading_rules")
-          .select("title, description")
-          .eq("user_id", user.id);
-
-        let imageBase64 = null;
-        if (imageBefore) {
-          const reader = new FileReader();
-          imageBase64 = await new Promise<string>((resolve) => {
-            reader.onload = () => resolve((reader.result as string).split(",")[1]);
-            reader.readAsDataURL(imageBefore);
-          });
-        }
-
-        const aiResponse = await fetch("/api/ai-review", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            trade: { ...finalTrade, trading_rules: tradingRules || [] },
-            history: trades.slice(0, 10),
-            imageBase64,
-          }),
-        });
-
-        const aiData = await aiResponse.json();
-
-        if (aiResponse.status === 403) {
-          setShowUpgradeModal(true);
-          setMessage("Trade saved ✅ (AI review needs Pro — free limit reached)");
-        } else if (!aiResponse.ok || aiData.error) {
-          throw new Error(aiData.error || "AI failed");
-        } else {
-          const { data: updated } = await supabase
-            .from("trades")
-            .update({
-              ai_score: aiData.ai_score,
-              ai_risk_score: aiData.ai_risk_score,
-              ai_psychology_score: aiData.ai_psychology_score,
-              ai_execution_score: aiData.ai_execution_score,
-              ai_feedback: aiData.ai_feedback,
-            })
-            .eq("id", finalTrade.id)
-            .select()
-            .single();
-          if (updated) finalTrade = updated as Trade;
-          setMessage("Trade saved with AI review ✅");
-        }
-      } catch (aiError) {
-        console.error(aiError);
-        setMessage("Trade saved ✅ AI review failed, but trade is safe.");
-      }
-
-      if (editingTrade) {
-        setTrades(old => old.map(t => (t.id === finalTrade.id ? finalTrade : t)));
-      } else {
-        setTrades(old => [finalTrade, ...old]);
-      }
-
-      setEditingTrade(null);
-      setImageBefore(null);
-      setImageAfter(null);
-      form.reset();
+      setTrades(old => [data as Trade, ...old]);
+      setRow({ ...emptyRow, pair: row.pair, direction: row.direction, session: row.session, timeframe: row.timeframe });
+      setNewBefore(null);
+      setNewAfter(null);
+      setMessage("Trade added ✅");
     } catch (err) {
-      console.error(err);
-      setMessage("Unexpected error: " + String(err));
+      setMessage("Error: " + String(err));
     } finally {
       setSaving(false);
     }
   }
 
+  async function uploadRowImage(tradeId: string, file: File, which: "before" | "after") {
+    setUploadingId(tradeId);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("trade-screenshots").upload(fileName, file);
+      if (upErr) { setMessage("Upload failed: " + upErr.message); return; }
+      const url = supabase.storage.from("trade-screenshots").getPublicUrl(fileName).data.publicUrl;
+      const column = which === "before" ? "image_url_before" : "image_url_after";
+      await supabase.from("trades").update({ [column]: url }).eq("id", tradeId).eq("user_id", user.id);
+      setTrades(old => old.map(t => t.id === tradeId ? { ...t, [column]: url } : t));
+      setMessage("Screenshot added ✅");
+    } catch (err) {
+      setMessage("Error: " + String(err));
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
   async function deleteTrade(id: string) {
     if (!confirm("Delete this trade?")) return;
-    const user = await getCurrentUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
-    const { error } = await supabase.from("trades").delete().eq("id", id).eq("user_id", user.id);
-    if (error) setMessage("Error: " + error.message);
-    else {
-      setTrades(old => old.filter(t => t.id !== id));
-      setMessage("Trade deleted ✅");
-    }
+    await supabase.from("trades").delete().eq("id", id).eq("user_id", user.id);
+    setTrades(old => old.filter(t => t.id !== id));
   }
 
-  async function reviewMt5WithAI(trade: MT5Trade) {
-    setMessage("Sending to AI review...");
-    try {
-      const user = await getCurrentUser();
-      const response = await fetch("/api/mt5-ai-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trade: { ...trade, user_id: user?.id } }),
-      });
+  const filtered = trades
+    .filter(t => pairFilter === "" || t.pair.toLowerCase().includes(pairFilter.toLowerCase()))
+    .filter(t => {
+      if (resultFilter === "All") return true;
+      const d = t.profit_loss > 0 ? "Win" : t.profit_loss < 0 ? "Loss" : "Break Even";
+      return d === resultFilter;
+    })
+    .sort((a, b) => {
+      if (sortBy === "pl") return b.profit_loss - a.profit_loss;
+      if (sortBy === "pair") return a.pair.localeCompare(b.pair);
+      return new Date(b.trade_date || b.created_at).getTime() - new Date(a.trade_date || a.created_at).getTime();
+    });
 
-      if (response.status === 403) {
-        setShowUpgradeModal(true);
-        setMessage("Upgrade to Pro for more AI reviews.");
-        return;
-      }
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "AI review failed");
-      setMessage("AI review complete ✅");
-      loadMt5Trades();
-    } catch (err) {
-      setMessage("AI review error: " + String(err));
-    }
-  }
-
-  const filteredTrades = trades.filter((t) => {
-    const matchesPair = pairFilter === "" || t.pair.toLowerCase().includes(pairFilter.toLowerCase());
-    const matchesResult = resultFilter === "All" || t.result === resultFilter;
-    const matchesStrategy = strategyFilter === "All" || t.strategy === strategyFilter;
-    const matchesGrade = gradeFilter === "All" || t.grade === gradeFilter;
-    const matchesSource = sourceFilter === "All" || (t.trade_source || "Live") === sourceFilter;
-    return matchesPair && matchesResult && matchesStrategy && matchesGrade && matchesSource;
-  });
-
-  if (loading) return (
-    <AppShell>
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="space-y-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-40 animate-pulse" />
-          ))}
-        </div>
-      </div>
-    </AppShell>
-  );
+  const n = trades.length;
+  const wins = trades.filter(t => t.profit_loss > 0);
+  const losses = trades.filter(t => t.profit_loss < 0);
+  const totalPL = trades.reduce((s, t) => s + Number(t.profit_loss), 0);
+  const winRate = n > 0 ? ((wins.length / n) * 100).toFixed(1) : "0";
+  const grossWin = wins.reduce((s, t) => s + Number(t.profit_loss), 0);
+  const grossLoss = Math.abs(losses.reduce((s, t) => s + Number(t.profit_loss), 0));
+  const pf = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : (grossWin > 0 ? "∞" : "0");
+  const expectancy = n > 0 ? (totalPL / n).toFixed(2) : "0";
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-10">
-          <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
-            Pro Trade Journal
-          </p>
-          <h1 className="text-4xl font-bold tracking-tight md:text-5xl">Trading Journal</h1>
-          <p className="mt-3 text-white/50">
-            Log live trades and backtests. Before/after screenshots, real trade dates, and AI review on every entry.
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-3">
+            <p className="w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
+              📓 Live Journal
+            </p>
+            <span className="rounded-full border border-green-500/30 bg-green-500/10 px-3 py-0.5 text-xs text-green-400">LIVE</span>
+          </div>
+          <h1 className="text-4xl font-bold">Trading Journal</h1>
+          <p className="mt-2 text-white/40">
+            Your live trades. Auto-synced from MT5 below, plus your own manual entries. Write your own notes — review the whole week in <button onClick={() => router.push("/edge-finder")} className="text-blue-400 underline">Edge Finder</button>.
           </p>
         </div>
 
         {message && (
-          <div className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 px-5 py-4 text-green-300">
-            {message}
-          </div>
+          <div className="mb-4 rounded-2xl border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-300">{message}</div>
         )}
 
-        {showUpgradeModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-6">
-            <div className="w-full max-w-md rounded-3xl border border-blue-500/30 bg-[#0a0a0a] p-8 text-center">
-              <p className="text-4xl mb-4">🚀</p>
-              <h2 className="text-2xl font-bold mb-2">Free AI reviews used up</h2>
-              <p className="text-white/50 mb-6">Upgrade to Pro for unlimited AI reviews and screenshot analysis.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowUpgradeModal(false)} className="flex-1 rounded-2xl border border-white/10 bg-white/5 py-3 font-semibold hover:bg-white/10">
-                  Later
-                </button>
-                <button onClick={() => router.push("/pricing")} className="flex-1 rounded-2xl bg-blue-600 py-3 font-semibold hover:bg-blue-700">
-                  Upgrade
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="text-2xl font-semibold">Imported Trades</h2>
-          <p className="mb-6 text-sm text-white/40">Auto-synced from MT4/MT5, or imported via CSV.</p>
-
+        {/* MT5 Synced Section */}
+        <div className="mb-8">
+          <h2 className="mb-3 text-lg font-semibold">🔌 Synced from MT5 <span className="text-sm font-normal text-white/40">({mt5Trades.length})</span></h2>
           {mt5Trades.length === 0 ? (
-            <p className="text-white/40">No trades imported yet.</p>
+            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-sm text-white/40">
+              No trades synced yet. Once your MT5 EA is connected and you close a trade, it appears here automatically.
+            </div>
           ) : (
-            <div className="space-y-4">
-              {mt5Trades.map((trade) => (
-                <div key={trade.id} className="rounded-3xl border border-white/10 bg-black/40 p-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h3 className="text-xl font-bold">{trade.symbol}</h3>
-                    <Badge text={trade.trade_type || "N/A"} />
-                    <Badge text={`Lot ${trade.lot_size}`} />
-                    {trade.ai_score !== null && <Badge text={`AI ${trade.ai_score}`} />}
-                  </div>
-                  <div className="mt-4 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
-                    <p>Entry: <span className="text-white">{trade.entry_price}</span></p>
-                    <p>Exit: <span className="text-white">{trade.exit_price}</span></p>
-                    <p>P/L: <span className={trade.profit >= 0 ? "text-green-400" : "text-red-400"}>{trade.profit}</span></p>
-                  </div>
-                  {trade.ai_feedback && (
-                    <p className="mt-4 rounded-2xl bg-blue-500/10 p-3 text-sm text-blue-300">AI: {trade.ai_feedback}</p>
-                  )}
-                  {trade.ai_score ? (
-                    <button onClick={() => router.push(`/journal/mt5-trade/${trade.id}`)} className="mt-4 rounded-xl bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-400 hover:bg-green-500/20">
-                      AI Reviewed ✅
-                    </button>
-                  ) : (
-                    <button onClick={() => reviewMt5WithAI(trade)} className="mt-4 rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">
-                      Review with AI
-                    </button>
-                  )}
-                </div>
-              ))}
+            <div className="overflow-x-auto rounded-3xl border border-white/10 bg-white/[0.04]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-left text-xs text-white/40">
+                    <th className="p-3">Closed</th>
+                    <th className="p-3">Symbol</th>
+                    <th className="p-3">Type</th>
+                    <th className="p-3">Lot</th>
+                    <th className="p-3">Entry</th>
+                    <th className="p-3">Exit</th>
+                    <th className="p-3 text-right">Profit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mt5Trades.map((t) => (
+                    <tr key={t.id} className="border-b border-white/5">
+                      <td className="p-3 text-xs text-white/50">{t.close_time || "—"}</td>
+                      <td className="p-3 font-semibold">{t.symbol}</td>
+                      <td className="p-3"><span className={t.trade_type === "BUY" ? "text-green-400" : "text-red-400"}>{t.trade_type}</span></td>
+                      <td className="p-3 text-white/50">{t.lot_size}</td>
+                      <td className="p-3 text-white/50">{t.entry_price}</td>
+                      <td className="p-3 text-white/50">{t.exit_price}</td>
+                      <td className={`p-3 text-right font-bold ${t.profit >= 0 ? "text-green-400" : "text-red-400"}`}>{t.profit >= 0 ? "+" : ""}{t.profit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
-        <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="mb-2 text-2xl font-semibold">{editingTrade ? "Edit Trade" : "Add New Trade"}</h2>
-          <p className="mb-6 text-sm text-white/40">
-            For backtests, set the real trade date — otherwise your session and time analysis will be wrong.
-          </p>
+        {/* Manual stats */}
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <StatBox label="Manual Trades" value={String(n)} />
+          <StatBox label="Win Rate" value={`${winRate}%`} color={Number(winRate) >= 50 ? "text-green-400" : "text-red-400"} />
+          <StatBox label="Total P/L" value={String(totalPL.toFixed(2))} color={totalPL >= 0 ? "text-green-400" : "text-red-400"} />
+          <StatBox label="Expectancy" value={String(expectancy)} color={Number(expectancy) >= 0 ? "text-green-400" : "text-red-400"} />
+          <StatBox label="Profit Factor" value={String(pf)} color="text-yellow-400" />
+        </div>
 
-          <form key={editingTrade?.id || "new"} onSubmit={saveTrade} className="grid gap-4 md:grid-cols-2">
-            <Field label="Trade type">
-              <Select name="trade_source" defaultValue={editingTrade?.trade_source || "Live"} options={["Live", "Backtest", "Demo"]} />
-            </Field>
-
-            <Field label="When did this trade happen?">
-              <input
-                type="datetime-local"
-                name="trade_date"
-                defaultValue={editingTrade?.trade_date ? new Date(editingTrade.trade_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16)}
-                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-              />
-            </Field>
-
-            <Field label="Pair">
-              <Input name="pair" placeholder="e.g. GBPUSD" defaultValue={editingTrade?.pair || ""} />
-            </Field>
-
-            <Field label="Timeframe">
-              <Select name="timeframe" defaultValue={editingTrade?.timeframe || "H1"} options={["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]} />
-            </Field>
-
-            <Field label="Direction">
-              <Select name="direction" defaultValue={editingTrade?.direction || "Buy"} options={["Buy", "Sell"]} />
-            </Field>
-
-            <Field label="Session">
-              <Select name="session" defaultValue={editingTrade?.session || "London"} options={["Asia", "London", "New York", "London-NY Overlap", "Other"]} />
-            </Field>
-
-            <Field label="Strategy">
-              <Input name="strategy" placeholder="e.g. SMC, Breakout" defaultValue={editingTrade?.strategy || ""} />
-            </Field>
-
-            <Field label="Risk : Reward planned">
-              <input
-                type="number"
-                step="any"
-                name="risk_reward"
-                placeholder="e.g. 2.5"
-                defaultValue={editingTrade?.risk_reward ?? ""}
-                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-              />
-            </Field>
-
-            <Field label="Entry price">
-              <input
-                type="number"
-                step="any"
-                name="entry_price"
-                placeholder="e.g. 1.26500"
-                defaultValue={editingTrade?.entry_price ?? ""}
-                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-              />
-            </Field>
-
-            <Field label="Exit price">
-              <input
-                type="number"
-                step="any"
-                name="exit_price"
-                placeholder="e.g. 1.27000"
-                defaultValue={editingTrade?.exit_price ?? ""}
-                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-              />
-            </Field>
-
-            <Field label="Profit / Loss">
-              <input
-                type="number"
-                step="any"
-                name="profit_loss"
-                placeholder="e.g. 150 or -80"
-                defaultValue={editingTrade?.profit_loss ?? ""}
-                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-              />
-            </Field>
-
-            <Field label="Result">
-              <Select name="result" defaultValue={editingTrade?.result || "Win"} options={["Win", "Loss", "Break Even"]} />
-            </Field>
-
-            <Field label="Grade">
-              <Select name="grade" defaultValue={editingTrade?.grade || "A"} options={["A+", "A", "B", "C", "D"]} />
-            </Field>
-
-            <Field label="Emotion">
-              <Select name="emotion" defaultValue={editingTrade?.emotion || "Calm"} options={["Calm", "Confident", "Fear", "Greed", "FOMO", "Revenge", "Impatient"]} />
-            </Field>
-
-            <Field label="Mistake (if any)">
-              <Input name="mistake" placeholder="e.g. Early entry" defaultValue={editingTrade?.mistake || ""} />
-            </Field>
-
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-xs font-semibold text-white/50">Notes</label>
-              <textarea
-                name="notes"
-                defaultValue={editingTrade?.notes || ""}
-                className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500"
-                placeholder="What was your reasoning? What did you see?"
-                rows={4}
-              />
-            </div>
-
-            <Field label="📸 Before entry screenshot">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setImageBefore(e.target.files?.[0] || null)}
-                className="w-full rounded-2xl border border-white/10 bg-black/50 p-3 text-sm text-white"
-              />
-              {editingTrade?.image_url_before && !imageBefore && (
-                <p className="mt-1 text-xs text-white/30">Current image kept unless you pick a new one</p>
-              )}
-            </Field>
-
-            <Field label="📸 After exit screenshot">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setImageAfter(e.target.files?.[0] || null)}
-                className="w-full rounded-2xl border border-white/10 bg-black/50 p-3 text-sm text-white"
-              />
-              {editingTrade?.image_url_after && !imageAfter && (
-                <p className="mt-1 text-xs text-white/30">Current image kept unless you pick a new one</p>
-              )}
-            </Field>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="md:col-span-2 rounded-2xl bg-blue-600 py-4 font-semibold transition hover:bg-blue-700 disabled:opacity-50"
-            >
-              {saving ? "Saving + AI review..." : editingTrade ? "Update Trade" : "Save Trade"}
+        {/* Add manual trade */}
+        <div className="mb-6 rounded-3xl border border-blue-500/20 bg-blue-500/5 p-4">
+          <p className="mb-2 text-sm font-semibold text-blue-300">➕ Add a manual live trade</p>
+          <p className="mb-3 text-xs text-white/30">Use a negative P/L for losses. Win/Loss is set automatically.</p>
+          <div className="grid gap-2 md:grid-cols-6">
+            <input type="datetime-local" value={row.trade_date} onChange={e => setRow({ ...row, trade_date: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-xs text-white outline-none focus:border-blue-500" />
+            <input placeholder="Pair" value={row.pair} onChange={e => setRow({ ...row, pair: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+            <select value={row.direction} onChange={e => setRow({ ...row, direction: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500">
+              <option>Buy</option><option>Sell</option>
+            </select>
+            <select value={row.session} onChange={e => setRow({ ...row, session: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500">
+              <option>Asia</option><option>London</option><option>New York</option><option>London-NY Overlap</option>
+            </select>
+            <select value={row.timeframe} onChange={e => setRow({ ...row, timeframe: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500">
+              <option>M1</option><option>M5</option><option>M15</option><option>M30</option><option>H1</option><option>H4</option><option>D1</option>
+            </select>
+            <select value={row.grade} onChange={e => setRow({ ...row, grade: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500">
+              <option>A+</option><option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+            <input type="number" step="any" placeholder="Entry" value={row.entry_price} onChange={e => setRow({ ...row, entry_price: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+            <input type="number" step="any" placeholder="Exit" value={row.exit_price} onChange={e => setRow({ ...row, exit_price: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+            <input type="number" step="any" placeholder="R:R" value={row.risk_reward} onChange={e => setRow({ ...row, risk_reward: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+            <input type="number" step="any" placeholder="P/L (- for loss)" value={row.profit_loss} onChange={e => setRow({ ...row, profit_loss: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+            <select value={row.emotion} onChange={e => setRow({ ...row, emotion: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500">
+              <option>Calm</option><option>Confident</option><option>Fear</option><option>Greed</option><option>FOMO</option><option>Revenge</option><option>Impatient</option>
+            </select>
+            <button onClick={addRow} disabled={saving} className="rounded-xl bg-blue-600 p-2 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+              {saving ? "..." : "Add +"}
             </button>
-
-            {editingTrade && (
-              <button
-                type="button"
-                onClick={() => { setEditingTrade(null); setImageBefore(null); setImageAfter(null); }}
-                className="md:col-span-2 rounded-2xl bg-white/10 py-4 font-semibold hover:bg-white/20"
-              >
-                Cancel Edit
-              </button>
-            )}
-          </form>
-        </div>
-
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="text-2xl font-semibold">Trade History</h2>
-          <p className="mb-6 text-sm text-white/40">{filteredTrades.length} of {trades.length} trades shown</p>
-
-          <div className="mb-6 grid gap-3 md:grid-cols-5">
-            <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
-              <option>All</option><option>Live</option><option>Backtest</option><option>Demo</option>
-            </select>
-            <input value={pairFilter} onChange={(e) => setPairFilter(e.target.value)} placeholder="Search pair..." className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500" />
-            <select value={resultFilter} onChange={(e) => setResultFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
-              <option>All</option><option>Win</option><option>Loss</option><option>Break Even</option>
-            </select>
-            <select value={strategyFilter} onChange={(e) => setStrategyFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
-              <option>All</option><option>SMC</option><option>Breakout</option><option>Scalping</option>
-            </select>
-            <select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-white outline-none focus:border-blue-500">
-              <option>All</option><option>A+</option><option>A</option><option>B</option><option>C</option><option>D</option>
-            </select>
           </div>
-
-          {filteredTrades.length === 0 ? (
-            <p className="text-white/40">No trades match your filters.</p>
-          ) : (
-            <div className="space-y-4">
-              {filteredTrades.map((trade) => (
-                <div key={trade.id} className="rounded-3xl border border-white/10 bg-black/40 p-4 transition hover:border-white/20">
-                  <div className="flex flex-wrap items-center gap-2 mb-3">
-                    <h3 className="text-xl font-bold">{trade.pair}</h3>
-                    <Badge text={trade.direction || "N/A"} />
-                    <Badge text={trade.timeframe || "—"} />
-                    <Badge text={trade.strategy || "No strategy"} />
-                    <Badge text={trade.grade || "No grade"} />
-                    <Badge text={trade.result} />
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      trade.trade_source === "Backtest" ? "bg-purple-500/20 text-purple-400" :
-                      trade.trade_source === "Demo" ? "bg-yellow-500/20 text-yellow-400" :
-                      "bg-green-500/20 text-green-400"
-                    }`}>{trade.trade_source || "Live"}</span>
-                    <Badge text={`AI ${trade.ai_score ?? "N/A"}`} />
-                  </div>
-
-                  <p className="mb-3 text-xs text-white/30">
-                    {trade.trade_date
-                      ? new Date(trade.trade_date).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Vienna" }) + " CET"
-                      : "No date set"}
-                  </p>
-
-                  <div className="mb-3 grid gap-3 text-sm text-white/50 sm:grid-cols-3">
-                    <p>Session: <span className="text-white">{trade.session}</span></p>
-                    <p>Entry: <span className="text-white">{trade.entry_price ?? "—"}</span></p>
-                    <p>Exit: <span className="text-white">{trade.exit_price ?? "—"}</span></p>
-                    <p>P/L: <span className={trade.profit_loss >= 0 ? "text-green-400" : "text-red-400"}>{trade.profit_loss}</span></p>
-                    <p>R:R: <span className="text-white">{trade.risk_reward ?? "N/A"}</span></p>
-                    <p>Emotion: <span className="text-white">{trade.emotion || "N/A"}</span></p>
-                  </div>
-
-                  {(trade.image_url_before || trade.image_url_after) && (
-                    <div className="mb-3 grid gap-3 sm:grid-cols-2">
-                      {trade.image_url_before && (
-                        <div>
-                          <p className="mb-1 text-xs text-white/40">Before entry</p>
-                          <a href={trade.image_url_before} target="_blank" rel="noopener noreferrer">
-                            <img src={trade.image_url_before} alt="Before" className="h-40 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80" />
-                          </a>
-                        </div>
-                      )}
-                      {trade.image_url_after && (
-                        <div>
-                          <p className="mb-1 text-xs text-white/40">After exit</p>
-                          <a href={trade.image_url_after} target="_blank" rel="noopener noreferrer">
-                            <img src={trade.image_url_after} alt="After" className="h-40 w-full rounded-2xl border border-white/10 object-cover hover:opacity-80" />
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {trade.ai_feedback && (
-                    <p className="mb-3 rounded-2xl bg-blue-500/10 p-3 text-sm text-blue-300">AI: {trade.ai_feedback}</p>
-                  )}
-
-                  {trade.mistake && (
-                    <p className="mb-3 rounded-2xl bg-red-500/10 p-3 text-sm text-red-300">Mistake: {trade.mistake}</p>
-                  )}
-
-                  {trade.notes && (
-                    <p className="mb-3 rounded-2xl bg-white/[0.03] p-3 text-sm text-white/50">{trade.notes}</p>
-                  )}
-
-                  <div className="flex flex-wrap gap-2">
-                    <button onClick={() => router.push(`/journal/trade/${trade.id}`)} className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-400 hover:bg-blue-500/20">View</button>
-                    <button onClick={() => { setEditingTrade(trade); window.scrollTo({ top: 400, behavior: "smooth" }); }} className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-400 hover:bg-yellow-500/20">Edit</button>
-                    <button onClick={() => deleteTrade(trade.id)} className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/20">Delete</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <input placeholder="Mistake (optional) — e.g. entered early" value={row.mistake} onChange={e => setRow({ ...row, mistake: e.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+          <textarea placeholder="Your notes — write freely in any language about what you did right or wrong" value={row.notes} onChange={e => setRow({ ...row, notes: e.target.value })} rows={2} className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 p-2 text-xs text-white/40 hover:border-blue-500">
+              {newBefore ? `✅ Before: ${newBefore.name.slice(0, 20)}` : "📸 Before screenshot (optional)"}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => setNewBefore(e.target.files?.[0] || null)} />
+            </label>
+            <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 p-2 text-xs text-white/40 hover:border-blue-500">
+              {newAfter ? `✅ After: ${newAfter.name.slice(0, 20)}` : "📸 After screenshot (optional)"}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => setNewAfter(e.target.files?.[0] || null)} />
+            </label>
+          </div>
         </div>
+
+        {/* Filters */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <input value={pairFilter} onChange={e => setPairFilter(e.target.value)} placeholder="Filter pair..." className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+          <select value={resultFilter} onChange={e => setResultFilter(e.target.value)} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500">
+            <option>All</option><option>Win</option><option>Loss</option><option>Break Even</option>
+          </select>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500">
+            <option value="date">Sort: Date</option><option value="pl">Sort: P/L</option><option value="pair">Sort: Pair</option>
+          </select>
+        </div>
+
+        {/* Manual table */}
+        <h2 className="mb-3 text-lg font-semibold">✍️ My Manual Trades</h2>
+        {loading ? (
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-40 animate-pulse" />
+        ) : filtered.length === 0 ? (
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-10 text-center">
+            <p className="text-4xl mb-3">📓</p>
+            <p className="text-white/40">No manual trades yet. Add one above.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-3xl border border-white/10 bg-white/[0.04]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-left text-xs text-white/40">
+                  <th className="p-3">Date</th>
+                  <th className="p-3">Pair</th>
+                  <th className="p-3">Dir</th>
+                  <th className="p-3">TF</th>
+                  <th className="p-3">Session</th>
+                  <th className="p-3">Grade</th>
+                  <th className="p-3">Emotion</th>
+                  <th className="p-3">Result</th>
+                  <th className="p-3 text-right">P/L</th>
+                  <th className="p-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((t) => (
+                  <>
+                    <tr key={t.id} className="border-b border-white/5 hover:bg-white/[0.02] cursor-pointer" onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}>
+                      <td className="p-3 text-xs text-white/60">{t.trade_date ? new Date(t.trade_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "—"}</td>
+                      <td className="p-3 font-semibold">{t.pair}</td>
+                      <td className="p-3"><span className={t.direction === "Buy" ? "text-green-400" : "text-red-400"}>{t.direction}</span></td>
+                      <td className="p-3 text-white/50">{t.timeframe || "—"}</td>
+                      <td className="p-3 text-white/50 text-xs">{t.session || "—"}</td>
+                      <td className="p-3"><span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{t.grade || "—"}</span></td>
+                      <td className="p-3 text-white/50 text-xs">{t.emotion || "—"}</td>
+                      <td className="p-3">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.profit_loss > 0 ? "bg-green-500/20 text-green-400" : t.profit_loss < 0 ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white/50"}`}>
+                          {t.profit_loss > 0 ? "Win" : t.profit_loss < 0 ? "Loss" : "BE"}
+                        </span>
+                      </td>
+                      <td className={`p-3 text-right font-bold ${t.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>{t.profit_loss >= 0 ? "+" : ""}{t.profit_loss}</td>
+                      <td className="p-3 text-right"><button onClick={(e) => { e.stopPropagation(); deleteTrade(t.id); }} className="text-xs text-red-400 hover:text-red-300">✕</button></td>
+                    </tr>
+                    {expandedId === t.id && (
+                      <tr key={t.id + "-exp"} className="border-b border-white/5 bg-black/30">
+                        <td colSpan={10} className="p-4">
+                          <div className="mb-3 grid gap-3 text-xs text-white/50 sm:grid-cols-4">
+                            <p>Entry: <span className="text-white">{t.entry_price ?? "—"}</span></p>
+                            <p>Exit: <span className="text-white">{t.exit_price ?? "—"}</span></p>
+                            <p>R:R: <span className="text-white">{t.risk_reward ?? "—"}</span></p>
+                            <p>Session: <span className="text-white">{t.session}</span></p>
+                          </div>
+                          {t.mistake && <p className="mb-3 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">Mistake: {t.mistake}</p>}
+                          {t.notes && <p className="mb-3 rounded-xl bg-white/5 p-3 text-sm text-white/70">📝 {t.notes}</p>}
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <p className="mb-1 text-xs text-white/40">Before entry</p>
+                              {t.image_url_before ? (
+                                <a href={t.image_url_before} target="_blank" rel="noopener noreferrer"><img src={t.image_url_before} alt="Before" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" /></a>
+                              ) : (
+                                <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-blue-500">
+                                  {uploadingId === t.id ? "Uploading..." : "📸 Upload before"}
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRowImage(t.id, f, "before"); }} />
+                                </label>
+                              )}
+                            </div>
+                            <div>
+                              <p className="mb-1 text-xs text-white/40">After exit</p>
+                              {t.image_url_after ? (
+                                <a href={t.image_url_after} target="_blank" rel="noopener noreferrer"><img src={t.image_url_after} alt="After" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" /></a>
+                              ) : (
+                                <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-blue-500">
+                                  {uploadingId === t.id ? "Uploading..." : "📸 Upload after"}
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRowImage(t.id, f, "after"); }} />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </AppShell>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function StatBox({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div>
-      <label className="mb-2 block text-xs font-semibold text-white/50">{label}</label>
-      {children}
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-center">
+      <p className="text-xs text-white/40">{label}</p>
+      <p className={`mt-1 text-lg font-bold ${color || "text-white"}`}>{value}</p>
     </div>
   );
-}
-
-function Input({ name, placeholder, defaultValue }: { name: string; placeholder: string; defaultValue: string | number }) {
-  return <input name={name} defaultValue={defaultValue} className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500" placeholder={placeholder} />;
-}
-
-function Select({ name, defaultValue, options }: { name: string; defaultValue: string; options: string[] }) {
-  return (
-    <select name={name} defaultValue={defaultValue} className="w-full rounded-2xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-blue-500">
-      {options.map((o) => <option key={o}>{o}</option>)}
-    </select>
-  );
-}
-
-function Badge({ text }: { text: string }) {
-  return <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">{text}</span>;
 }
