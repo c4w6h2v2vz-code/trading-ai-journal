@@ -52,6 +52,32 @@ export default function BacktestPage() {
   const [message, setMessage] = useState("");
   const [row, setRow] = useState({ ...emptyRow });
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  async function uploadRowImage(tradeId: string, file: File, which: "before" | "after") {
+    setUploadingId(tradeId);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("trade-screenshots").upload(fileName, file);
+      if (upErr) { setMessage("Upload failed: " + upErr.message); return; }
+
+      const url = supabase.storage.from("trade-screenshots").getPublicUrl(fileName).data.publicUrl;
+      const column = which === "before" ? "image_url_before" : "image_url_after";
+
+      const { error: updErr } = await supabase.from("trades").update({ [column]: url }).eq("id", tradeId).eq("user_id", user.id);
+      if (updErr) { setMessage("Save failed: " + updErr.message); return; }
+
+      setTrades(old => old.map(t => t.id === tradeId ? { ...t, [column]: url } : t));
+      setMessage("Screenshot added ✅");
+    } catch (err) {
+      setMessage("Error: " + String(err));
+    } finally {
+      setUploadingId(null);
+    }
+  }
   const [pairFilter, setPairFilter] = useState("");
   const [resultFilter, setResultFilter] = useState("All");
   const [sortBy, setSortBy] = useState<"date" | "pl" | "pair">("date");
@@ -279,14 +305,34 @@ export default function BacktestPage() {
                       <tr key={t.id + "-exp"} className="border-b border-white/5 bg-black/30">
                         <td colSpan={11} className="p-4">
                           {t.notes && <p className="mb-3 text-sm text-white/60">📝 {t.notes}</p>}
-                          {(t.image_url_before || t.image_url_after) ? (
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              {t.image_url_before && <img src={t.image_url_before} alt="Before" className="h-40 w-full rounded-xl border border-white/10 object-cover" />}
-                              {t.image_url_after && <img src={t.image_url_after} alt="After" className="h-40 w-full rounded-xl border border-white/10 object-cover" />}
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <p className="mb-1 text-xs text-white/40">Before entry</p>
+                              {t.image_url_before ? (
+                                <a href={t.image_url_before} target="_blank" rel="noopener noreferrer">
+                                  <img src={t.image_url_before} alt="Before" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" />
+                                </a>
+                              ) : (
+                                <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-purple-500">
+                                  {uploadingId === t.id ? "Uploading..." : "📸 Click to upload before"}
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRowImage(t.id, f, "before"); }} />
+                                </label>
+                              )}
                             </div>
-                          ) : (
-                            <p className="text-xs text-white/30">No screenshots. Add them in the full Journal if needed.</p>
-                          )}
+                            <div>
+                              <p className="mb-1 text-xs text-white/40">After exit</p>
+                              {t.image_url_after ? (
+                                <a href={t.image_url_after} target="_blank" rel="noopener noreferrer">
+                                  <img src={t.image_url_after} alt="After" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" />
+                                </a>
+                              ) : (
+                                <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-purple-500">
+                                  {uploadingId === t.id ? "Uploading..." : "📸 Click to upload after"}
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRowImage(t.id, f, "after"); }} />
+                                </label>
+                              )}
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     )}
