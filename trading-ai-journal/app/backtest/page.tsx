@@ -51,33 +51,10 @@ export default function BacktestPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [row, setRow] = useState({ ...emptyRow });
+  const [newBefore, setNewBefore] = useState<File | null>(null);
+  const [newAfter, setNewAfter] = useState<File | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
-
-  async function uploadRowImage(tradeId: string, file: File, which: "before" | "after") {
-    setUploadingId(tradeId);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
-      const { error: upErr } = await supabase.storage.from("trade-screenshots").upload(fileName, file);
-      if (upErr) { setMessage("Upload failed: " + upErr.message); return; }
-
-      const url = supabase.storage.from("trade-screenshots").getPublicUrl(fileName).data.publicUrl;
-      const column = which === "before" ? "image_url_before" : "image_url_after";
-
-      const { error: updErr } = await supabase.from("trades").update({ [column]: url }).eq("id", tradeId).eq("user_id", user.id);
-      if (updErr) { setMessage("Save failed: " + updErr.message); return; }
-
-      setTrades(old => old.map(t => t.id === tradeId ? { ...t, [column]: url } : t));
-      setMessage("Screenshot added ✅");
-    } catch (err) {
-      setMessage("Error: " + String(err));
-    } finally {
-      setUploadingId(null);
-    }
-  }
   const [pairFilter, setPairFilter] = useState("");
   const [resultFilter, setResultFilter] = useState("All");
   const [sortBy, setSortBy] = useState<"date" | "pl" | "pair">("date");
@@ -131,16 +108,58 @@ export default function BacktestPage() {
         notes: row.notes || "",
       };
 
-      const { data, error } = await supabase.from("trades").insert([tradeData]).select().single();
+      let beforeUrl = "";
+      let afterUrl = "";
+      if (newBefore) {
+        const fn = `${user.id}/${Date.now()}-b-${newBefore.name}`;
+        const { error: e1 } = await supabase.storage.from("trade-screenshots").upload(fn, newBefore);
+        if (!e1) beforeUrl = supabase.storage.from("trade-screenshots").getPublicUrl(fn).data.publicUrl;
+      }
+      if (newAfter) {
+        const fn = `${user.id}/${Date.now()}-a-${newAfter.name}`;
+        const { error: e2 } = await supabase.storage.from("trade-screenshots").upload(fn, newAfter);
+        if (!e2) afterUrl = supabase.storage.from("trade-screenshots").getPublicUrl(fn).data.publicUrl;
+      }
+
+      const fullTradeData = { ...tradeData, image_url_before: beforeUrl, image_url_after: afterUrl };
+
+      const { data, error } = await supabase.from("trades").insert([fullTradeData]).select().single();
       if (error) { setMessage("Save error: " + error.message); setSaving(false); return; }
 
       setTrades(old => [data as Trade, ...old]);
       setRow({ ...emptyRow, pair: row.pair, direction: row.direction, session: row.session, timeframe: row.timeframe });
+      setNewBefore(null);
+      setNewAfter(null);
       setMessage("Trade added ✅");
     } catch (err) {
       setMessage("Error: " + String(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function uploadRowImage(tradeId: string, file: File, which: "before" | "after") {
+    setUploadingId(tradeId);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("trade-screenshots").upload(fileName, file);
+      if (upErr) { setMessage("Upload failed: " + upErr.message); return; }
+
+      const url = supabase.storage.from("trade-screenshots").getPublicUrl(fileName).data.publicUrl;
+      const column = which === "before" ? "image_url_before" : "image_url_after";
+
+      const { error: updErr } = await supabase.from("trades").update({ [column]: url }).eq("id", tradeId).eq("user_id", user.id);
+      if (updErr) { setMessage("Save failed: " + updErr.message); return; }
+
+      setTrades(old => old.map(t => t.id === tradeId ? { ...t, [column]: url } : t));
+      setMessage("Screenshot added ✅");
+    } catch (err) {
+      setMessage("Error: " + String(err));
+    } finally {
+      setUploadingId(null);
     }
   }
 
@@ -161,7 +180,6 @@ export default function BacktestPage() {
       return new Date(b.trade_date || b.created_at).getTime() - new Date(a.trade_date || a.created_at).getTime();
     });
 
-  // Stats
   const n = trades.length;
   const wins = trades.filter(t => t.profit_loss > 0);
   const losses = trades.filter(t => t.profit_loss < 0);
@@ -195,7 +213,6 @@ export default function BacktestPage() {
           <div className="mb-4 rounded-2xl border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-300">{message}</div>
         )}
 
-        {/* Stats bar */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
           <StatBox label="Trades" value={String(n)} />
           <StatBox label="Win Rate" value={`${winRate}%`} color={Number(winRate) >= 50 ? "text-green-400" : "text-red-400"} />
@@ -204,7 +221,6 @@ export default function BacktestPage() {
           <StatBox label="Profit Factor" value={String(pf)} color="text-yellow-400" />
         </div>
 
-        {/* Add row */}
         <div className="mb-6 rounded-3xl border border-purple-500/20 bg-purple-500/5 p-4">
           <p className="mb-3 text-sm font-semibold text-purple-300">➕ Add a trade</p>
           <div className="grid gap-2 md:grid-cols-6">
@@ -234,9 +250,18 @@ export default function BacktestPage() {
             </button>
           </div>
           <input placeholder="Notes (optional)" value={row.notes} onChange={e => setRow({ ...row, notes: e.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 p-2 text-xs text-white/40 hover:border-purple-500">
+              {newBefore ? `✅ Before: ${newBefore.name.slice(0, 20)}` : "📸 Before screenshot (optional)"}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => setNewBefore(e.target.files?.[0] || null)} />
+            </label>
+            <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 p-2 text-xs text-white/40 hover:border-purple-500">
+              {newAfter ? `✅ After: ${newAfter.name.slice(0, 20)}` : "📸 After screenshot (optional)"}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => setNewAfter(e.target.files?.[0] || null)} />
+            </label>
+          </div>
         </div>
 
-        {/* Filters */}
         <div className="mb-4 flex flex-wrap gap-2">
           <input value={pairFilter} onChange={e => setPairFilter(e.target.value)} placeholder="Filter pair..." className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
           <select value={resultFilter} onChange={e => setResultFilter(e.target.value)} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500">
@@ -249,7 +274,6 @@ export default function BacktestPage() {
           </select>
         </div>
 
-        {/* Table */}
         {loading ? (
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-40 animate-pulse" />
         ) : filtered.length === 0 ? (
