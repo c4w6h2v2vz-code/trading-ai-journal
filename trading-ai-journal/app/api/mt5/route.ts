@@ -20,10 +20,12 @@ export async function POST(request: Request) {
     if (body.event === "closed_trade") {
       // Find user by account number
       // Find which user owns this MT5 account number
+      const cleanAccount = String(body.account || "").trim();
+
       const { data: account, error: accountError } = await supabase
         .from("trading_accounts")
         .select("user_id")
-        .eq("account_number", String(body.account))
+        .eq("account_number", cleanAccount)
         .maybeSingle();
 
       if (accountError) {
