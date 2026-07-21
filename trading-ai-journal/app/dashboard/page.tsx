@@ -30,8 +30,7 @@ export default function DashboardPage() {
       if (!user) { router.push("/login"); return; }
 
       const activeAccount = localStorage.getItem("active_account");
-      const activeAccountNumber = activeAccount ? JSON.parse(activeAccount).account_number : null;
-
+      const activeAccountNumber = activeAccount ? String(JSON.parse(activeAccount).account_number).trim() : null;
       const { data: manualTrades } = await supabase
         .from("trades").select("*").eq("user_id", user.id)
         .eq("trade_source", "Live")
