@@ -42,7 +42,8 @@ export default function CalendarPage() {
         session: "MT5",
         profit_loss: t.profit,
         result: t.profit > 0 ? "Win" : t.profit < 0 ? "Loss" : "Break Even",
-        created_at: t.open_time || new Date().toISOString(),
+        created_at: t.close_time || t.open_time || t.created_at || new Date().toISOString(),
+        trade_date: t.close_time || t.open_time || t.created_at,
       }));
 
       setTrades([...(manualTrades || []), ...mt5Mapped]);
@@ -59,7 +60,7 @@ export default function CalendarPage() {
 
   const profitByDay: Record<string, { profit: number; trades: Trade[] }> = {};
   trades.forEach((trade) => {
-    const date = new Date(trade.created_at);
+    const date = new Date((trade as any).trade_date || trade.created_at);
     if (date.getFullYear() !== year || date.getMonth() !== month) return;
     const key = date.toISOString().slice(0, 10);
     if (!profitByDay[key]) profitByDay[key] = { profit: 0, trades: [] };
