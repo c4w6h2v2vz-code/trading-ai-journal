@@ -71,7 +71,15 @@ function hourCET(iso: string) {
   const d = new Date(iso);
   return d.toLocaleString("en-US", { hour: "2-digit", hour12: false, timeZone: "Europe/Vienna" });
 }
-
+function sessionFromTime(iso: string): string {
+  const hourStr = new Date(iso).toLocaleString("en-US", { hour: "2-digit", hour12: false, timeZone: "Europe/Vienna" });
+  const h = parseInt(hourStr, 10);
+  if (h >= 0 && h < 8) return "Asia";
+  if (h >= 8 && h < 13) return "London";
+  if (h >= 13 && h < 17) return "London-NY Overlap";
+  if (h >= 17 && h < 22) return "New York";
+  return "Asia";
+}
 function dayName(iso: string) {
   return new Date(iso).toLocaleString("en-US", { weekday: "long", timeZone: "Europe/Vienna" });
 }
@@ -99,9 +107,8 @@ export async function POST(request: Request) {
     if (!source || source === "All" || source === "Live") {
       let mt5Query = supabase
         .from("mt5_trades")
-        .select("symbol, trade_type, profit, created_at, account")
+        .select("symbol, trade_type, profit, created_at, close_time, account")
         .eq("user_id", userId);
-
       if (accountNumber) mt5Query = mt5Query.eq("account", accountNumber);
 
       const { data } = await mt5Query;
@@ -110,7 +117,7 @@ export async function POST(request: Request) {
 
     const mt5Mapped: Trade[] = mt5.map((t: any) => ({
       pair: t.symbol,
-      session: null,
+      session: t.close_time ? sessionFromTime(t.close_time) : null,
       strategy: "MT5 Synced",
       direction: t.trade_type === "SELL" ? "Sell" : "Buy",
       grade: null,
@@ -120,7 +127,7 @@ export async function POST(request: Request) {
       profit_loss: Number(t.profit),
       result: Number(t.profit) > 0 ? "Win" : Number(t.profit) < 0 ? "Loss" : "Break Even",
       created_at: t.created_at,
-      trade_date: t.created_at,
+      trade_date: t.close_time || t.created_at,
       timeframe: null,
     }));
 
