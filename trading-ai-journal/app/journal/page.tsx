@@ -41,6 +41,10 @@ type MT5Trade = {
   profit: number;
   close_time: string;
   created_at: string;
+  notes: string | null;
+  mistake: string | null;
+  image_url_before: string | null;
+  image_url_after: string | null;
 };
 
 const emptyRow = {
@@ -71,6 +75,47 @@ export default function JournalPage() {
   const [newAfter, setNewAfter] = useState<File | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [expandedMt5, setExpandedMt5] = useState<number | null>(null);
+  const [mt5Notes, setMt5Notes] = useState("");
+  const [mt5Mistake, setMt5Mistake] = useState("");
+  const [savingMt5, setSavingMt5] = useState(false);
+
+  function openMt5(t: MT5Trade) {
+    if (expandedMt5 === t.id) { setExpandedMt5(null); return; }
+    setExpandedMt5(t.id);
+    setMt5Notes(t.notes || "");
+    setMt5Mistake(t.mistake || "");
+  }
+
+  async function saveMt5Notes(id: number) {
+    setSavingMt5(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("mt5_trades").update({ notes: mt5Notes, mistake: mt5Mistake }).eq("id", id).eq("user_id", user.id);
+    setMt5Trades(old => old.map(t => t.id === id ? { ...t, notes: mt5Notes, mistake: mt5Mistake } : t));
+    setSavingMt5(false);
+    setMessage("Notes saved ✅");
+  }
+
+  async function uploadMt5Image(id: number, file: File, which: "before" | "after") {
+    setUploadingId("mt5-" + id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const fn = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("trade-screenshots").upload(fn, file);
+      if (upErr) { setMessage("Upload failed: " + upErr.message); return; }
+      const url = supabase.storage.from("trade-screenshots").getPublicUrl(fn).data.publicUrl;
+      const column = which === "before" ? "image_url_before" : "image_url_after";
+      await supabase.from("mt5_trades").update({ [column]: url }).eq("id", id).eq("user_id", user.id);
+      setMt5Trades(old => old.map(t => t.id === id ? { ...t, [column]: url } : t));
+      setMessage("Screenshot added ✅");
+    } catch (err) {
+      setMessage("Error: " + String(err));
+    } finally {
+      setUploadingId(null);
+    }
+  }
   const [pairFilter, setPairFilter] = useState("");
   const [resultFilter, setResultFilter] = useState("All");
   const [sortBy, setSortBy] = useState<"date" | "pl" | "pair">("date");
@@ -259,15 +304,55 @@ export default function JournalPage() {
                 </thead>
                 <tbody>
                   {mt5Trades.map((t) => (
-                    <tr key={t.id} className="border-b border-white/5">
-                      <td className="p-3 text-xs text-white/50">{t.close_time || "—"}</td>
-                      <td className="p-3 font-semibold">{t.symbol}</td>
-                      <td className="p-3"><span className={t.trade_type === "BUY" ? "text-green-400" : "text-red-400"}>{t.trade_type}</span></td>
-                      <td className="p-3 text-white/50">{t.lot_size}</td>
-                      <td className="p-3 text-white/50">{t.entry_price}</td>
-                      <td className="p-3 text-white/50">{t.exit_price}</td>
-                      <td className={`p-3 text-right font-bold ${t.profit >= 0 ? "text-green-400" : "text-red-400"}`}>{t.profit >= 0 ? "+" : ""}{t.profit}</td>
-                    </tr>
+                    <>
+                      <tr key={t.id} className="border-b border-white/5 hover:bg-white/[0.02] cursor-pointer" onClick={() => openMt5(t)}>
+                        <td className="p-3 text-xs text-white/50">
+                          {(t.notes || t.image_url_before || t.image_url_after) && <span className="mr-1">📝</span>}
+                          {t.close_time || "—"}
+                        </td>
+                        <td className="p-3 font-semibold">{t.symbol}</td>
+                        <td className="p-3"><span className={t.trade_type === "BUY" ? "text-green-400" : "text-red-400"}>{t.trade_type}</span></td>
+                        <td className="p-3 text-white/50">{t.lot_size}</td>
+                        <td className="p-3 text-white/50">{t.entry_price}</td>
+                        <td className="p-3 text-white/50">{t.exit_price}</td>
+                        <td className={`p-3 text-right font-bold ${t.profit >= 0 ? "text-green-400" : "text-red-400"}`}>{t.profit >= 0 ? "+" : ""}{t.profit}</td>
+                      </tr>
+                      {expandedMt5 === t.id && (
+                        <tr key={t.id + "-exp"} className="border-b border-white/5 bg-black/30">
+                          <td colSpan={7} className="p-4">
+                            <input placeholder="Mistake (optional)" value={mt5Mistake} onChange={e => setMt5Mistake(e.target.value)} className="mb-2 w-full rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+                            <textarea placeholder="Your notes — write freely in any language" value={mt5Notes} onChange={e => setMt5Notes(e.target.value)} rows={3} className="mb-2 w-full rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-blue-500" />
+                            <button onClick={() => saveMt5Notes(t.id)} disabled={savingMt5} className="mb-3 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                              {savingMt5 ? "Saving..." : "Save Notes"}
+                            </button>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div>
+                                <p className="mb-1 text-xs text-white/40">Before entry</p>
+                                {t.image_url_before ? (
+                                  <a href={t.image_url_before} target="_blank" rel="noopener noreferrer"><img src={t.image_url_before} alt="Before" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" /></a>
+                                ) : (
+                                  <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-blue-500">
+                                    {uploadingId === "mt5-" + t.id ? "Uploading..." : "📸 Upload before"}
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMt5Image(t.id, f, "before"); }} />
+                                  </label>
+                                )}
+                              </div>
+                              <div>
+                                <p className="mb-1 text-xs text-white/40">After exit</p>
+                                {t.image_url_after ? (
+                                  <a href={t.image_url_after} target="_blank" rel="noopener noreferrer"><img src={t.image_url_after} alt="After" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" /></a>
+                                ) : (
+                                  <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-blue-500">
+                                    {uploadingId === "mt5-" + t.id ? "Uploading..." : "📸 Upload after"}
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMt5Image(t.id, f, "after"); }} />
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
