@@ -90,7 +90,7 @@ export default function JournalPage() {
     else setTrades(data || []);
 
     const activeAccount = localStorage.getItem("active_account");
-    const acctNum = activeAccount ? JSON.parse(activeAccount).account_number : null;
+    const acctNum = activeAccount ? String(JSON.parse(activeAccount).account_number).trim() : null;
     let q = supabase.from("mt5_trades").select("*").eq("user_id", user.id);
     if (acctNum) q = q.eq("account", acctNum);
     const { data: mt5 } = await q.order("created_at", { ascending: false });
