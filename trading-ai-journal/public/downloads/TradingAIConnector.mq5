@@ -1,7 +1,9 @@
 #property strict
-input string ApiUrl = "https://piptrak.com/api/mt5";
+
+input string ApiUrl = "https://www.piptrak.com/api/mt5";
 input string SecretKey = "jama-ftmo-mt5-2026";
 input double DailyLossLimitPercent = 3.0;
+input bool UseRemoteSettings = true;
 input bool EnableProfitLock = false;
 input double DailyProfitTargetPercent = 10.0;
 input bool EnableAutoClose = true;
@@ -9,14 +11,21 @@ input int SignalCheckInterval = 30;
 
 double startOfDayBalance = 0;
 bool tradingBlocked = false;
+double activeLossLimit = 3.0;
+bool guardianEnabled = true;
+datetime lastSettingsFetch = 0;
 
 int OnInit()
 {
-   Print("TradingAIConnector started with Risk Guardian");
+   Print("=== TradingAIConnector v2 STARTED ===");
+   Print("Account: ", AccountInfoInteger(ACCOUNT_LOGIN));
    startOfDayBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+   activeLossLimit = DailyLossLimitPercent;
    EventSetTimer(SignalCheckInterval);
-   Print("Timer set for ", SignalCheckInterval, " seconds - signals check active");
+
+   if (UseRemoteSettings) FetchSettings();
    ScanHistory();
+
    return(INIT_SUCCEEDED);
 }
 
@@ -26,23 +35,68 @@ void OnDeinit(const int reason)
    Print("TradingAIConnector stopped");
 }
 
+void FetchSettings()
+{
+   char result[];
+   string resultHeaders;
+   char postData[];
+
+   string url = ApiUrl + "/settings?account=" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN));
+
+   int status = WebRequest("GET", url, "x-mt5-secret: " + SecretKey + "\r\n", 5000, postData, result, resultHeaders);
+
+   if (status != 200)
+   {
+      Print("Settings fetch FAILED, status: ", status, " - using local limit: ", DailyLossLimitPercent, "%");
+      return;
+   }
+
+   string response = CharArrayToString(result);
+
+   int limStart = StringFind(response, "\"daily_loss_limit\":");
+   if (limStart >= 0)
+   {
+      limStart += 19;
+      int limEnd = StringFind(response, ",", limStart);
+      if (limEnd < 0) limEnd = StringFind(response, "}", limStart);
+      double remoteLimit = StringToDouble(StringSubstr(response, limStart, limEnd - limStart));
+      if (remoteLimit > 0 && remoteLimit <= 50) activeLossLimit = remoteLimit;
+   }
+
+   int enStart = StringFind(response, "\"risk_guardian_enabled\":");
+   if (enStart >= 0)
+   {
+      enStart += 24;
+      guardianEnabled = (StringFind(StringSubstr(response, enStart, 6), "true") >= 0);
+   }
+
+   Print(">>> Settings synced from PipTrak - Loss limit: ", activeLossLimit, "% | Guardian: ", guardianEnabled ? "ON" : "OFF");
+   lastSettingsFetch = TimeCurrent();
+}
+
 void OnTimer()
 {
+   if (UseRemoteSettings && TimeCurrent() - lastSettingsFetch >= 60)
+      FetchSettings();
+
    CheckForSignals();
 }
 
 void OnTick()
 {
    if (!EnableAutoClose) return;
+   if (UseRemoteSettings && !guardianEnabled) return;
 
    double currentEquity = AccountInfoDouble(ACCOUNT_EQUITY);
    double dailyPL = currentEquity - startOfDayBalance;
    double dailyPLPercent = (dailyPL / startOfDayBalance) * 100;
 
-   if (dailyPLPercent <= -DailyLossLimitPercent && !tradingBlocked)
+   double limitToUse = UseRemoteSettings ? activeLossLimit : DailyLossLimitPercent;
+
+   if (dailyPLPercent <= -limitToUse && !tradingBlocked)
    {
       tradingBlocked = true;
-      Print("DAILY LOSS LIMIT REACHED: ", dailyPLPercent, "% - Closing all trades!");
+      Print("DAILY LOSS LIMIT HIT: ", dailyPLPercent, "% (limit ", limitToUse, "%) - Closing all!");
       CloseAllTrades();
       SendAlert(dailyPLPercent, "loss_limit");
    }
@@ -50,7 +104,7 @@ void OnTick()
    if (EnableProfitLock && dailyPLPercent >= DailyProfitTargetPercent && !tradingBlocked)
    {
       tradingBlocked = true;
-      Print("DAILY PROFIT TARGET REACHED: ", dailyPLPercent, "% - Locking profits!");
+      Print("PROFIT TARGET HIT: ", dailyPLPercent, "% - Locking profits!");
       CloseAllTrades();
       SendAlert(dailyPLPercent, "profit_target");
    }
@@ -66,15 +120,7 @@ void CheckForSignals()
 
    string url = ApiUrl + "/signals?account=" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN));
 
-   int status = WebRequest(
-      "GET",
-      url,
-      "x-mt5-secret: " + SecretKey + "\r\n",
-      5000,
-      postData,
-      result,
-      resultHeaders
-   );
+   int status = WebRequest("GET", url, "x-mt5-secret: " + SecretKey + "\r\n", 5000, postData, result, resultHeaders);
 
    if (status != 200) return;
 
@@ -103,7 +149,7 @@ void CheckForSignals()
 
    if (symbol == "" || lot <= 0) return;
 
-   Print("Signal received: ", tradeType, " ", symbol, " Lot:", lot, " SL:", slPips, " TP:", tpPips);
+   Print("Signal received: ", tradeType, " ", symbol, " Lot:", lot);
    ExecuteTrade(symbol, tradeType, lot, slPips, tpPips);
 }
 
@@ -139,7 +185,7 @@ void ExecuteTrade(string symbol, string type, double lot, double slPips, double 
    }
 
    bool sent = OrderSend(request, result);
-   Print("Trade executed: ", sent, " RetCode: ", result.retcode, " Deal: ", result.deal);
+   Print("Trade executed: ", sent, " RetCode: ", result.retcode);
 }
 
 void CloseAllTrades()
@@ -161,7 +207,6 @@ void CloseAllTrades()
          ? SymbolInfoDouble(request.symbol, SYMBOL_BID)
          : SymbolInfoDouble(request.symbol, SYMBOL_ASK);
       request.deviation = 10;
-      request.magic = 0;
       request.comment = "RiskGuardian";
 
       OrderSend(request, result);
@@ -199,8 +244,9 @@ void ScanHistory()
 {
    HistorySelect(0, TimeCurrent());
    int total = HistoryDealsTotal();
-   Print("Scanning ", total, " deals in history...");
+   Print(">>> Scanning ", total, " deals in history...");
 
+   int sent = 0;
    for(int i = 0; i < total; i++)
    {
       ulong deal = HistoryDealGetTicket(i);
@@ -235,8 +281,9 @@ void ScanHistory()
       }
 
       SendTrade(deal, symbol, profit, volume, exitPrice, closeTime, entryPrice, openTime, tradeType);
+      sent++;
    }
-   Print("History scan complete.");
+   Print(">>> History scan complete. Sent ", sent, " closed trades.");
 }
 
 void OnTradeTransaction(
@@ -318,14 +365,6 @@ void SendJson(string json)
    string headers =
       "Content-Type: application/json\r\n"
       "x-mt5-secret: " + SecretKey + "\r\n";
-   int status = WebRequest(
-      "POST",
-      ApiUrl,
-      headers,
-      10000,
-      postData,
-      result,
-      resultHeaders
-   );
-   Print("Status: ", status, " Response: ", CharArrayToString(result));
+   int status = WebRequest("POST", ApiUrl, headers, 10000, postData, result, resultHeaders);
+   Print("Sent trade -> Status: ", status);
 }
