@@ -71,6 +71,7 @@ function hourCET(iso: string) {
   const d = new Date(iso);
   return d.toLocaleString("en-US", { hour: "2-digit", hour12: false, timeZone: "Europe/Vienna" });
 }
+
 function sessionFromTime(iso: string): string {
   const hourStr = new Date(iso).toLocaleString("en-US", { hour: "2-digit", hour12: false, timeZone: "Europe/Vienna" });
   const h = parseInt(hourStr, 10);
@@ -80,6 +81,7 @@ function sessionFromTime(iso: string): string {
   if (h >= 17 && h < 22) return "New York";
   return "Asia";
 }
+
 function dayName(iso: string) {
   return new Date(iso).toLocaleString("en-US", { weekday: "long", timeZone: "Europe/Vienna" });
 }
@@ -109,7 +111,8 @@ export async function POST(request: Request) {
         .from("mt5_trades")
         .select("symbol, trade_type, profit, created_at, close_time, account")
         .eq("user_id", userId);
-      if (accountNumber) mt5Query = mt5Query.eq("account", accountNumber);
+
+      if (accountNumber) mt5Query = mt5Query.eq("account", String(accountNumber).trim());
 
       const { data } = await mt5Query;
       mt5 = data || [];
@@ -219,7 +222,8 @@ ABSOLUTE RULES:
 4. Be direct and honest. If the data shows they are losing money, say it plainly.
 5. Never use the word "guaranteed". Never promise future results.
 6. If the overall sample is under 30 trades, lead by saying the analysis is preliminary.
-7. If the data source filter is "Backtest", note that backtest results measure the setup, not real trading psychology, since the trader knew no real money was at risk.`,
+7. If the data source filter is "Backtest", note that backtest results measure the setup, not real trading psychology, since the trader knew no real money was at risk.
+8. MT5-synced trades don't have emotion, grade, or planned R:R logged — if those breakdowns are sparse, note that the trader should log more detail manually.`,
           },
           {
             role: "user",

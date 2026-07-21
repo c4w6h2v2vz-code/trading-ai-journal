@@ -74,7 +74,7 @@ export default function EdgeFinderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          accountNumber: activeAccount?.account_number || null,
+          accountNumber: activeAccount?.account_number ? String(activeAccount.account_number).trim() : null,
           source,
         }),
       });
