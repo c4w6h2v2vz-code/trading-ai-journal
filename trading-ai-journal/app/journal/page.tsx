@@ -258,7 +258,16 @@ async function deleteMt5Image(id: number, which: "before" | "after") {
       if (sortBy === "pair") return a.pair.localeCompare(b.pair);
       return new Date(b.trade_date || b.created_at).getTime() - new Date(a.trade_date || a.created_at).getTime();
     });
-
+// MT5 synced stats
+  const mtN = mt5Trades.length;
+  const mtWins = mt5Trades.filter(t => t.profit > 0);
+  const mtLosses = mt5Trades.filter(t => t.profit < 0);
+  const mtTotalPL = mt5Trades.reduce((s, t) => s + Number(t.profit), 0);
+  const mtWinRate = mtN > 0 ? ((mtWins.length / mtN) * 100).toFixed(1) : "0";
+  const mtGrossWin = mtWins.reduce((s, t) => s + Number(t.profit), 0);
+  const mtGrossLoss = Math.abs(mtLosses.reduce((s, t) => s + Number(t.profit), 0));
+  const mtPF = mtGrossLoss > 0 ? (mtGrossWin / mtGrossLoss).toFixed(2) : (mtGrossWin > 0 ? "∞" : "0");
+  const mtExpectancy = mtN > 0 ? (mtTotalPL / mtN).toFixed(2) : "0";
   const n = trades.length;
   const wins = trades.filter(t => t.profit_loss > 0);
   const losses = trades.filter(t => t.profit_loss < 0);
@@ -292,6 +301,15 @@ async function deleteMt5Image(id: number, which: "before" | "after") {
         {/* MT5 Synced Section */}
         <div className="mb-8">
           <h2 className="mb-3 text-lg font-semibold">🔌 Synced from MT5 <span className="text-sm font-normal text-white/40">({mt5Trades.length})</span></h2>
+          {mt5Trades.length > 0 && (
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <StatBox label="Live Trades" value={String(mtN)} />
+              <StatBox label="Win Rate" value={`${mtWinRate}%`} color={Number(mtWinRate) >= 50 ? "text-green-400" : "text-red-400"} />
+              <StatBox label="Total P/L" value={String(mtTotalPL.toFixed(2))} color={mtTotalPL >= 0 ? "text-green-400" : "text-red-400"} />
+              <StatBox label="Expectancy" value={String(mtExpectancy)} color={Number(mtExpectancy) >= 0 ? "text-green-400" : "text-red-400"} />
+              <StatBox label="Profit Factor" value={String(mtPF)} color="text-yellow-400" />
+            </div>
+          )}
           {mt5Trades.length === 0 ? (
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-sm text-white/40">
               No trades synced yet. Once your MT5 EA is connected and you close a trade, it appears here automatically.
