@@ -80,13 +80,14 @@ export default function PropFirmPage() {
 
       const { data: mt5 } = await supabase
         .from("mt5_trades")
-        .select("profit, created_at")
+        .select("profit, created_at, close_time")
         .eq("user_id", user.id)
         .eq("account", accountNumber);
 
       const mt5Mapped = (mt5 || []).map(t => ({
         profit_loss: t.profit,
         created_at: t.created_at,
+        trade_date: t.close_time || t.created_at,
       }));
 
       setTrades([...(manual || []), ...mt5Mapped]);
@@ -208,7 +209,7 @@ export default function PropFirmPage() {
 
   const today = new Date().toDateString();
   const todayPL = trades
-    .filter(t => new Date(t.created_at).toDateString() === today)
+    .filter(t => new Date(t.trade_date || t.created_at).toDateString() === today)
     .reduce((sum, t) => sum + Number(t.profit_loss), 0);
 
   const endDate = new Date(startDate);
