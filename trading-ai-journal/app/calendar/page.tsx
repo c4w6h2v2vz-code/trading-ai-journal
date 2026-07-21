@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import AppShell from "@/components/AppShell";
 import { supabase } from "@/lib/supabase";
+import AppShell from "@/components/AppShell";
 
 type Trade = {
   id: string;
@@ -12,12 +12,26 @@ type Trade = {
   profit_loss: number;
   result: string;
   created_at: string;
+  trade_date?: string | null;
 };
+
+// Build a YYYY-MM-DD key using LOCAL date (not UTC) to avoid timezone day-shift
+function localKey(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default function CalendarPage() {
   const router = useRouter();
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
 
   useEffect(() => {
     async function loadTrades() {
@@ -28,41 +42,50 @@ export default function CalendarPage() {
         .from("trades")
         .select("*")
         .eq("user_id", user.id)
+        .eq("trade_source", "Live")
         .order("created_at", { ascending: true });
 
-      const { data: mt5Data } = await supabase
-        .from("mt5_trades")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
+      const activeAccount = localStorage.getItem("active_account");
+      const acctNum = activeAccount ? String(JSON.parse(activeAccount).account_number).trim() : null;
 
-      const mt5Mapped = (mt5Data || []).map((t) => ({
+      let mt5Query = supabase.from("mt5_trades").select("*").eq("user_id", user.id);
+      if (acctNum) mt5Query = mt5Query.eq("account", acctNum);
+      const { data: mt5 } = await mt5Query.order("created_at", { ascending: true });
+
+      const manualMapped: Trade[] = (manualTrades || []).map((t: any) => ({
         id: String(t.id),
-        pair: t.symbol,
-        session: "MT5",
-        profit_loss: t.profit,
-        result: t.profit > 0 ? "Win" : t.profit < 0 ? "Loss" : "Break Even",
-        created_at: t.close_time || t.open_time || t.created_at || new Date().toISOString(),
-        trade_date: t.close_time || t.open_time || t.created_at,
+        pair: t.pair,
+        session: t.session || "Manual",
+        profit_loss: Number(t.profit_loss),
+        result: t.result,
+        created_at: t.created_at,
+        trade_date: t.trade_date || t.created_at,
       }));
 
-      setTrades([...(manualTrades || []), ...mt5Mapped]);
+      const mt5Mapped: Trade[] = (mt5 || []).map((t: any) => ({
+        id: "mt5-" + t.id,
+        pair: t.symbol,
+        session: "MT5",
+        profit_loss: Number(t.profit),
+        result: t.profit > 0 ? "Win" : t.profit < 0 ? "Loss" : "Break Even",
+        created_at: t.created_at,
+        trade_date: t.close_time || t.created_at,
+      }));
+
+      setTrades([...manualMapped, ...mt5Mapped]);
+      setLoading(false);
     }
     loadTrades();
   }, []);
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  const firstDay = new Date(year, month, 1).getDay();
-  const totalDays = new Date(year, month + 1, 0).getDate();
-
+  // Group by real local date
   const profitByDay: Record<string, { profit: number; trades: Trade[] }> = {};
   trades.forEach((trade) => {
-    const date = new Date((trade as any).trade_date || trade.created_at);
+    const raw = trade.trade_date || trade.created_at;
+    const date = new Date(raw);
+    if (isNaN(date.getTime())) return;
     if (date.getFullYear() !== year || date.getMonth() !== month) return;
-    const key = date.toISOString().slice(0, 10);
+    const key = localKey(date);
     if (!profitByDay[key]) profitByDay[key] = { profit: 0, trades: [] };
     profitByDay[key].profit += Number(trade.profit_loss);
     profitByDay[key].trades.push(trade);
@@ -70,95 +93,125 @@ export default function CalendarPage() {
 
   const selectedDayTrades = selectedDay ? (profitByDay[selectedDay]?.trades || []) : [];
 
-  const monthName = now.toLocaleString("default", { month: "long", year: "numeric" });
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = new Date(year, month, 1).getDay(); // 0 = Sunday
+  const monthName = new Date(year, month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const todayKey = localKey(new Date());
+
+  function prevMonth() {
+    setSelectedDay(null);
+    if (month === 0) { setMonth(11); setYear(year - 1); } else setMonth(month - 1);
+  }
+  function nextMonth() {
+    setSelectedDay(null);
+    if (month === 11) { setMonth(0); setYear(year + 1); } else setMonth(month + 1);
+  }
+
+  // Month total
+  const monthTotal = Object.values(profitByDay).reduce((s, d) => s + d.profit, 0);
+
+  if (loading) return (
+    <AppShell>
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <div className="h-96 animate-pulse rounded-2xl bg-white/[0.04]" />
+      </div>
+    </AppShell>
+  );
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <div className="mb-6">
-          <p className="mb-3 w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
-            Trading Calendar
-          </p>
-          <h1 className="text-3xl font-bold">{monthName}</h1>
-          <p className="mt-2 text-sm text-white/40">Tap a day to see your trades.</p>
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <div className="mb-6 flex items-end justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-blue-400">Calendar</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Trading Calendar</h1>
+            <p className="mt-1 text-sm text-white/40">Tap a day to see your trades.</p>
+          </div>
+          <div className={`rounded-2xl border px-4 py-2 text-right ${monthTotal >= 0 ? "border-emerald-500/20 bg-emerald-500/[0.07]" : "border-red-500/20 bg-red-500/[0.07]"}`}>
+            <p className="text-xs text-white/40">Month P/L</p>
+            <p className={`text-lg font-semibold tabular-nums ${monthTotal >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {monthTotal >= 0 ? "+" : "-"}${Math.abs(monthTotal).toFixed(0)}
+            </p>
+          </div>
         </div>
 
-        {/* Calendar grid */}
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-          {/* Day headers */}
-          <div className="mb-2 grid grid-cols-7 text-center">
-            {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-              <div key={i} className="py-1 text-xs text-white/30">{d}</div>
-            ))}
-          </div>
+        {/* Month nav */}
+        <div className="mb-4 flex items-center justify-between">
+          <button onClick={prevMonth} className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm hover:bg-white/[0.06]">← Prev</button>
+          <h2 className="text-lg font-semibold">{monthName}</h2>
+          <button onClick={nextMonth} className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm hover:bg-white/[0.06]">Next →</button>
+        </div>
 
-          {/* Days grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {/* Empty cells */}
-            {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`empty-${i}`} />
-            ))}
+        {/* Weekday headers */}
+        <div className="mb-2 grid grid-cols-7 gap-2">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+            <div key={d} className="text-center text-xs font-medium text-white/30">{d}</div>
+          ))}
+        </div>
 
-            {/* Day cells */}
-            {Array.from({ length: totalDays }).map((_, i) => {
-              const day = i + 1;
-              const date = new Date(year, month, day).toISOString().slice(0, 10);
-              const data = profitByDay[date];
-              const isSelected = selectedDay === date;
+        {/* Day grid */}
+        <div className="grid grid-cols-7 gap-2">
+          {Array.from({ length: firstWeekday }).map((_, i) => (
+            <div key={"empty-" + i} />
+          ))}
+          {Array.from({ length: totalDays }).map((_, i) => {
+            const day = i + 1;
+            const key = localKey(new Date(year, month, day));
+            const dayData = profitByDay[key];
+            const hasTrades = !!dayData;
+            const profit = dayData?.profit || 0;
+            const isSelected = selectedDay === key;
+            const isToday = key === todayKey;
 
-              return (
-                <button
-                  key={date}
-                  onClick={() => setSelectedDay(isSelected ? null : date)}
-                  className={`flex flex-col items-center justify-start rounded-xl p-1 py-2 transition ${
-                    isSelected
-                      ? "ring-2 ring-blue-500 bg-blue-500/10"
-                      : data
-                      ? data.profit > 0
-                        ? "bg-green-500/10 border border-green-500/20 hover:bg-green-500/20"
-                        : "bg-red-500/10 border border-red-500/20 hover:bg-red-500/20"
-                      : "bg-white/[0.02] border border-white/5"
-                  }`}
-                >
-                  <span className="text-xs text-white/50">{day}</span>
-                  {data && (
-                    <span className={`text-xs font-bold mt-1 ${
-                      data.profit > 0 ? "text-green-400" : "text-red-400"
-                    }`}>
-                      {data.profit > 0 ? "+" : ""}{data.profit.toFixed(0)}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+            return (
+              <button
+                key={key}
+                onClick={() => setSelectedDay(isSelected ? null : key)}
+                className={`flex aspect-square flex-col items-center justify-center rounded-xl border p-1 transition ${
+                  isSelected ? "border-blue-500 bg-blue-500/10" :
+                  hasTrades
+                    ? profit >= 0 ? "border-emerald-500/20 bg-emerald-500/[0.06]" : "border-red-500/20 bg-red-500/[0.06]"
+                    : "border-white/[0.06] bg-white/[0.02]"
+                } ${isToday ? "ring-1 ring-blue-400" : ""}`}
+              >
+                <span className={`text-sm font-medium ${isToday ? "text-blue-400" : "text-white/70"}`}>{day}</span>
+                {hasTrades && (
+                  <span className={`text-[10px] font-semibold tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {profit >= 0 ? "+" : ""}{profit.toFixed(0)}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Selected day trades */}
         {selectedDay && (
-          <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-            <h2 className="mb-4 text-lg font-semibold">
-              {new Date(selectedDay).toLocaleDateString("en-US", {
-                weekday: "long", month: "long", day: "numeric"
-              })}
-            </h2>
-
+          <div className="mt-6">
+            <h3 className="mb-3 text-sm font-semibold text-white/80">
+              {new Date(selectedDay + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </h3>
             {selectedDayTrades.length === 0 ? (
-              <p className="text-white/40">No trades on this day.</p>
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-center text-sm text-white/40">
+                No trades on this day.
+              </div>
             ) : (
-              <div className="space-y-3">
-                {selectedDayTrades.map((trade) => (
-                  <div key={trade.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <div>
-                      <p className="font-semibold">{trade.pair}</p>
-                      <p className="text-sm text-white/40">{trade.session}</p>
+              <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+                {selectedDayTrades.map((trade, i) => (
+                  <div key={trade.id} className={`flex items-center justify-between px-4 py-3 ${i !== selectedDayTrades.length - 1 ? "border-b border-white/[0.04]" : ""}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-xs font-semibold text-white/60">
+                        {trade.pair?.slice(0, 3) || "—"}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{trade.pair}</p>
+                        <p className="text-xs text-white/30">{trade.session === "MT5" ? "Synced" : trade.session}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className={`font-bold ${trade.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                        ${trade.profit_loss}
-                      </p>
-                      <p className="text-sm text-white/40">{trade.result}</p>
-                    </div>
+                    <p className={`text-sm font-semibold tabular-nums ${trade.profit_loss >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {trade.profit_loss >= 0 ? "+" : "-"}${Math.abs(trade.profit_loss).toFixed(2)}
+                    </p>
                   </div>
                 ))}
               </div>
