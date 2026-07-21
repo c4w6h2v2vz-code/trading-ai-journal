@@ -96,7 +96,15 @@ export default function JournalPage() {
     setSavingMt5(false);
     setMessage("Notes saved ✅");
   }
-
+async function deleteMt5Image(id: number, which: "before" | "after") {
+    if (!confirm("Remove this screenshot?")) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const column = which === "before" ? "image_url_before" : "image_url_after";
+    await supabase.from("mt5_trades").update({ [column]: null }).eq("id", id).eq("user_id", user.id);
+    setMt5Trades(old => old.map(t => t.id === id ? { ...t, [column]: null } : t));
+    setMessage("Screenshot removed ✅");
+  }
   async function uploadMt5Image(id: number, file: File, which: "before" | "after") {
     setUploadingId("mt5-" + id);
     try {
@@ -329,7 +337,10 @@ export default function JournalPage() {
                               <div>
                                 <p className="mb-1 text-xs text-white/40">Before entry</p>
                                 {t.image_url_before ? (
-                                  <a href={t.image_url_before} target="_blank" rel="noopener noreferrer"><img src={t.image_url_before} alt="Before" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" /></a>
+                                  <div className="relative">
+                                    <a href={t.image_url_before} target="_blank" rel="noopener noreferrer"><img src={t.image_url_before} alt="Before" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" /></a>
+                                    <button onClick={() => deleteMt5Image(t.id, "before")} className="absolute top-2 right-2 rounded-full bg-black/70 px-2 py-1 text-xs text-red-400 hover:bg-black">✕ Remove</button>
+                                  </div>
                                 ) : (
                                   <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-blue-500">
                                     {uploadingId === "mt5-" + t.id ? "Uploading..." : "📸 Upload before"}
@@ -340,7 +351,10 @@ export default function JournalPage() {
                               <div>
                                 <p className="mb-1 text-xs text-white/40">After exit</p>
                                 {t.image_url_after ? (
-                                  <a href={t.image_url_after} target="_blank" rel="noopener noreferrer"><img src={t.image_url_after} alt="After" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" /></a>
+                                  <div className="relative">
+                                    <a href={t.image_url_after} target="_blank" rel="noopener noreferrer"><img src={t.image_url_after} alt="After" className="h-40 w-full rounded-xl border border-white/10 object-cover hover:opacity-80" /></a>
+                                    <button onClick={() => deleteMt5Image(t.id, "after")} className="absolute top-2 right-2 rounded-full bg-black/70 px-2 py-1 text-xs text-red-400 hover:bg-black">✕ Remove</button>
+                                  </div>
                                 ) : (
                                   <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-blue-500">
                                     {uploadingId === "mt5-" + t.id ? "Uploading..." : "📸 Upload after"}
