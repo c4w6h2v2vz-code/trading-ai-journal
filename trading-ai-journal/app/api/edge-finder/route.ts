@@ -88,7 +88,7 @@ function dayName(iso: string) {
 
 export async function POST(request: Request) {
   try {
-    const { userId, accountNumber, source, lang } = await request.json();
+    const { userId, accountNumber, source } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 });
@@ -205,10 +205,6 @@ ${fmt("BY TIMEFRAME", byTimeframe)}
 ${mistakeCost.length > 0 ? "MOST COSTLY MISTAKES:\n" + mistakeCost.map(m => `  ${m.key} — ${m.trades} trades, cost ${m.total_pl}`).join("\n") : "MISTAKES: none logged"}
 `.trim();
 
-    const langInstruction = lang === "so"
-      ? `\n\nIMPORTANT: Write ALL text values in your JSON response in SOMALI (Af-Soomaali). Keep the JSON keys in English, but every value the user reads (headline, findings, insights, next_steps, warnings, etc.) must be in clear, simple Somali. Keep trading terms like "pip", "R:R", "profit factor", "win rate" as-is since traders know them, but explain everything else in Somali. Do NOT invent any numbers — only translate the meaning.`
-      : "";
-
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
@@ -227,7 +223,7 @@ ABSOLUTE RULES:
 5. Never use the word "guaranteed". Never promise future results.
 6. If the overall sample is under 30 trades, lead by saying the analysis is preliminary.
 7. If the data source filter is "Backtest", note that backtest results measure the setup, not real trading psychology, since the trader knew no real money was at risk.
-8. MT5-synced trades don't have emotion, grade, or planned R:R logged — if those breakdowns are sparse, note that the trader should log more detail manually.${langInstruction}`,
+8. MT5-synced trades don't have emotion, grade, or planned R:R logged — if those breakdowns are sparse, note that the trader should log more detail manually.`,
           },
           {
             role: "user",

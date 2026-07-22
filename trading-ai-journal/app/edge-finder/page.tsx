@@ -55,13 +55,10 @@ export default function EdgeFinderPage() {
   const [activeAccount, setActiveAccount] = useState<any>(null);
   const [tab, setTab] = useState("session");
   const [source, setSource] = useState("All");
-  const [lang, setLang] = useState("en");
 
   useEffect(() => {
     const saved = localStorage.getItem("active_account");
     if (saved) setActiveAccount(JSON.parse(saved));
-    const savedLang = localStorage.getItem("piptrak_lang");
-    if (savedLang) setLang(savedLang);
   }, []);
 
   async function analyze() {
@@ -79,7 +76,6 @@ export default function EdgeFinderPage() {
           userId: user.id,
           accountNumber: activeAccount?.account_number ? String(activeAccount.account_number).trim() : null,
           source,
-          lang,
         }),
       });
       const data = await response.json();
@@ -128,21 +124,6 @@ export default function EdgeFinderPage() {
               Account: {activeAccount.account_name} #{activeAccount.account_number}
             </p>
           )}
-        </div>
-
-        <div className="mb-3 flex gap-2">
-          <button
-            onClick={() => { setLang("en"); localStorage.setItem("piptrak_lang", "en"); }}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${lang === "en" ? "bg-blue-600 text-white" : "bg-white/5 text-white/40 hover:bg-white/10"}`}
-          >
-            🇬🇧 English
-          </button>
-          <button
-            onClick={() => { setLang("so"); localStorage.setItem("piptrak_lang", "so"); }}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${lang === "so" ? "bg-blue-600 text-white" : "bg-white/5 text-white/40 hover:bg-white/10"}`}
-          >
-            🇸🇴 Soomaali
-          </button>
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
