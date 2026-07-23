@@ -137,6 +137,16 @@ export default function PropFirmPage() {
     if (!activeAccount) return;
     if (!confirm(`Delete "${activeAccount.account_name}" and its challenge tracking? This cannot be undone.`)) return;
 
+    // Delete this account's synced MT5 trades first so no orphans are left behind
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && activeAccount.account_number) {
+      await supabase
+        .from("mt5_trades")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("account", String(activeAccount.account_number).trim());
+    }
+
     const { error } = await supabase
       .from("trading_accounts")
       .delete()
