@@ -2,105 +2,76 @@
 
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
-import { supabase } from "@/lib/supabase";
 
-type Pair = {
-  pair: string;
-  current_price: string;
-  direction: string;
-  confidence: number;
-  reason: string;
-  target: string;
-  stop_loss: string;
-  key_support: string;
-  key_resistance: string;
-  volatility: string;
-  expected_range: string;
-  best_time_cet: string;
+type Quote = {
+  name: string;
+  symbol: string;
+  price: string;
+  change: string;
+  changePercent: string;
+  source: string;
+  fetchedAt: string;
+  available: boolean;
+  note?: string;
 };
 
-type EventToday = {
-  time: string;
-  currency: string;
-  event: string;
-  impact: string;
-  forecast: string;
-  previous: string;
-  expected_move: string;
-  bias_direction?: string;
-  bias_strength?: string;
-  historical_note?: string;
-  if_beats_forecast?: string;
-  if_misses_forecast?: string;
+type Coin = {
+  name: string;
+  symbol: string;
+  price: number;
+  change24h: string | null;
+  marketCap: number;
+  volume24h: number;
 };
 
-type NewsItem = { source: string; title: string; url: string };
+type Meme = {
+  name: string;
+  symbol: string;
+  address: string;
+  price: number | null;
+  change24h: string | null;
+  change1h: string | null;
+  liquidity: number | null;
+  volume24h: number | null;
+  dexUrl: string;
+};
+
+type NewsItem = { title: string; url: string; source: string; publishedAt: string | null };
 
 type Brief = {
-  brief_date: string;
-  brief_time: string;
-  is_weekend: boolean;
   headline: string;
-  market_mood: string;
-  summary: string;
-  key_theme: string;
-  usd_bias: { direction: string; reasoning: string; confidence_note: string };
-  hot_pairs: { pair: string; reason: string; expected_move: string; direction: string }[];
-  pairs: Pair[];
-  crypto_analysis: {
-    sentiment: string;
-    btc_dominance: string;
-    btc_analysis: string;
-    top_gainers: { symbol: string; price: string; change_24h: string; continue_probability: number; reason: string; trade_plan: string }[];
-    top_losers: { symbol: string; price: string; change_24h: string; bounce_probability: number; reason: string }[];
-    best_crypto_trade: string;
-  };
-  cot_report: { summary: string; positions: { pair: string; signal: string; insight: string }[] };
-  correlations: { assets: string; relationship: string; meaning: string; action: string }[];
-  events_today: EventToday[];
-  best_setup: {
-    asset: string;
-    direction: string;
-    entry: string;
-    target: string;
-    stop: string;
-    risk_reward: string;
-    confidence: number;
-    reasoning: string;
-    invalidation: string;
-  };
-  volatility_overview: {
-    overall: string;
-    hottest_asset: string;
-    best_window_cet: string;
-    avoid_window_cet: string;
-    news_warning: string;
-  };
-  warnings: string[];
-  action_items: string[];
-  missing_pairs: string[];
-  news_items: NewsItem[];
+  dollar_view: string;
+  indices_view: string;
+  crypto_view: string;
+  crypto_opportunity: string;
+  memecoin_view: string;
+  news_summary: string;
+  what_to_watch: string[];
+  risk_warning: string;
+  data_note: string;
+  quotes: Quote[];
+  crypto: Coin[];
+  crypto_available: boolean;
+  global: { totalMarketCap: number | null; marketCapChange24h: string | null; btcDominance: string | null } | null;
+  memecoins: Meme[];
+  news: NewsItem[];
+  unavailable: string[];
+  fetched_at: string;
+  sources_used: string[];
 };
 
-function clean(v: any) {
-  return String(v ?? "").replace(/%/g, "");
-}
-
 export default function MorningBriefPage() {
-  const [loading, setLoading] = useState(false);
   const [brief, setBrief] = useState<Brief | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [executing, setExecuting] = useState(false);
-  const [tradeMsg, setTradeMsg] = useState("");
 
   async function generate() {
     setLoading(true);
     setError("");
     setBrief(null);
-    setTradeMsg("");
     try {
-      const response = await fetch("/api/morning-brief", { method: "POST" });
-      const data = await response.json();
+      const res = await fetch("/api/morning-brief", { method: "POST", cache: "no-store" });
+      const data = await res.json();
       if (data.error) setError(data.error);
       else setBrief(data);
     } catch (err) {
@@ -110,558 +81,204 @@ export default function MorningBriefPage() {
     }
   }
 
-  async function executeSetup() {
-    if (!brief?.best_setup) return;
-    const setup = brief.best_setup;
-
-    if (String(setup.asset).toLowerCase().includes("none")) {
-      setTradeMsg("No valid setup to execute today.");
-      return;
-    }
-
-    const saved = localStorage.getItem("active_account");
-    if (!saved) {
-      setTradeMsg("Set an active account on the Accounts page first.");
-      return;
-    }
-
-    const account = JSON.parse(saved);
-    setExecuting(true);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const res = await fetch("/api/mt5/signal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          account: account.account_number,
-          symbol: setup.asset.replace("/", ""),
-          trade_type: setup.direction === "Buy" ? "BUY" : "SELL",
-          lot_size: 0.01,
-          stop_loss_pips: 30,
-          take_profit_pips: 60,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) setTradeMsg(`✅ Signal sent — ${setup.direction} ${setup.asset} executing in MT5`);
-      else setTradeMsg("Error: " + data.error);
-    } catch (err) {
-      setTradeMsg("Error: " + String(err));
-    } finally {
-      setExecuting(false);
-    }
-  }
-
   return (
     <AppShell>
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <p className="w-fit rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1 text-sm text-blue-300">
-              🌅 Morning Brief
-            </p>
-            <span className="rounded-full border border-green-500/30 bg-green-500/10 px-3 py-0.5 text-xs text-green-400">
-              LIVE PRICES
-            </span>
-          </div>
-          <h1 className="text-4xl font-bold">Daily Market Intelligence</h1>
-          <p className="mt-1 text-sm text-blue-400">
-            📅 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Europe/Vienna" })}
-            {" · "}
-            🕐 {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Vienna" })} CET
-          </p>
-          <p className="mt-2 text-white/40">
-            7 forex pairs · crypto · COT context · correlations · events. Real prices only, cited sources, no invented numbers.
+        <div className="mb-6">
+          <p className="text-xs font-medium uppercase tracking-wider text-blue-400">Intelligence</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Morning Brief</h1>
+          <p className="mt-1 text-sm text-white/40">
+            DXY, US30, NAS100, crypto and trending Solana tokens. Every number is fetched live and labelled with its source.
           </p>
         </div>
 
-        <button
-          onClick={generate}
-          disabled={loading}
-          className="mb-8 w-full rounded-2xl bg-blue-600 py-4 text-lg font-semibold transition hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? "🤖 Fetching live prices, crypto & news... (~45s)" : "🌅 Generate Morning Brief"}
+        <button onClick={generate} disabled={loading} className="mb-6 w-full rounded-2xl bg-blue-600 py-4 text-base font-semibold transition hover:bg-blue-500 disabled:opacity-40">
+          {loading ? "Fetching live market data..." : "Generate Today's Brief"}
         </button>
 
-        {loading && (
-          <p className="mb-6 text-center text-xs text-white/30">
-            Forex prices are fetched one at a time to respect API limits. Please wait.
-          </p>
-        )}
-
         {error && (
-          <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-400 text-sm">{error}</div>
+          <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/[0.07] p-4 text-sm text-red-400">{error}</div>
         )}
 
         {brief && (
-          <div className="space-y-6">
+          <div className="space-y-5">
 
-            {brief.is_weekend && (
-              <div className="rounded-3xl border border-yellow-500/30 bg-yellow-500/5 p-5">
-                <p className="text-sm text-yellow-300">🛌 Forex markets are closed for the weekend. Crypto analysis only today.</p>
-              </div>
-            )}
-
-            {brief.missing_pairs?.length > 0 && !brief.is_weekend && (
-              <div className="rounded-3xl border border-orange-500/30 bg-orange-500/5 p-5">
-                <p className="text-sm text-orange-300">
-                  ⚠️ Live price unavailable for: <strong>{brief.missing_pairs.join(", ")}</strong>.
-                  These are excluded rather than guessed.
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-white/40">
+                  Fetched {new Date(brief.fetched_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
                 </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {brief.sources_used.map(s => (
+                    <span key={s} className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs text-white/50">{s}</span>
+                  ))}
+                </div>
               </div>
-            )}
-
-            {/* Headline */}
-            <div className="rounded-3xl border border-blue-500/30 bg-blue-500/5 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-sm text-white/40">{brief.brief_date} · {brief.brief_time}</p>
-                <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-                  brief.market_mood === "Risk-On" ? "bg-green-500/20 text-green-400" :
-                  brief.market_mood === "Risk-Off" ? "bg-red-500/20 text-red-400" :
-                  "bg-yellow-500/20 text-yellow-400"
-                }`}>{brief.market_mood}</span>
-              </div>
-              <h2 className="text-2xl font-bold mb-3">{brief.headline}</h2>
-              <p className="text-sm text-white/70 leading-relaxed mb-4">{brief.summary}</p>
-              <div className="rounded-2xl border border-blue-500/20 bg-black/30 p-3">
-                <p className="text-xs text-blue-400 font-semibold mb-1">🎯 Key Theme</p>
-                <p className="text-sm text-white/70">{brief.key_theme}</p>
-              </div>
+              {brief.data_note && <p className="mt-2 text-xs text-white/30">{brief.data_note}</p>}
             </div>
 
-            {/* USD Bias */}
-            {brief.usd_bias && (
-              <div className="rounded-3xl border border-purple-500/20 bg-purple-500/5 p-6">
-                <div className="flex flex-wrap items-center gap-3 mb-3">
-                  <h2 className="text-xl font-semibold text-purple-400">💵 USD Bias Today</h2>
-                  <span className={`rounded-full px-3 py-1 text-sm font-bold ${
-                    brief.usd_bias.direction?.toLowerCase().includes("bull") ? "bg-green-500/20 text-green-400" :
-                    brief.usd_bias.direction?.toLowerCase().includes("bear") ? "bg-red-500/20 text-red-400" :
-                    "bg-yellow-500/20 text-yellow-400"
-                  }`}>{brief.usd_bias.direction}</span>
-                </div>
-                <p className="text-sm text-white/70 mb-3">{brief.usd_bias.reasoning}</p>
-                <div className="rounded-2xl bg-black/30 p-3">
-                  <p className="text-xs text-white/50">{brief.usd_bias.confidence_note}</p>
-                </div>
+            {brief.unavailable && brief.unavailable.length > 0 && (
+              <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.06] p-4">
+                <p className="mb-1 text-xs font-semibold text-orange-400">Some data could not be fetched</p>
+                {brief.unavailable.map((u, i) => (
+                  <p key={i} className="text-xs text-orange-300/70">• {u}</p>
+                ))}
+                <p className="mt-2 text-xs text-white/30">These are shown as unavailable rather than estimated.</p>
               </div>
             )}
 
-            {/* Hot Pairs */}
-            {brief.hot_pairs?.length > 0 && (
-              <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-red-400">🔥 Hottest Today</h2>
-                <div className="space-y-3">
-                  {brief.hot_pairs.map((hp, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-2xl border border-red-500/20 bg-black/30 p-4">
-                      <div>
-                        <p className="font-bold text-lg">{hp.pair}</p>
-                        <p className="text-xs text-white/60">{hp.reason}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-bold ${hp.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
-                          {hp.direction === "Bullish" ? "↑" : "↓"} {hp.direction}
-                        </p>
-                        <p className="text-xs text-yellow-400">{hp.expected_move}</p>
-                      </div>
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/[0.06] p-5">
+              <h2 className="text-lg font-semibold">{brief.headline}</h2>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {brief.quotes.map(q => (
+                <div key={q.symbol} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-white/35">{q.name}</p>
+                  {q.available ? (
+                    <div>
+                      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-white">{q.price}</p>
+                      <p className={`text-xs font-medium tabular-nums ${q.change.startsWith("-") ? "text-red-400" : "text-emerald-400"}`}>
+                        {q.change} ({q.changePercent})
+                      </p>
+                      <p className="mt-1 text-[10px] text-white/25">{q.source} · {q.fetchedAt}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Volatility */}
-            {brief.volatility_overview && (
-              <div className="rounded-3xl border border-orange-500/20 bg-orange-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-orange-400">⚡ Volatility Overview</h2>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-xs text-white/40">Overall</p>
-                    <p className={`text-xl font-bold mt-1 ${
-                      brief.volatility_overview.overall === "High" ? "text-red-400" :
-                      brief.volatility_overview.overall === "Medium" ? "text-yellow-400" : "text-green-400"
-                    }`}>{brief.volatility_overview.overall}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-xs text-white/40">Best Window</p>
-                    <p className="text-sm font-bold mt-1 text-green-400">{brief.volatility_overview.best_window_cet}</p>
-                  </div>
-                </div>
-                {brief.volatility_overview.hottest_asset && (
-                  <div className="mt-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-3">
-                    <p className="text-xs text-red-400">🔥 Hottest: {brief.volatility_overview.hottest_asset}</p>
-                  </div>
-                )}
-                {brief.volatility_overview.avoid_window_cet && (
-                  <div className="mt-3 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-3">
-                    <p className="text-xs text-yellow-400">⚠️ Avoid: {brief.volatility_overview.avoid_window_cet}</p>
-                  </div>
-                )}
-                {brief.volatility_overview.news_warning && (
-                  <div className="mt-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-3">
-                    <p className="text-xs text-red-400">📰 {brief.volatility_overview.news_warning}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Events */}
-            {brief.events_today?.length > 0 && (
-              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-                <h2 className="mb-4 text-xl font-semibold">📅 Today's Events (CET)</h2>
-                <div className="space-y-3">
-                  {brief.events_today.map((evt, i) => (
-                    <div key={i} className={`rounded-2xl border p-3 ${
-                      evt.impact === "High" ? "border-red-500/20 bg-red-500/5" : "border-yellow-500/20 bg-yellow-500/5"
-                    }`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                            evt.impact === "High" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"
-                          }`}>{evt.impact}</span>
-                          <span className="text-sm font-semibold">{evt.time}</span>
-                          <span className="text-sm text-blue-400">{evt.currency}</span>
-                          <span className="text-sm">{evt.event}</span>
-                        </div>
-                        <span className="text-xs text-white/40">{evt.expected_move}</span>
-                      </div>
-                      <p className="text-xs text-white/40 mb-2">Forecast: {evt.forecast} · Previous: {evt.previous}</p>
-
-                      {evt.bias_direction && (
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-                            evt.bias_direction.toLowerCase().includes("bull") ? "bg-green-500/20 text-green-400" :
-                            evt.bias_direction.toLowerCase().includes("bear") ? "bg-red-500/20 text-red-400" :
-                            "bg-yellow-500/20 text-yellow-400"
-                          }`}>📊 Bias: {evt.bias_direction}</span>
-                          {evt.bias_strength && (
-                            <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/50">{evt.bias_strength}</span>
-                          )}
-                        </div>
-                      )}
-
-                      {evt.historical_note && (
-                        <div className="rounded-xl bg-black/30 p-3">
-                          <p className="text-xs text-purple-400 font-semibold mb-1">📚 Historically</p>
-                          <p className="text-xs text-white/60">{evt.historical_note}</p>
-                          <p className="text-[10px] text-white/30 mt-2">General tendency, not a prediction or guarantee.</p>
-                        </div>
-                      )}
-
-                      {(evt.if_beats_forecast || evt.if_misses_forecast) && (
-                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                          {evt.if_beats_forecast && (
-                            <div className="rounded-xl border border-green-500/10 bg-green-500/5 p-3">
-                              <p className="text-xs text-green-400 font-semibold mb-1">If beats forecast</p>
-                              <p className="text-xs text-white/60">{evt.if_beats_forecast}</p>
-                            </div>
-                          )}
-                          {evt.if_misses_forecast && (
-                            <div className="rounded-xl border border-red-500/10 bg-red-500/5 p-3">
-                              <p className="text-xs text-red-400 font-semibold mb-1">If misses forecast</p>
-                              <p className="text-xs text-white/60">{evt.if_misses_forecast}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                  ) : (
+                    <div>
+                      <p className="mt-1.5 text-lg font-semibold text-white/30">Unavailable</p>
+                      <p className="mt-1 text-[10px] text-white/25">{q.note}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Pairs */}
-            {brief.pairs?.length > 0 && (
-              <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-green-400">💱 Forex Analysis</h2>
-                <div className="space-y-3">
-                  {brief.pairs.map((p, i) => (
-                    <div key={i} className={`rounded-2xl border p-4 ${
-                      p.direction === "Bullish" ? "border-green-500/20 bg-green-500/5" :
-                      p.direction === "Bearish" ? "border-red-500/20 bg-red-500/5" :
-                      "border-yellow-500/20 bg-yellow-500/5"
-                    }`}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg font-bold">{p.pair}</span>
-                          <span className="text-sm text-white/40">{p.current_price}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm font-bold ${
-                            p.direction === "Bullish" ? "text-green-400" :
-                            p.direction === "Bearish" ? "text-red-400" : "text-yellow-400"
-                          }`}>{p.direction}</span>
-                          {p.confidence != null && (
-                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{clean(p.confidence)}%</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 mb-3">
-                        <div className="rounded-xl bg-black/30 p-2 text-center">
-                          <p className="text-xs text-white/30">Target</p>
-                          <p className="text-sm font-bold text-green-400">{p.target}</p>
-                        </div>
-                        <div className="rounded-xl bg-black/30 p-2 text-center">
-                          <p className="text-xs text-white/30">Stop</p>
-                          <p className="text-sm font-bold text-red-400">{p.stop_loss}</p>
-                        </div>
-                        <div className="rounded-xl bg-black/30 p-2 text-center">
-                          <p className="text-xs text-white/30">Range</p>
-                          <p className="text-sm font-bold text-yellow-400">{p.expected_range}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                          p.volatility === "High" ? "bg-red-500/20 text-red-400" :
-                          p.volatility === "Medium" ? "bg-yellow-500/20 text-yellow-400" :
-                          "bg-green-500/20 text-green-400"
-                        }`}>{p.volatility} volatility</span>
-                        <span className="text-xs text-white/30">🕐 {p.best_time_cet}</span>
-                      </div>
-
-                      <p className="text-xs text-white/40 mb-1">S: {p.key_support} · R: {p.key_resistance}</p>
-                      <p className="text-xs text-white/60">{p.reason}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Crypto */}
-            {brief.crypto_analysis && (
-              <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-yellow-400">🪙 Crypto Analysis</h2>
-
-                <div className="grid gap-3 sm:grid-cols-2 mb-4">
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
-                    <p className="text-xs text-white/40">Sentiment</p>
-                    <p className={`text-lg font-bold mt-1 ${
-                      brief.crypto_analysis.sentiment === "Bullish" ? "text-green-400" :
-                      brief.crypto_analysis.sentiment === "Bearish" ? "text-red-400" : "text-yellow-400"
-                    }`}>{brief.crypto_analysis.sentiment}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
-                    <p className="text-xs text-white/40">BTC Dominance</p>
-                    <p className="text-lg font-bold mt-1 text-orange-400">{clean(brief.crypto_analysis.btc_dominance)}%</p>
-                  </div>
-                </div>
-
-                <div className="mb-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-                  <p className="text-xs text-orange-400 font-semibold mb-1">₿ BTC</p>
-                  <p className="text-sm text-white/70">{brief.crypto_analysis.btc_analysis}</p>
-                </div>
-
-                {brief.crypto_analysis.top_gainers?.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-sm font-semibold text-green-400 mb-3">📈 Top Gainers</p>
-                    <div className="space-y-3">
-                      {brief.crypto_analysis.top_gainers.map((g, i) => (
-                        <div key={i} className="rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold">{g.symbol}</span>
-                              <span className="text-sm text-white/40">${clean(g.price)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-green-400 font-bold">{clean(g.change_24h)}%</span>
-                              <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs text-blue-400">
-                                {clean(g.continue_probability)}% continue
-                              </span>
-                            </div>
-                          </div>
-                          <p className="text-xs text-white/60 mb-1">{g.reason}</p>
-                          <p className="text-xs text-yellow-400">📋 {g.trade_plan}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {brief.crypto_analysis.top_losers?.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-sm font-semibold text-red-400 mb-3">📉 Top Losers</p>
-                    <div className="space-y-3">
-                      {brief.crypto_analysis.top_losers.map((l, i) => (
-                        <div key={i} className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold">{l.symbol}</span>
-                              <span className="text-sm text-white/40">${clean(l.price)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-red-400 font-bold">{clean(l.change_24h)}%</span>
-                              <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-400">
-                                {clean(l.bounce_probability)}% bounce
-                              </span>
-                            </div>
-                          </div>
-                          <p className="text-xs text-white/60">{l.reason}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {brief.crypto_analysis.best_crypto_trade && (
-                  <div className="rounded-2xl border border-yellow-500/20 bg-black/30 p-3">
-                    <p className="text-xs text-yellow-400 font-semibold mb-1">🏆 Best Crypto Trade</p>
-                    <p className="text-sm text-white/70">{brief.crypto_analysis.best_crypto_trade}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* COT */}
-            {brief.cot_report && (
-              <div className="rounded-3xl border border-purple-500/20 bg-purple-500/5 p-6">
-                <h2 className="mb-2 text-xl font-semibold text-purple-400">🏦 Institutional Context</h2>
-                <p className="text-sm text-white/50 mb-4">{brief.cot_report.summary}</p>
-                <div className="space-y-2">
-                  {brief.cot_report.positions?.map((pos, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 p-3">
-                      <div>
-                        <p className="font-bold text-sm">{pos.pair}</p>
-                        <p className="text-xs text-white/40">{pos.insight}</p>
-                      </div>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                        pos.signal === "Bullish" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
-                      }`}>{pos.signal}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Correlations */}
-            {brief.correlations?.length > 0 && (
-              <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-yellow-400">🔗 Correlations</h2>
-                <div className="space-y-2">
-                  {brief.correlations.map((c, i) => (
-                    <div key={i} className="rounded-2xl border border-white/10 bg-black/30 p-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-bold text-sm">{c.assets}</p>
-                        <span className="text-xs text-white/40">{c.relationship}</span>
-                      </div>
-                      <p className="text-xs text-white/60">{c.meaning}</p>
-                      <p className="text-xs text-blue-400 mt-1">→ {c.action}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Best Setup */}
-            {brief.best_setup && (
-              <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-green-400">⭐ Best Setup Today</h2>
-                <div className="flex flex-wrap items-center gap-3 mb-4">
-                  <span className="text-xl font-bold">{brief.best_setup.asset}</span>
-                  {!String(brief.best_setup.asset).toLowerCase().includes("none") && (
-                    <>
-                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-                        brief.best_setup.direction === "Buy" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
-                      }`}>{brief.best_setup.direction}</span>
-                      {brief.best_setup.confidence != null && (
-                        <span className="rounded-full bg-white/10 px-3 py-1 text-xs">{clean(brief.best_setup.confidence)}%</span>
-                      )}
-                    </>
                   )}
                 </div>
+              ))}
+            </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">Entry</p>
-                    <p className="text-sm font-bold">{brief.best_setup.entry}</p>
-                  </div>
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">Target</p>
-                    <p className="text-sm font-bold text-green-400">{brief.best_setup.target}</p>
-                  </div>
-                  <div className="rounded-xl bg-black/30 p-2 text-center">
-                    <p className="text-xs text-white/30">Stop</p>
-                    <p className="text-sm font-bold text-red-400">{brief.best_setup.stop}</p>
-                  </div>
-                </div>
+            <Section title="Dollar (DXY)" text={brief.dollar_view} />
+            <Section title="Indices — US30 & NAS100" text={brief.indices_view} />
 
-                <p className="text-xs text-white/40 mb-2">R:R {brief.best_setup.risk_reward}</p>
-                <p className="text-sm text-white/60 mb-3">{brief.best_setup.reasoning}</p>
-
-                <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-3 mb-3">
-                  <p className="text-xs text-yellow-400">⚠️ Invalidation: {brief.best_setup.invalidation}</p>
-                </div>
-
-                {tradeMsg && (
-                  <div className={`mb-3 rounded-xl p-2 text-xs ${
-                    tradeMsg.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
-                  }`}>{tradeMsg}</div>
-                )}
-
-                {!brief.is_weekend && !String(brief.best_setup.asset).toLowerCase().includes("none") && (
-                  <button
-                    onClick={executeSetup}
-                    disabled={executing}
-                    className="w-full rounded-xl bg-green-600 py-2.5 text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
-                  >
-                    {executing ? "Sending..." : `⚡ Execute ${brief.best_setup.direction} ${brief.best_setup.asset} in MT5`}
-                  </button>
-                )}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white/80">Crypto Market</h3>
+                <span className="text-xs text-white/25">CoinGecko</span>
               </div>
-            )}
 
-            {/* Warnings */}
-            {brief.warnings?.length > 0 && (
-              <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
-                <h2 className="mb-3 text-xl font-semibold text-red-400">⚠️ Today's Risks</h2>
-                <div className="space-y-2">
-                  {brief.warnings.map((w, i) => (
-                    <p key={i} className="text-sm text-white/70">• {w}</p>
-                  ))}
+              {brief.global && (
+                <div className="mb-4 grid grid-cols-3 gap-2">
+                  <MiniStat label="Total Mkt Cap" value={brief.global.totalMarketCap ? `$${(brief.global.totalMarketCap / 1e9).toFixed(0)}B` : "—"} />
+                  <MiniStat label="24h Change" value={brief.global.marketCapChange24h ? `${brief.global.marketCapChange24h}%` : "—"} tone={Number(brief.global.marketCapChange24h) >= 0 ? "pos" : "neg"} />
+                  <MiniStat label="BTC Dominance" value={brief.global.btcDominance ? `${brief.global.btcDominance}%` : "—"} />
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Action Items */}
-            {brief.action_items?.length > 0 && (
-              <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-blue-400">✅ Action Items</h2>
-                <div className="space-y-2">
-                  {brief.action_items.map((item, i) => (
-                    <div key={i} className="flex items-start gap-3 rounded-xl bg-white/5 p-3">
-                      <span className="text-blue-400 font-bold">{i + 1}.</span>
-                      <p className="text-sm text-white/70">{item}</p>
+              {brief.crypto_available && brief.crypto.length > 0 ? (
+                <div className="mb-4 overflow-hidden rounded-xl border border-white/[0.06]">
+                  {brief.crypto.map((c, i) => (
+                    <div key={c.symbol} className={`flex items-center justify-between px-3 py-2 ${i !== brief.crypto.length - 1 ? "border-b border-white/[0.04]" : ""}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">{c.symbol}</span>
+                        <span className="text-xs text-white/30">{c.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium tabular-nums">${c.price.toLocaleString("en-US", { maximumFractionDigits: c.price < 1 ? 6 : 2 })}</p>
+                        {c.change24h && (
+                          <p className={`text-xs tabular-nums ${Number(c.change24h) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {Number(c.change24h) >= 0 ? "+" : ""}{c.change24h}%
+                          </p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="mb-4 text-sm text-white/30">Crypto data unavailable right now.</p>
+              )}
 
-            {/* Sources */}
-            {brief.news_items?.length > 0 && (
-              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-                <h2 className="mb-4 text-xl font-semibold">📰 News Sources Used Today</h2>
-                <div className="space-y-2">
-                  {brief.news_items.map((item, i) => (
-                    <a key={i} href={item.url} target="_blank" rel="noopener noreferrer" className="block rounded-2xl border border-white/10 bg-black/30 p-3 hover:border-white/20 transition">
-                      <p className="text-xs text-blue-400 mb-1">{item.source}</p>
-                      <p className="text-sm text-white/70">{item.title}</p>
+              <p className="text-sm text-white/60">{brief.crypto_view}</p>
+              {brief.crypto_opportunity && (
+                <p className="mt-3 rounded-xl bg-blue-500/[0.08] p-3 text-sm text-blue-300">{brief.crypto_opportunity}</p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-purple-500/20 bg-purple-500/[0.05] p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-purple-300">Trending Solana Tokens</h3>
+                <span className="text-xs text-white/25">DexScreener</span>
+              </div>
+
+              {brief.memecoins && brief.memecoins.length > 0 ? (
+                <div className="mb-4 space-y-2">
+                  {brief.memecoins.map(m => (
+                    <a key={m.address} href={m.dexUrl} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-white/[0.06] bg-black/30 p-3 transition hover:border-purple-500/30">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold">{m.symbol}</p>
+                          <p className="text-xs text-white/30">{m.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm tabular-nums">${m.price != null ? m.price.toFixed(m.price < 0.01 ? 8 : 4) : "—"}</p>
+                          <div className="flex gap-2 text-xs tabular-nums">
+                            {m.change1h && <span className={Number(m.change1h) >= 0 ? "text-emerald-400" : "text-red-400"}>1h {m.change1h}%</span>}
+                            {m.change24h && <span className={Number(m.change24h) >= 0 ? "text-emerald-400" : "text-red-400"}>24h {m.change24h}%</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex gap-3 text-[10px] text-white/25">
+                        <span>Liq ${m.liquidity != null ? m.liquidity.toLocaleString() : "—"}</span>
+                        <span>Vol24h ${m.volume24h != null ? m.volume24h.toLocaleString() : "—"}</span>
+                        <span className="text-purple-400">View on DexScreener →</span>
+                      </div>
                     </a>
                   ))}
                 </div>
+              ) : (
+                <p className="mb-4 text-sm text-white/30">No trending Solana tokens returned right now.</p>
+              )}
+
+              <p className="text-sm text-white/60">{brief.memecoin_view}</p>
+            </div>
+
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <h3 className="mb-3 text-sm font-semibold text-white/80">News</h3>
+              {brief.news && brief.news.length > 0 ? (
+                <div className="mb-3 space-y-2">
+                  {brief.news.map((n, i) => (
+                    <a key={i} href={n.url} target="_blank" rel="noopener noreferrer" className="block rounded-xl bg-black/30 p-3 transition hover:bg-black/50">
+                      <p className="text-sm text-white/80">{n.title}</p>
+                      <p className="mt-1 text-xs text-blue-400">{n.source} — read source →</p>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="mb-3 text-sm text-white/30">No verified news items available right now. Nothing has been invented to fill this space.</p>
+              )}
+              <p className="text-sm text-white/60">{brief.news_summary}</p>
+            </div>
+
+            {brief.what_to_watch && brief.what_to_watch.length > 0 && (
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+                <h3 className="mb-3 text-sm font-semibold text-white/80">What to Watch</h3>
+                <div className="space-y-2">
+                  {brief.what_to_watch.map((w, i) => (
+                    <div key={i} className="flex gap-3 rounded-xl bg-black/30 p-3">
+                      <span className="text-sm font-semibold text-blue-400">{i + 1}.</span>
+                      <p className="text-sm text-white/70">{w}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-              <p className="text-xs text-white/20 text-center">
-                ⚠️ Research only, not financial advice. Prices are live at generation time.
-                Historical notes are general tendencies, not predictions. Institutional context is general reasoning, not live COT data.
-                AI analysis can be wrong. Verify independently.
+            {brief.risk_warning && (
+              <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/[0.06] p-5">
+                <h3 className="mb-1 text-xs font-semibold text-yellow-400">Risk Note</h3>
+                <p className="text-sm text-white/60">{brief.risk_warning}</p>
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-white/[0.04] bg-white/[0.01] p-4">
+              <p className="text-center text-xs text-white/20">
+                All prices fetched live from named sources at the time shown. Free-tier index data may be delayed.
+                Nothing here is financial advice. Trending tokens are extremely high risk.
               </p>
             </div>
 
@@ -669,5 +286,25 @@ export default function MorningBriefPage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+function Section({ title, text }: { title: string; text: string }) {
+  if (!text) return null;
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <h3 className="mb-2 text-sm font-semibold text-white/80">{title}</h3>
+      <p className="text-sm text-white/60">{text}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" }) {
+  const color = tone === "pos" ? "text-emerald-400" : tone === "neg" ? "text-red-400" : "text-white";
+  return (
+    <div className="rounded-xl bg-black/30 p-2 text-center">
+      <p className="text-[10px] text-white/30">{label}</p>
+      <p className={`text-sm font-semibold tabular-nums ${color}`}>{value}</p>
+    </div>
   );
 }
