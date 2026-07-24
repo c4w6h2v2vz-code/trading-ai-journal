@@ -188,9 +188,9 @@ export async function POST() {
 
     // Indices + dollar index (Twelve Data)
     const [dxy, us30, nas100] = await Promise.all([
-      fetchTwelveData("DXY", "US Dollar Index (DXY)"),
-      fetchTwelveData("DJI", "US30 (Dow Jones)"),
-      fetchTwelveData("IXIC", "NAS100 (Nasdaq)"),
+      fetchTwelveData("UUP", "Dollar Index proxy (UUP ETF)"),
+      fetchTwelveData("DIA", "US30 proxy (DIA ETF)"),
+      fetchTwelveData("QQQ", "NAS100 proxy (QQQ ETF)"),
     ]);
 
     const [cryptoData, globalData, memecoins, news] = await Promise.all([
