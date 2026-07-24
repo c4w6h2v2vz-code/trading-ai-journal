@@ -29,6 +29,16 @@ type TokenRisk = {
   rugcheckAvailable: boolean;
   redFlags: string[];
   dataNotes: string[];
+  momentum?: {
+    volumeAcceleration: string | null;
+    volumeAccelerationNote: string;
+    buyPressure: string | null;
+    buyPressureNote: string;
+    liquidityRatio: string | null;
+    liquidityRatioNote: string;
+    trendAlignment: string;
+    whatWouldHaveToHold: string[];
+  };
 };
 
 type AlphaData = {
@@ -183,7 +193,42 @@ export default function AlphaPage() {
                       </p>
                     </div>
                   )}
+{t.momentum && (
+                    <div className="mb-3 rounded-xl border border-blue-500/20 bg-blue-500/[0.05] p-3">
+                      <p className="mb-2 text-xs font-semibold text-blue-400">Live activity analysis</p>
 
+                      <div className="mb-2 grid grid-cols-3 gap-2">
+                        <div className="rounded-lg bg-black/30 p-2 text-center">
+                          <p className="text-[10px] text-white/30">Vol acceleration</p>
+                          <p className="text-xs font-semibold text-white/80">{t.momentum.volumeAcceleration ?? "—"}</p>
+                        </div>
+                        <div className="rounded-lg bg-black/30 p-2 text-center">
+                          <p className="text-[10px] text-white/30">Buy pressure</p>
+                          <p className="text-xs font-semibold text-white/80">{t.momentum.buyPressure ?? "—"}</p>
+                        </div>
+                        <div className="rounded-lg bg-black/30 p-2 text-center">
+                          <p className="text-[10px] text-white/30">Vol / Liquidity</p>
+                          <p className="text-xs font-semibold text-white/80">{t.momentum.liquidityRatio ?? "—"}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-white/50">{t.momentum.volumeAccelerationNote}</p>
+                        <p className="text-xs text-white/50">{t.momentum.buyPressureNote}</p>
+                        <p className="text-xs text-white/50">{t.momentum.liquidityRatioNote}</p>
+                        <p className="text-xs text-white/50">{t.momentum.trendAlignment}</p>
+                      </div>
+
+                      {t.momentum.whatWouldHaveToHold.length > 0 && (
+                        <div className="mt-3 rounded-lg bg-black/30 p-2">
+                          <p className="mb-1 text-[10px] font-semibold text-white/40">Conditions to watch yourself</p>
+                          {t.momentum.whatWouldHaveToHold.map((c, i) => (
+                            <p key={i} className="text-xs text-white/40">• {c}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {t.dataNotes.length > 0 && (
                     <div className="mb-3 rounded-xl bg-black/30 p-3">
                       {t.dataNotes.map((n, i) => (

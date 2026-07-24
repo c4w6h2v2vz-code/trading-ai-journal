@@ -32,6 +32,16 @@ type TokenRisk = {
   // Derived warnings — all rule-based, no prediction
   redFlags: string[];
   dataNotes: string[];
+  momentum?: {
+    volumeAcceleration: string | null;
+    volumeAccelerationNote: string;
+    buyPressure: string | null;
+    buyPressureNote: string;
+    liquidityRatio: string | null;
+    liquidityRatioNote: string;
+    trendAlignment: string;
+    whatWouldHaveToHold: string[];
+  };
 };
 
 function hoursSince(ms: number | null | undefined) {
@@ -48,7 +58,108 @@ async function fetchRugcheck(address: string) {
     return null;
   }
 }
+type Momentum = {
+  volumeAcceleration: string | null;
+  volumeAccelerationNote: string;
+  buyPressure: string | null;
+  buyPressureNote: string;
+  liquidityRatio: string | null;
+  liquidityRatioNote: string;
+  trendAlignment: string;
+  whatWouldHaveToHold: string[];
+};
 
+function buildMomentum(t: Partial<TokenRisk>): Momentum {
+  const m: Momentum = {
+    volumeAcceleration: null,
+    volumeAccelerationNote: "Not enough volume data returned to compare periods.",
+    buyPressure: null,
+    buyPressureNote: "Buy/sell counts not available.",
+    liquidityRatio: null,
+    liquidityRatioNote: "Liquidity or volume missing.",
+    trendAlignment: "Not enough timeframe data.",
+    whatWouldHaveToHold: [],
+  };
+
+  // Volume acceleration: 1h volume vs the average hourly volume across 24h
+  if (t.volume1h != null && t.volume24h != null && t.volume24h > 0) {
+    const avgHourly = t.volume24h / 24;
+    if (avgHourly > 0) {
+      const accel = t.volume1h / avgHourly;
+      m.volumeAcceleration = accel.toFixed(1) + "x";
+      m.volumeAccelerationNote =
+        accel > 3
+          ? `Last hour's volume is ${accel.toFixed(1)}x the 24h hourly average — activity is spiking right now. This describes what is happening, not what happens next.`
+          : accel < 0.4
+          ? `Last hour's volume is only ${accel.toFixed(1)}x the 24h average — interest is cooling off.`
+          : `Last hour's volume is ${accel.toFixed(1)}x the 24h average — activity is roughly steady.`;
+    }
+  }
+
+  // Buy pressure
+  if (t.buys24h != null && t.sells24h != null && (t.buys24h + t.sells24h) > 0) {
+    const total = t.buys24h + t.sells24h;
+    const buyShare = (t.buys24h / total) * 100;
+    m.buyPressure = buyShare.toFixed(0) + "% buys";
+    m.buyPressureNote =
+      buyShare > 60
+        ? `${buyShare.toFixed(0)}% of transactions were buys (${t.buys24h} buys vs ${t.sells24h} sells) — more wallets entering than exiting over 24h.`
+        : buyShare < 40
+        ? `Only ${buyShare.toFixed(0)}% were buys (${t.buys24h} buys vs ${t.sells24h} sells) — distribution, holders are leaving.`
+        : `Buys and sells are roughly balanced (${t.buys24h} buys vs ${t.sells24h} sells).`;
+  }
+
+  // Liquidity vs volume — exit feasibility
+  if (t.liquidityUsd != null && t.volume24h != null && t.liquidityUsd > 0) {
+    const ratio = t.volume24h / t.liquidityUsd;
+    m.liquidityRatio = ratio.toFixed(1) + "x";
+    m.liquidityRatioNote =
+      ratio > 20
+        ? `24h volume is ${ratio.toFixed(0)}x the pool size. A position of any size will move the price against you on exit.`
+        : ratio > 5
+        ? `24h volume is ${ratio.toFixed(1)}x the pool. Exiting a large position would cause noticeable slippage.`
+        : `24h volume is ${ratio.toFixed(1)}x the pool — relatively normal turnover for this liquidity.`;
+  }
+
+  // Trend alignment across timeframes (fact, not forecast)
+  const tf = [
+    { label: "5m", v: t.change5m },
+    { label: "1h", v: t.change1h },
+    { label: "6h", v: t.change6h },
+    { label: "24h", v: t.change24h },
+  ].filter(x => x.v != null) as { label: string; v: number }[];
+
+  if (tf.length >= 3) {
+    const allUp = tf.every(x => x.v > 0);
+    const allDown = tf.every(x => x.v < 0);
+    if (allUp) m.trendAlignment = `All measured timeframes (${tf.map(x => x.label).join(", ")}) are positive. Note: sustained vertical moves in new tokens frequently reverse hard.`;
+    else if (allDown) m.trendAlignment = `All measured timeframes (${tf.map(x => x.label).join(", ")}) are negative — consistent selling.`;
+    else {
+      const shortTerm = t.change1h ?? 0;
+      const longTerm = t.change24h ?? 0;
+      m.trendAlignment =
+        shortTerm > 0 && longTerm < 0
+          ? "Short-term bounce inside a 24h downtrend — this is often a dead-cat bounce in new tokens."
+          : shortTerm < 0 && longTerm > 0
+          ? "Pulling back after a 24h gain — could be profit taking, cannot be known in advance."
+          : "Mixed signals across timeframes.";
+    }
+  }
+
+  // What would have to hold — conditions, not predictions
+  if (t.liquidityUsd != null) {
+    m.whatWouldHaveToHold.push(`Liquidity must stay above $${Math.round(t.liquidityUsd).toLocaleString()} — if it drops sharply, the pool is being pulled.`);
+  }
+  if (t.buys24h != null && t.sells24h != null) {
+    m.whatWouldHaveToHold.push("Buy count must keep pace with sells — flipping to majority sells means distribution.");
+  }
+  if (t.topHolderPercent != null && t.topHolderPercent > 10) {
+    m.whatWouldHaveToHold.push(`Top holder (${t.topHolderPercent.toFixed(1)}%) must not sell — watch that wallet on-chain.`);
+  }
+  m.whatWouldHaveToHold.push("None of these are predictions. They are conditions you can check yourself in real time.");
+
+  return m;
+}
 function buildRedFlags(t: Partial<TokenRisk>): string[] {
   const flags: string[] = [];
 
@@ -141,6 +252,7 @@ async function buildToken(boost: any): Promise<TokenRisk | null> {
     };
 
     base.redFlags = buildRedFlags(base);
+    (base as any).momentum = buildMomentum(base);
 
     return base as TokenRisk;
   } catch {
