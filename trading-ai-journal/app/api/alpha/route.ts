@@ -1,244 +1,190 @@
 import { NextResponse } from "next/server";
 
-async function getSolanaTrending() {
-  const EXCLUDED_SYMBOLS = new Set(["SOL", "WSOL", "USDC", "USDT", "USDH"]);
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-  try {
-    const response = await fetch(
-      "https://api.dexscreener.com/token-boosts/top/v1",
-      { cache: "no-store" }
-    );
-    const boosted = await response.json();
+type TokenRisk = {
+  address: string;
+  name: string;
+  symbol: string;
+  priceUsd: number | null;
+  change5m: number | null;
+  change1h: number | null;
+  change6h: number | null;
+  change24h: number | null;
+  liquidityUsd: number | null;
+  volume24h: number | null;
+  volume1h: number | null;
+  marketCap: number | null;
+  ageHours: number | null;
+  buys24h: number | null;
+  sells24h: number | null;
+  dexUrl: string;
+  // Risk facts (from RugCheck)
+  rugcheckScore: number | null;
+  mintAuthority: string | null;
+  freezeAuthority: string | null;
+  lpLocked: number | null;
+  topHolderPercent: number | null;
+  rugcheckRisks: { name: string; level: string; description: string }[];
+  rugcheckAvailable: boolean;
+  // Derived warnings — all rule-based, no prediction
+  redFlags: string[];
+  dataNotes: string[];
+};
 
-    const solanaBoosted = Array.isArray(boosted)
-      ? boosted.filter((t: any) => t.chainId === "solana").slice(0, 30)
-      : [];
-
-    if (solanaBoosted.length === 0) return [];
-
-    const addresses = solanaBoosted.map((t: any) => t.tokenAddress).filter(Boolean);
-    const uniqueAddresses = [...new Set(addresses)].slice(0, 30);
-
-    const pairsResponse = await fetch(
-      `https://api.dexscreener.com/latest/dex/tokens/${uniqueAddresses.join(",")}`,
-      { cache: "no-store" }
-    );
-    const pairsData = await pairsResponse.json();
-
-    if (!pairsData.pairs) return [];
-
-    const bestPairPerToken = new Map<string, any>();
-    for (const p of pairsData.pairs) {
-      if (p.chainId !== "solana") continue;
-      if (!p.baseToken?.symbol || EXCLUDED_SYMBOLS.has(p.baseToken.symbol.toUpperCase())) continue;
-      if (!p.liquidity?.usd || p.liquidity.usd < 5000) continue;
-
-      const addr = p.baseToken.address;
-      const existing = bestPairPerToken.get(addr);
-      if (!existing || (p.liquidity?.usd || 0) > (existing.liquidity?.usd || 0)) {
-        bestPairPerToken.set(addr, p);
-      }
-    }
-
-    const uniqueTokens = Array.from(bestPairPerToken.values())
-      .sort((a: any, b: any) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
-      .slice(0, 20);
-
-    return uniqueTokens.map((p: any) => ({
-      address: p.baseToken?.address,
-      name: p.baseToken?.name,
-      symbol: p.baseToken?.symbol,
-      price: parseFloat(p.priceUsd || "0"),
-      change_24h: p.priceChange?.h24 || 0,
-      volume_24h: p.volume?.h24 || 0,
-      liquidity: p.liquidity?.usd || 0,
-      market_cap: p.marketCap || p.fdv || 0,
-      pair_created_at: p.pairCreatedAt,
-      dex_url: p.url,
-    }));
-  } catch (err) {
-    console.error("DexScreener fetch failed:", err);
-    return [];
-  }
+function hoursSince(ms: number | null | undefined) {
+  if (!ms) return null;
+  return Math.round((Date.now() - ms) / 3600000);
 }
 
-async function getRugCheck(tokenAddress: string) {
+async function fetchRugcheck(address: string) {
   try {
-    const response = await fetch(
-      `https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report/summary`,
-      { cache: "no-store" }
-    );
-    if (!response.ok) return null;
-    const data = await response.json();
-    return {
-      score: data.score,
-      risks: (data.risks || []).map((r: any) => r.name),
-    };
+    const res = await fetch(`https://api.rugcheck.xyz/v1/tokens/${address}/report`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
   } catch {
     return null;
   }
 }
 
-async function getSolanaAndBtcContext() {
-  try {
-    const response = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=usd&include_24hr_change=true",
-      { cache: "no-store" }
-    );
-    const data = await response.json();
-    return {
-      btc_price: data?.bitcoin?.usd,
-      btc_change_24h: data?.bitcoin?.usd_24h_change,
-      sol_price: data?.solana?.usd,
-      sol_change_24h: data?.solana?.usd_24h_change,
-    };
-  } catch {
-    return null;
+function buildRedFlags(t: Partial<TokenRisk>): string[] {
+  const flags: string[] = [];
+
+  // Liquidity vs volume — thin liquidity with heavy volume means you may not be able to exit
+  if (t.liquidityUsd != null && t.volume24h != null && t.liquidityUsd > 0) {
+    const ratio = t.volume24h / t.liquidityUsd;
+    if (ratio > 20) flags.push(`Volume is ${ratio.toFixed(0)}x liquidity — exiting a position may move the price against you badly`);
   }
+
+  if (t.liquidityUsd != null && t.liquidityUsd < 10000) {
+    flags.push(`Liquidity only $${Math.round(t.liquidityUsd).toLocaleString()} — very thin, high slippage risk`);
+  }
+
+  if (t.mintAuthority && t.mintAuthority !== "null" && t.mintAuthority !== "") {
+    flags.push("Mint authority is NOT revoked — the creator can mint unlimited new tokens");
+  }
+
+  if (t.freezeAuthority && t.freezeAuthority !== "null" && t.freezeAuthority !== "") {
+    flags.push("Freeze authority is NOT revoked — the creator can freeze your wallet's tokens");
+  }
+
+  if (t.topHolderPercent != null && t.topHolderPercent > 20) {
+    flags.push(`Top holder owns ${t.topHolderPercent.toFixed(1)}% of supply — a single sell could crash the price`);
+  }
+
+  if (t.lpLocked != null && t.lpLocked < 50) {
+    flags.push(`Only ${t.lpLocked.toFixed(0)}% of liquidity is locked — the rest can be pulled at any time`);
+  }
+
+  if (t.ageHours != null && t.ageHours < 24) {
+    flags.push(`Token is only ${t.ageHours}h old — no track record, highest rug risk window`);
+  }
+
+  if (t.buys24h != null && t.sells24h != null && t.sells24h > 0) {
+    const ratio = t.buys24h / t.sells24h;
+    if (ratio < 0.7) flags.push(`More sells than buys (${t.buys24h} buys vs ${t.sells24h} sells) — holders are exiting`);
+  }
+
+  if (t.change24h != null && t.change24h < -50) {
+    flags.push(`Down ${Math.abs(t.change24h).toFixed(0)}% in 24h — may already have rugged or be dumping`);
+  }
+
+  return flags;
 }
 
-async function getCryptoNews() {
-  const today = new Date().toISOString().slice(0, 10);
+async function buildToken(boost: any): Promise<TokenRisk | null> {
   try {
-    const response = await fetch(
-      `https://newsapi.org/v2/everything?q=solana+crypto+memecoin&from=${today}&sortBy=publishedAt&language=en&apiKey=${process.env.NEWS_API_KEY}&pageSize=8`,
-      { cache: "no-store" }
-    );
-    const data = await response.json();
-    if (data.articles) {
-      return data.articles.map((a: any) => `[Source: ${a.source.name}] ${a.title}`).join("\n");
-    }
-    return "";
+    const address = boost.tokenAddress;
+    const pRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`, { cache: "no-store" });
+    if (!pRes.ok) return null;
+    const pData = await pRes.json();
+    const pair = pData?.pairs?.[0];
+    if (!pair) return null;
+
+    const rug = await fetchRugcheck(address);
+
+    const topHolderPercent = rug?.topHolders?.[0]?.pct != null ? Number(rug.topHolders[0].pct) : null;
+    const lpLocked = rug?.markets?.[0]?.lp?.lpLockedPct != null ? Number(rug.markets[0].lp.lpLockedPct) : null;
+
+    const dataNotes: string[] = [];
+    if (!rug) dataNotes.push("RugCheck data unavailable for this token — security checks could not be verified");
+
+    const base: Partial<TokenRisk> = {
+      address,
+      name: pair.baseToken?.name || "Unknown",
+      symbol: pair.baseToken?.symbol || "?",
+      priceUsd: pair.priceUsd ? Number(pair.priceUsd) : null,
+      change5m: pair.priceChange?.m5 != null ? Number(pair.priceChange.m5) : null,
+      change1h: pair.priceChange?.h1 != null ? Number(pair.priceChange.h1) : null,
+      change6h: pair.priceChange?.h6 != null ? Number(pair.priceChange.h6) : null,
+      change24h: pair.priceChange?.h24 != null ? Number(pair.priceChange.h24) : null,
+      liquidityUsd: pair.liquidity?.usd ? Math.round(pair.liquidity.usd) : null,
+      volume24h: pair.volume?.h24 ? Math.round(pair.volume.h24) : null,
+      volume1h: pair.volume?.h1 ? Math.round(pair.volume.h1) : null,
+      marketCap: pair.marketCap ? Math.round(pair.marketCap) : null,
+      ageHours: hoursSince(pair.pairCreatedAt),
+      buys24h: pair.txns?.h24?.buys ?? null,
+      sells24h: pair.txns?.h24?.sells ?? null,
+      dexUrl: pair.url || `https://dexscreener.com/solana/${address}`,
+      rugcheckScore: rug?.score != null ? Number(rug.score) : null,
+      mintAuthority: rug?.token?.mintAuthority ?? null,
+      freezeAuthority: rug?.token?.freezeAuthority ?? null,
+      lpLocked,
+      topHolderPercent,
+      rugcheckRisks: Array.isArray(rug?.risks)
+        ? rug.risks.map((r: any) => ({ name: r.name, level: r.level, description: r.description }))
+        : [],
+      rugcheckAvailable: !!rug,
+      dataNotes,
+    };
+
+    base.redFlags = buildRedFlags(base);
+
+    return base as TokenRisk;
   } catch {
-    return "";
+    return null;
   }
 }
 
 export async function POST() {
   try {
-    const today = new Date().toLocaleDateString("en-US", {
-      weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Europe/Vienna",
+    const fetchedAt = new Date().toISOString();
+
+    const boostRes = await fetch("https://api.dexscreener.com/token-boosts/top/v1", { cache: "no-store" });
+    if (!boostRes.ok) {
+      return NextResponse.json({ error: "DexScreener unavailable right now. Try again shortly." }, { status: 503 });
+    }
+    const boosts = await boostRes.json();
+    if (!Array.isArray(boosts)) {
+      return NextResponse.json({ error: "DexScreener returned unexpected data." }, { status: 503 });
+    }
+
+    const solTokens = boosts.filter((b: any) => b.chainId === "solana").slice(0, 8);
+
+    const tokens: TokenRisk[] = [];
+    for (const b of solTokens) {
+      const t = await buildToken(b);
+      if (t) tokens.push(t);
+    }
+
+    if (tokens.length === 0) {
+      return NextResponse.json({ error: "No Solana tokens could be loaded right now." }, { status: 503 });
+    }
+
+    // Sort: safest-looking first (fewest red flags), so danger is obvious
+    tokens.sort((a, b) => a.redFlags.length - b.redFlags.length);
+
+    return NextResponse.json({
+      tokens,
+      fetched_at: fetchedAt,
+      sources_used: ["DexScreener", "RugCheck"],
+      disclaimer:
+        "This is a risk scanner, not a signal service. Nothing here predicts which tokens will rise. Every number is fetched live from DexScreener and RugCheck. Red flags are rule-based checks on real data. Most new tokens lose money. Never invest more than you can afford to lose completely.",
     });
-
-    const [trending, context, news] = await Promise.all([
-      getSolanaTrending(),
-      getSolanaAndBtcContext(),
-      getCryptoNews(),
-    ]);
-
-    // Fetch rug check for top 15 tokens only, to respect rate limits
-    const topForRiskCheck = trending.slice(0, 15);
-    const riskChecks = await Promise.all(
-      topForRiskCheck.map((t: any) => t.address ? getRugCheck(t.address) : Promise.resolve(null))
-    );
-
-    const enrichedTokens = topForRiskCheck.map((t: any, i: number) => ({
-      ...t,
-      rug_check: riskChecks[i],
-    }));
-
-    const tokensText = enrichedTokens.map((t: any) =>
-      `${t.symbol} (${t.name}) | Address: ${t.address} | Price: $${t.price} | 24h: ${t.change_24h}% | Volume: $${Math.round(t.volume_24h)} | Liquidity: $${Math.round(t.liquidity)} | MCap: $${Math.round(t.market_cap)} | RugCheck: ${t.rug_check ? `Score ${t.rug_check.score}, Risks: ${t.rug_check.risks.join(", ") || "None flagged"}` : "Not available"}`
-    ).join("\n");
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are an AI research assistant for Solana memecoin day traders, built into PipTrak Alpha.
-
-ABSOLUTE RULES:
-- NEVER promise profit. NEVER say a coin "will" pump. Use language like "shows momentum consistent with" or "carries elevated risk of".
-- Every score (AI Score, Risk Score) must include a plain-English explanation using the REAL data provided — liquidity, volume, price change, RugCheck flags.
-- If RugCheck data is "Not available" for a token, say so explicitly rather than inventing a risk assessment.
-- Only use the real token data provided. Never invent tokens, prices, or holder counts.
-- This tool is for research only, not a signal service. The user executes trades manually on Axiom.`,
-          },
-          {
-            role: "user",
-            content: `Today: ${today}
-
-MARKET CONTEXT:
-BTC: $${context?.btc_price} (${context?.btc_change_24h?.toFixed(2)}% 24h)
-SOL: $${context?.sol_price} (${context?.sol_change_24h?.toFixed(2)}% 24h)
-
-REAL SOLANA TOKENS (top by volume, with RugCheck data where available):
-${tokensText || "No token data available"}
-
-TODAY'S CRYPTO NEWS:
-${news || "No specific news available today."}
-
-Analyze this real data and build today's Alpha Brief. Rank tokens by a combination of volume, liquidity health, price momentum, and RugCheck risk score. Explain reasoning transparently using the real numbers given.
-
-Return ONLY this JSON:
-{
-  "analysis_date": "${today}",
-  "market_grade": "A/B/C/D/F - overall quality of setups available today",
-  "market_bias": "Risk-On/Risk-Off/Neutral - explain briefly citing BTC/SOL trend",
-  "btc_trend": "Bullish/Bearish/Neutral with real price and % cited",
-  "sol_trend": "Bullish/Bearish/Neutral with real price and % cited",
-  "risk_level": "Low/Medium/High/Extreme - overall memecoin market risk today",
-  "ai_market_summary": "3-4 sentences summarizing today's real opportunities and risks, citing specific token symbols and numbers from the data",
-  "top_opportunities": [
-    {
-      "address": "The exact token contract address from the data provided for this token",
-      "symbol": "REAL symbol from data",
-      "name": "REAL name from data",
-      "price": "real price",
-      "ai_score": 72,
-      "risk_score": 45,
-      "score_explanation": "Why these scores, citing real liquidity/volume/rugcheck numbers",
-      "entry_zone": "realistic zone based on current price",
-      "stop_loss": "realistic based on price",
-      "take_profit": "realistic based on price",
-      "risk_reward": "1:X.X",
-      "market_cap": "real mcap from data",
-      "liquidity": "real liquidity from data",
-      "volume_24h": "real volume from data",
-      "reason": "Why this token appears in today's list - cite specific real numbers"
-    }
-  ],
-  "high_risk_opportunities": [
-    {
-      "symbol": "REAL symbol showing high momentum but high risk",
-      "reason": "Why it's high risk but still worth watching, cite RugCheck flags if present"
-    }
-  ],
-  "coins_to_avoid": [
-    {
-      "symbol": "REAL symbol with poor liquidity or rugcheck flags",
-      "reason": "Specific real reason - low liquidity, rugcheck risk flags, or declining volume"
-    }
-  ],
-  "volume_breakouts": [
-    { "symbol": "REAL symbol with unusually high volume relative to market cap", "detail": "Real volume/mcap ratio explanation" }
-  ],
-  "rug_pull_warnings": [
-    { "symbol": "REAL symbol only if RugCheck flagged real risks", "warning": "The specific real flags from RugCheck data" }
-  ]
-}`
-          }
-        ],
-      }),
-    });
-
-    const data = await response.json();
-    const text = data.choices?.[0]?.message?.content || "";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON found");
-    const parsed = JSON.parse(jsonMatch[0]);
-
-    parsed.raw_tokens = enrichedTokens;
-    parsed.market_context = context;
-    parsed.generated_at = new Date().toISOString();
-
-    return NextResponse.json(parsed);
   } catch (error) {
-    console.error("Alpha brief error:", error);
+    console.error("Alpha error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
