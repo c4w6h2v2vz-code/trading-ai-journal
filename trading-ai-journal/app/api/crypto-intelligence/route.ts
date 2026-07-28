@@ -1,153 +1,141 @@
 import { NextResponse } from "next/server";
 
-async function getCryptoMarketData() {
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+async function fetchMarkets() {
   try {
-    const response = await fetch(
-      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h",
+    const res = await fetch(
+      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&price_change_percentage=1h,24h,7d",
       { cache: "no-store" }
     );
-    const data = await response.json();
-    if (!Array.isArray(data)) return { gainers: [], losers: [], top10: [], btc: null, eth: null };
-
-    const sorted = [...data].sort((a, b) => (b.price_change_percentage_24h || 0) - (a.price_change_percentage_24h || 0));
-
-    const gainers = sorted.slice(0, 8).map((c: any) => ({
-      id: c.id, name: c.name, symbol: c.symbol.toUpperCase(), price: c.current_price,
-      change_24h: (c.price_change_percentage_24h || 0).toFixed(2),
-      volume: c.total_volume, market_cap: c.market_cap,
-    }));
-
-    const losers = sorted.slice(-8).reverse().map((c: any) => ({
-      id: c.id, name: c.name, symbol: c.symbol.toUpperCase(), price: c.current_price,
-      change_24h: (c.price_change_percentage_24h || 0).toFixed(2),
-      volume: c.total_volume, market_cap: c.market_cap,
-    }));
-
-    const top10 = data.slice(0, 10).map((c: any) => ({
-      id: c.id, name: c.name, symbol: c.symbol.toUpperCase(), price: c.current_price,
-      change_24h: (c.price_change_percentage_24h || 0).toFixed(2), market_cap: c.market_cap,
-    }));
-
-    const btc = data.find((c: any) => c.symbol === "btc");
-    const eth = data.find((c: any) => c.symbol === "eth");
-
-    return { gainers, losers, top10, btc, eth };
-  } catch (err) {
-    console.error("CoinGecko fetch failed:", err);
-    return { gainers: [], losers: [], top10: [], btc: null, eth: null };
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
   }
 }
 
-async function getTopTicker(coinId: string) {
+async function fetchGlobal() {
   try {
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/coins/${coinId}/tickers`,
-      { cache: "no-store" }
-    );
-    const data = await response.json();
-    if (!data.tickers || data.tickers.length === 0) return null;
-
-    const sorted = [...data.tickers].sort(
-      (a: any, b: any) => (b.converted_volume?.usd || 0) - (a.converted_volume?.usd || 0)
-    );
-    const best = sorted[0];
-    if (!best) return null;
-
-    return {
-      exchange: best.market?.name || "Unknown",
-      pair: `${best.base}/${best.target}`,
-      trade_url: best.trade_url || null,
-    };
-  } catch (err) {
-    console.error(`Ticker fetch failed for ${coinId}:`, err);
-    return null;
-  }
-}
-
-async function getGlobalMarketData() {
-  try {
-    const response = await fetch("https://api.coingecko.com/api/v3/global", { cache: "no-store" });
-    const data = await response.json();
-    return {
-      total_market_cap: data?.data?.total_market_cap?.usd,
-      market_cap_change_24h: data?.data?.market_cap_change_percentage_24h_usd,
-      btc_dominance: data?.data?.market_cap_percentage?.btc,
-      eth_dominance: data?.data?.market_cap_percentage?.eth,
-    };
+    const res = await fetch("https://api.coingecko.com/api/v3/global", { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data || null;
   } catch {
     return null;
   }
 }
 
-async function getCryptoNews() {
-  const today = new Date().toISOString().slice(0, 10);
-  const allNews: { source: string; title: string; url: string }[] = [];
-
-  const queries = [
-    "bitcoin price today",
-    "ethereum crypto market today",
-    "memecoin pump today",
-    "crypto whale alert today",
-    "SEC crypto regulation today",
-  ];
-
-  for (const q of queries) {
-    try {
-      const response = await fetch(
-        `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&from=${today}&sortBy=publishedAt&language=en&apiKey=${process.env.NEWS_API_KEY}&pageSize=4`,
-        { cache: "no-store" }
-      );
-      const data = await response.json();
-      if (data.articles) {
-        data.articles.forEach((a: any) =>
-          allNews.push({ source: a.source.name, title: a.title, url: a.url })
-        );
-      }
-    } catch {
-      console.error("News fetch failed for:", q);
-    }
+async function fetchTrending() {
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/search/trending", { cache: "no-store" });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return Array.isArray(json?.coins) ? json.coins.slice(0, 7) : [];
+  } catch {
+    return [];
   }
+}
 
-  return allNews.slice(0, 20);
+async function fetchFearGreed() {
+  try {
+    const res = await fetch("https://api.alternative.me/fng/?limit=1", { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const d = json?.data?.[0];
+    if (!d) return null;
+    return { value: Number(d.value), label: d.value_classification, source: "Alternative.me" };
+  } catch {
+    return null;
+  }
 }
 
 export async function POST() {
   try {
-    const now = new Date();
-    const today = now.toLocaleDateString("en-US", {
-      weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Europe/Vienna",
-    });
+    const fetchedAt = new Date().toISOString();
 
-    const [marketData, globalData, newsItems] = await Promise.all([
-      getCryptoMarketData(),
-      getGlobalMarketData(),
-      getCryptoNews(),
+    const [markets, global, trending, fearGreed] = await Promise.all([
+      fetchMarkets(),
+      fetchGlobal(),
+      fetchTrending(),
+      fetchFearGreed(),
     ]);
 
-    // Fetch real exchange/pair data for the top gainers (used for "where to trade")
-    const tickerLookups = await Promise.all(
-      marketData.gainers.slice(0, 8).map(async (g: any) => ({
-        symbol: g.symbol,
-        ticker: g.id ? await getTopTicker(g.id) : null,
-      }))
-    );
-    const tickerMap: Record<string, any> = {};
-    tickerLookups.forEach(t => { tickerMap[t.symbol] = t.ticker; });
+    if (markets.length === 0) {
+      return NextResponse.json({ error: "CoinGecko unavailable right now. Try again shortly." }, { status: 503 });
+    }
 
-    const gainersText = marketData.gainers.map((g: any) => {
-      const t = tickerMap[g.symbol];
-      const tradeInfo = t ? ` | Trade at: ${t.pair} on ${t.exchange}` : " | Trade venue: not available";
-      return `${g.symbol} (${g.name}): $${g.price} (${g.change_24h}%) Vol: $${g.volume}${tradeInfo}`;
-    }).join("\n");
+    const majors = markets.slice(0, 15).map((c: any) => ({
+      name: c.name,
+      symbol: String(c.symbol).toUpperCase(),
+      price: Number(c.current_price),
+      change1h: c.price_change_percentage_1h_in_currency != null ? Number(c.price_change_percentage_1h_in_currency).toFixed(2) : null,
+      change24h: c.price_change_percentage_24h != null ? Number(c.price_change_percentage_24h).toFixed(2) : null,
+      change7d: c.price_change_percentage_7d_in_currency != null ? Number(c.price_change_percentage_7d_in_currency).toFixed(2) : null,
+      marketCap: c.market_cap,
+      volume24h: c.total_volume,
+    }));
 
-    const losersText = marketData.losers.map((l: any) => `${l.symbol} (${l.name}): $${l.price} (${l.change_24h}%) Vol: $${l.volume}`).join("\n");
-    const top10Text = marketData.top10.map((t: any) => `${t.symbol}: $${t.price} (${t.change_24h}%)`).join("\n");
+    const sorted24h = [...markets].filter((c: any) => c.price_change_percentage_24h != null);
+    const topGainers = [...sorted24h]
+      .sort((a: any, b: any) => b.price_change_percentage_24h - a.price_change_percentage_24h)
+      .slice(0, 5)
+      .map((c: any) => ({ name: c.name, symbol: String(c.symbol).toUpperCase(), change24h: Number(c.price_change_percentage_24h).toFixed(1), price: Number(c.current_price) }));
+    const topLosers = [...sorted24h]
+      .sort((a: any, b: any) => a.price_change_percentage_24h - b.price_change_percentage_24h)
+      .slice(0, 5)
+      .map((c: any) => ({ name: c.name, symbol: String(c.symbol).toUpperCase(), change24h: Number(c.price_change_percentage_24h).toFixed(1), price: Number(c.current_price) }));
 
-    const newsText = newsItems.length > 0
-      ? newsItems.map(n => `[Source: ${n.source}] ${n.title}`).join("\n")
-      : "";
+    const trendingCoins = trending.map((t: any) => ({
+      name: t.item?.name,
+      symbol: String(t.item?.symbol || "").toUpperCase(),
+      rank: t.item?.market_cap_rank ?? null,
+    }));
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const globalStats = global ? {
+      totalMarketCap: global.total_market_cap?.usd ?? null,
+      marketCapChange24h: global.market_cap_change_percentage_24h_usd != null ? Number(global.market_cap_change_percentage_24h_usd).toFixed(2) : null,
+      btcDominance: global.market_cap_percentage?.btc != null ? Number(global.market_cap_percentage.btc).toFixed(1) : null,
+      ethDominance: global.market_cap_percentage?.eth != null ? Number(global.market_cap_percentage.eth).toFixed(1) : null,
+    } : null;
+
+    // Build fact sheet
+    const majorsText = majors.map((c: any) =>
+      `${c.symbol} (${c.name}): $${c.price} | 1h ${c.change1h ?? "n/a"}% | 24h ${c.change24h ?? "n/a"}% | 7d ${c.change7d ?? "n/a"}%`
+    ).join("\n");
+
+    const gainersText = topGainers.map((c: any) => `${c.symbol}: +${c.change24h}% ($${c.price})`).join("\n");
+    const losersText = topLosers.map((c: any) => `${c.symbol}: ${c.change24h}% ($${c.price})`).join("\n");
+    const trendingText = trendingCoins.map((c: any) => `${c.symbol} (${c.name}) rank ${c.rank ?? "n/a"}`).join("\n");
+    const fgText = fearGreed ? `${fearGreed.value}/100 — ${fearGreed.label} (source Alternative.me)` : "unavailable";
+    const globalText = globalStats
+      ? `Total market cap $${globalStats.totalMarketCap ? (globalStats.totalMarketCap / 1e9).toFixed(0) + "B" : "n/a"} | 24h ${globalStats.marketCapChange24h ?? "n/a"}% | BTC dominance ${globalStats.btcDominance ?? "n/a"}% | ETH dominance ${globalStats.ethDominance ?? "n/a"}%`
+      : "unavailable";
+
+    const factSheet = `
+DATA FETCHED AT: ${fetchedAt} (source: CoinGecko, Alternative.me)
+
+FEAR & GREED INDEX: ${fgText}
+
+MARKET OVERVIEW: ${globalText}
+
+TOP 15 BY MARKET CAP:
+${majorsText}
+
+TOP 5 GAINERS (24h):
+${gainersText}
+
+TOP 5 LOSERS (24h):
+${losersText}
+
+TRENDING (most searched):
+${trendingText}
+`.trim();
+
+    const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
@@ -155,108 +143,59 @@ export async function POST() {
         messages: [
           {
             role: "system",
-            content: `You are an elite crypto market analyst. Today is ${today}. Crypto trades 24/7 including weekends.
-CRITICAL RULE: Use ONLY the real prices and data provided — never invent numbers.
-CRITICAL RULE: Every claim must cite its source (news headlines are tagged [Source: NAME]). If no news supports a claim, say "based on price/volume data" instead of inventing a source.
-CRITICAL RULE: For each top coin, use the REAL "Trade at: PAIR on EXCHANGE" data provided — never invent an exchange or pair. If trade venue is "not available", say so explicitly instead of guessing.
-CRITICAL RULE: Give realistic probability percentages with an explanation of what specifically drives that probability (volume, momentum, news, or nothing significant).
-CRITICAL RULE: List every distinct news source actually used in your analysis in the "sources_used" array, exactly as given (source name).`,
+            content: `You are PipTrak's crypto desk analyst.
+
+ABSOLUTE RULES:
+1. Use ONLY numbers from the fact sheet. Never invent, estimate, or recall a price.
+2. If something is unavailable, say so — never guess.
+3. Never predict a specific future price. Describe what the data shows now.
+4. Always cite sources (CoinGecko, Alternative.me).
+5. Trending/searched coins are often more speculative — note that.
+6. Be practical and concise for a trader.
+7. Never say "guaranteed" or give advice framed as certainty.`,
           },
           {
             role: "user",
-            content: `Today: ${today}
+            content: `Today's verified crypto data:
 
-GLOBAL CRYPTO MARKET:
-Total Market Cap: $${globalData?.total_market_cap ? Math.round(globalData.total_market_cap / 1e9) + "B" : "unavailable"}
-24h Change: ${globalData?.market_cap_change_24h?.toFixed(2) || "unavailable"}%
-BTC Dominance: ${globalData?.btc_dominance?.toFixed(1) || "unavailable"}%
-ETH Dominance: ${globalData?.eth_dominance?.toFixed(1) || "unavailable"}%
-
-TOP 10 COINS BY MARKET CAP:
-${top10Text || "unavailable"}
-
-TOP GAINERS (24h, REAL DATA, includes where to trade):
-${gainersText || "unavailable"}
-
-TOP LOSERS (24h, REAL DATA):
-${losersText || "unavailable"}
-
-TODAY'S CRYPTO NEWS (with real sources):
-${newsText || "No news available today - say so explicitly, do not invent a source."}
-
-Analyze this real data and give a comprehensive crypto intelligence report. For each gainer/loser, explain WHY based on volume, momentum, or cited news - do not guess.
+${factSheet}
 
 Return ONLY this JSON:
 {
-  "analysis_date": "${today}",
-  "market_overview": {
-    "sentiment": "Bullish/Bearish/Neutral based on real data",
-    "total_market_cap": "real figure from data above",
-    "market_cap_change_24h": "real figure",
-    "btc_dominance": "real figure",
-    "market_trend": "What is actually happening based on real data and cited news"
-  },
-  "top_coins_to_watch": [
-    {
-      "coin": "REAL coin symbol from gainers data",
-      "price": "real price from data",
-      "trading_pair": "the exact real PAIR from the 'Trade at' data, e.g. BTC/USDT",
-      "exchange": "the exact real EXCHANGE name from the 'Trade at' data",
-      "timeframe": "24-48 hours",
-      "direction": "Bullish/Bearish",
-      "probability": 65,
-      "probability_reason": "Specific reason this probability was chosen - cite volume/momentum/news",
-      "potential_gain": "+X% to +X%",
-      "potential_loss": "-X%",
-      "risk_level": "Low/Medium/High",
-      "reason": "Real reason citing source or data",
-      "entry": "realistic entry based on current price",
-      "target": "realistic target",
-      "stop_loss": "realistic stop",
-      "category": "Layer1/Meme/DeFi/etc"
-    }
-  ],
-  "meme_coins_alert": [
-    { "coin": "real memecoin only if genuinely in gainers/losers data", "reason": "Real reason with source", "buzz_level": "High/Medium/Low", "risk": "High" }
-  ],
-  "whale_alerts": [
-    { "coin": "real coin", "action": "Only include if news source mentions actual whale activity, otherwise omit this array entirely", "impact": "Expected impact" }
-  ],
-  "coins_to_avoid": [
-    { "coin": "real coin from losers data", "reason": "Real reason citing data or news", "risk": "High/Medium" }
-  ],
-  "rug_pull_warnings": [],
-  "best_trade_today": {
-    "coin": "Best coin from real data today",
-    "trading_pair": "real pair from Trade at data",
-    "exchange": "real exchange from Trade at data",
-    "entry": "real entry price",
-    "target": "real target with % gain",
-    "stop_loss": "real stop loss",
-    "timeframe": "24-48 hours",
-    "reason": "Real detailed reason citing data/news for ${today}"
-  },
-  "sources_used": ["List each distinct real source name actually cited above, e.g. Reuters, Bloomberg - empty array if none were used"],
-  "weekly_outlook": "Real weekly outlook based on current real market conditions"
-}`,
+  "headline": "One sentence on the crypto market right now, citing a real number",
+  "market_mood": "What the Fear & Greed index and market cap change suggest about sentiment today, citing the real values",
+  "btc_eth_view": "What BTC and ETH are specifically doing today using their real 1h/24h/7d numbers",
+  "where_movement_is": "Where today's real movement is based on the gainers/losers, citing numbers. Be honest if it's a quiet day.",
+  "trending_note": "Comment on the trending/most-searched coins, noting they are often more speculative",
+  "dominance_note": "What BTC/ETH dominance implies today, if available",
+  "what_to_watch": ["2-4 concrete things to watch based only on the provided data"],
+  "risk_note": "One honest sentence on today's crypto risk conditions",
+  "data_note": "One sentence on fetch time and sources"
+}`
           }
         ],
       }),
     });
 
-    const data = await response.json();
-    const text = data.choices?.[0]?.message?.content || "";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON in response");
-    const parsed = JSON.parse(jsonMatch[0]);
-    parsed.real_market_data = marketData;
-    parsed.global_data = globalData;
-    parsed.news_items = newsItems;
-    parsed.generated_at = new Date().toISOString();
+    const aiData = await aiRes.json();
+    const text = aiData.choices?.[0]?.message?.content || "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("AI returned no JSON");
+    const parsed = JSON.parse(match[0]);
 
-    return NextResponse.json(parsed);
+    return NextResponse.json({
+      ...parsed,
+      majors,
+      topGainers,
+      topLosers,
+      trending: trendingCoins,
+      global: globalStats,
+      fearGreed,
+      fetched_at: fetchedAt,
+      sources_used: ["CoinGecko", "Alternative.me"],
+    });
   } catch (error) {
-    console.error("Crypto intelligence error:", error);
+    console.error("Crypto Intel error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }

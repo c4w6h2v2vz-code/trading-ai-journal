@@ -3,81 +3,58 @@
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
 
-type CoinWatch = {
-  coin: string;
-  price: string;
-  trading_pair: string;
-  exchange: string;
-  timeframe: string;
-  direction: string;
-  probability: number;
-  probability_reason: string;
-  potential_gain: string;
-  potential_loss: string;
-  risk_level: string;
-  reason: string;
-  entry: string;
-  target: string;
-  stop_loss: string;
-  category: string;
+type Coin = {
+  name: string;
+  symbol: string;
+  price: number;
+  change1h: string | null;
+  change24h: string | null;
+  change7d: string | null;
+  marketCap: number;
+  volume24h: number;
 };
 
-type NewsItem = {
-  source: string;
-  title: string;
-  url: string;
-};
+type Mover = { name: string; symbol: string; change24h: string; price: number };
+type Trend = { name: string; symbol: string; rank: number | null };
 
-type Intelligence = {
-  analysis_date: string;
-  market_overview: {
-    sentiment: string;
-    total_market_cap: string;
-    market_cap_change_24h: string;
-    btc_dominance: string;
-    market_trend: string;
-  };
-  top_coins_to_watch: CoinWatch[];
-  meme_coins_alert: { coin: string; reason: string; buzz_level: string; risk: string }[];
-  whale_alerts: { coin: string; action: string; impact: string }[];
-  coins_to_avoid: { coin: string; reason: string; risk: string }[];
-  rug_pull_warnings: { coin: string; warning: string }[];
-  best_trade_today: {
-    coin: string;
-    trading_pair: string;
-    exchange: string;
-    entry: string;
-    target: string;
-    stop_loss: string;
-    timeframe: string;
-    reason: string;
-  };
+type Data = {
+  headline: string;
+  market_mood: string;
+  btc_eth_view: string;
+  where_movement_is: string;
+  trending_note: string;
+  dominance_note: string;
+  what_to_watch: string[];
+  risk_note: string;
+  data_note: string;
+  majors: Coin[];
+  topGainers: Mover[];
+  topLosers: Mover[];
+  trending: Trend[];
+  global: { totalMarketCap: number | null; marketCapChange24h: string | null; btcDominance: string | null; ethDominance: string | null } | null;
+  fearGreed: { value: number; label: string; source: string } | null;
+  fetched_at: string;
   sources_used: string[];
-  news_items: NewsItem[];
-  weekly_outlook: string;
 };
 
-export default function CryptoIntelligencePage() {
+function price(n: number) {
+  return "$" + n.toLocaleString("en-US", { maximumFractionDigits: n < 1 ? 6 : 2 });
+}
+
+export default function CryptoIntelPage() {
+  const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(false);
-  const [intelligence, setIntelligence] = useState<Intelligence | null>(null);
   const [error, setError] = useState("");
 
-  async function analyze() {
+  async function load() {
     setLoading(true);
     setError("");
-    setIntelligence(null);
+    setData(null);
     try {
-      const response = await fetch("/api/crypto-intelligence", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = await response.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setIntelligence(data);
-      }
+      const res = await fetch("/api/crypto-intelligence", { method: "POST", cache: "no-store" });
+      const json = await res.json();
+      if (json.error) setError(json.error);
+      else setData(json);
     } catch (err) {
       setError(String(err));
     } finally {
@@ -85,279 +62,196 @@ export default function CryptoIntelligencePage() {
     }
   }
 
+  const fgColor = (v: number) =>
+    v >= 75 ? "text-emerald-400" : v >= 55 ? "text-emerald-300" : v >= 45 ? "text-yellow-400" : v >= 25 ? "text-orange-400" : "text-red-400";
+
   return (
     <AppShell>
-      <div className="mx-auto max-w-4xl px-6 py-8">
-        <div className="mb-8">
-          <p className="mb-3 w-fit rounded-full border border-yellow-500/30 bg-yellow-500/10 px-4 py-1 text-sm text-yellow-300">
-            🪙 Crypto Intelligence
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-6">
+          <p className="text-xs font-medium uppercase tracking-wider text-blue-400">Intelligence</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Crypto Intel</h1>
+          <p className="mt-1 text-sm text-white/40">
+            The dedicated crypto desk — majors, movers, sentiment and trending coins. Every number live from CoinGecko, nothing estimated.
           </p>
-          <h1 className="text-4xl font-bold">Crypto Market Intelligence</h1>
-          <p className="mt-1 text-sm text-blue-400">
-            📅 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Europe/Vienna" })}
-          </p>
-          <p className="mt-2 text-white/40">
-            Real-time data from CoinGecko. AI analyzes today's actual gainers, losers, and news across major crypto markets.
-          </p>
-          <div className="mt-3 rounded-2xl border border-blue-500/20 bg-blue-500/5 px-4 py-3">
-            <p className="text-xs text-blue-300">
-              ℹ️ This page covers <strong>major coins</strong> (BTC, ETH, DeFi, Layer1s) tradeable on exchanges or MT5 crypto CFDs.
-              Looking for <strong>Solana memecoins</strong> (pump.fun style, Axiom trading)? Use{" "}
-              <a href="/alpha" className="underline hover:text-blue-200">PipTrak Alpha</a> instead.
-            </p>
-          </div>
         </div>
 
-        <button
-          onClick={analyze}
-          disabled={loading}
-          className="mb-8 w-full rounded-2xl bg-yellow-600 py-4 text-lg font-semibold transition hover:bg-yellow-700 disabled:opacity-50"
-        >
-          {loading ? "🤖 Scanning Real Market Data..." : "🔍 Generate Crypto Intelligence Report"}
+        <button onClick={load} disabled={loading} className="mb-6 w-full rounded-2xl bg-blue-600 py-4 text-base font-semibold transition hover:bg-blue-500 disabled:opacity-40">
+          {loading ? "Fetching live crypto data..." : "Load Crypto Intel"}
         </button>
 
         {error && (
-          <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-400">
-            {error}
-          </div>
+          <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/[0.07] p-4 text-sm text-red-400">{error}</div>
         )}
 
-        {intelligence && (
-          <div className="space-y-6">
+        {data && (
+          <div className="space-y-5">
 
-            <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-6">
-              <h2 className="mb-4 text-xl font-semibold">📊 Market Overview</h2>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                  <p className="text-sm text-white/40">Sentiment</p>
-                  <p className={`text-xl font-bold mt-1 ${
-                    intelligence.market_overview.sentiment === "Bullish" ? "text-green-400" :
-                    intelligence.market_overview.sentiment === "Bearish" ? "text-red-400" :
-                    "text-yellow-400"
-                  }`}>{intelligence.market_overview.sentiment}</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-white/40">
+                  Fetched {new Date(data.fetched_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
+                </p>
+                <div className="flex gap-1.5">
+                  {data.sources_used.map(s => (
+                    <span key={s} className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs text-white/50">{s}</span>
+                  ))}
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                  <p className="text-sm text-white/40">Total Market Cap</p>
-                  <p className="text-xl font-bold mt-1 text-blue-400">
-                    {intelligence.market_overview.total_market_cap}
-                  </p>
-                  {intelligence.market_overview.market_cap_change_24h && (
-                    <span className={`text-sm ${
-                      String(intelligence.market_overview.market_cap_change_24h).startsWith("-") ? "text-red-400" : "text-green-400"
-                    }`}>{intelligence.market_overview.market_cap_change_24h}% (24h)</span>
-                  )}
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                  <p className="text-sm text-white/40">BTC Dominance</p>
-                  <p className="text-xl font-bold mt-1 text-orange-400">{intelligence.market_overview.btc_dominance}</p>
-                </div>
-              </div>
-              <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-4">
-                <p className="text-xs text-white/40 mb-1">Market Trend</p>
-                <p className="text-sm text-white/70">{intelligence.market_overview.market_trend}</p>
               </div>
             </div>
 
-            {intelligence.best_trade_today && (
-              <div className="rounded-3xl border border-green-500/20 bg-green-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-green-400">⭐ Best Trade Today</h2>
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/[0.06] p-5">
+              <p className="text-sm text-white/80">{data.headline}</p>
+            </div>
 
-                {(intelligence.best_trade_today.trading_pair || intelligence.best_trade_today.exchange) && (
-                  <div className="mb-4 rounded-2xl border border-green-500/20 bg-black/30 p-3">
-                    <p className="text-xs text-white/40">Where to trade</p>
-                    <p className="text-sm font-semibold text-green-300">
-                      {intelligence.best_trade_today.trading_pair || "Pair unavailable"} on {intelligence.best_trade_today.exchange || "exchange unavailable"}
-                    </p>
-                  </div>
-                )}
-
-                <div className="grid gap-3 sm:grid-cols-3 mb-4">
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
-                    <p className="text-xs text-white/40">Entry</p>
-                    <p className="text-lg font-bold text-green-400">{intelligence.best_trade_today.entry}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
-                    <p className="text-xs text-white/40">Target</p>
-                    <p className="text-lg font-bold text-blue-400">{intelligence.best_trade_today.target}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
-                    <p className="text-xs text-white/40">Stop Loss</p>
-                    <p className="text-lg font-bold text-red-400">{intelligence.best_trade_today.stop_loss}</p>
+            {/* Sentiment + market */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {data.fearGreed && (
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
+                  <p className="text-xs font-medium uppercase tracking-wide text-white/35">Fear & Greed</p>
+                  <p className={`mt-1 text-3xl font-semibold tabular-nums ${fgColor(data.fearGreed.value)}`}>{data.fearGreed.value}</p>
+                  <p className={`text-sm font-medium ${fgColor(data.fearGreed.value)}`}>{data.fearGreed.label}</p>
+                  <p className="mt-1 text-[10px] text-white/25">Alternative.me</p>
+                </div>
+              )}
+              {data.global && (
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-white/35">Market</p>
+                  <div className="mt-2 space-y-1 text-sm">
+                    <div className="flex justify-between"><span className="text-white/40">Total cap</span><span className="tabular-nums">{data.global.totalMarketCap ? `$${(data.global.totalMarketCap / 1e9).toFixed(0)}B` : "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-white/40">24h</span><span className={`tabular-nums ${Number(data.global.marketCapChange24h) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{data.global.marketCapChange24h ? `${data.global.marketCapChange24h}%` : "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-white/40">BTC dom</span><span className="tabular-nums">{data.global.btcDominance ? `${data.global.btcDominance}%` : "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-white/40">ETH dom</span><span className="tabular-nums">{data.global.ethDominance ? `${data.global.ethDominance}%` : "—"}</span></div>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-green-500/20 bg-black/30 p-4">
-                  <p className="text-sm font-semibold text-green-400 mb-1">
-                    {intelligence.best_trade_today.coin} — {intelligence.best_trade_today.timeframe}
-                  </p>
-                  <p className="text-sm text-white/70">{intelligence.best_trade_today.reason}</p>
-                </div>
+              )}
+            </div>
+
+            <Section title="Market Mood" text={data.market_mood} />
+            <Section title="BTC & ETH" text={data.btc_eth_view} />
+
+            {/* Gainers / Losers */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4">
+                <h3 className="mb-2 text-sm font-semibold text-emerald-400">Top Gainers 24h</h3>
+                {data.topGainers.map(c => (
+                  <div key={c.symbol} className="flex items-center justify-between border-b border-white/[0.04] py-1.5 last:border-0">
+                    <span className="text-sm font-medium">{c.symbol}</span>
+                    <div className="text-right">
+                      <span className="text-xs tabular-nums text-emerald-400">+{c.change24h}%</span>
+                      <p className="text-[10px] text-white/30 tabular-nums">{price(c.price)}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-              <h2 className="mb-4 text-xl font-semibold">🔭 Top Coins to Watch</h2>
-              <div className="space-y-4">
-                {intelligence.top_coins_to_watch?.map((coin, i) => (
-                  <div key={i} className={`rounded-2xl border p-4 ${
-                    coin.direction === "Bullish" ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"
-                  }`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl font-bold">{coin.coin}</span>
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/40">{coin.category}</span>
-                        <span className="text-sm text-white/40">{coin.price}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-lg font-bold ${coin.direction === "Bullish" ? "text-green-400" : "text-red-400"}`}>
-                          {coin.potential_gain}
-                        </span>
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{coin.probability}%</span>
-                      </div>
-                    </div>
-
-                    {(coin.trading_pair || coin.exchange) && (
-                      <div className="mb-3 rounded-xl bg-white/5 px-3 py-2">
-                        <p className="text-xs text-white/40">Where to trade</p>
-                        <p className="text-sm font-semibold text-white/80">
-                          {coin.trading_pair || "Pair unavailable"} on {coin.exchange || "exchange unavailable"}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                      <div className="rounded-xl bg-black/30 p-2 text-center">
-                        <p className="text-xs text-white/30">Entry</p>
-                        <p className="text-sm font-semibold text-green-400">{coin.entry}</p>
-                      </div>
-                      <div className="rounded-xl bg-black/30 p-2 text-center">
-                        <p className="text-xs text-white/30">Target</p>
-                        <p className="text-sm font-semibold text-blue-400">{coin.target}</p>
-                      </div>
-                      <div className="rounded-xl bg-black/30 p-2 text-center">
-                        <p className="text-xs text-white/30">Stop</p>
-                        <p className="text-sm font-semibold text-red-400">{coin.stop_loss}</p>
-                      </div>
-                    </div>
-
-                    {coin.probability_reason && (
-                      <div className="mb-2 rounded-xl bg-blue-500/10 p-2">
-                        <p className="text-xs text-blue-400">🎯 Why {coin.probability}%: {coin.probability_reason}</p>
-                      </div>
-                    )}
-
-                    <p className="text-xs text-white/60 mb-2">{coin.reason}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-white/30">⏱ {coin.timeframe}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${
-                        coin.risk_level === "High" ? "bg-red-500/20 text-red-400" :
-                        coin.risk_level === "Medium" ? "bg-yellow-500/20 text-yellow-400" :
-                        "bg-green-500/20 text-green-400"
-                      }`}>{coin.risk_level} Risk</span>
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-4">
+                <h3 className="mb-2 text-sm font-semibold text-red-400">Top Losers 24h</h3>
+                {data.topLosers.map(c => (
+                  <div key={c.symbol} className="flex items-center justify-between border-b border-white/[0.04] py-1.5 last:border-0">
+                    <span className="text-sm font-medium">{c.symbol}</span>
+                    <div className="text-right">
+                      <span className="text-xs tabular-nums text-red-400">{c.change24h}%</span>
+                      <p className="text-[10px] text-white/30 tabular-nums">{price(c.price)}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {intelligence.meme_coins_alert?.length > 0 && (
-              <div className="rounded-3xl border border-orange-500/20 bg-orange-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-orange-400">🔥 Meme Coin Alerts</h2>
-                <div className="space-y-3">
-                  {intelligence.meme_coins_alert.map((alert, i) => (
-                    <div key={i} className="rounded-2xl border border-orange-500/20 bg-black/30 p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-bold text-orange-400">{alert.coin}</p>
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${
-                          alert.buzz_level === "Very High" ? "bg-red-500/20 text-red-400" :
-                          alert.buzz_level === "High" ? "bg-orange-500/20 text-orange-400" :
-                          "bg-yellow-500/20 text-yellow-400"
-                        }`}>{alert.buzz_level} Buzz</span>
-                      </div>
-                      <p className="text-sm text-white/60">{alert.reason}</p>
-                      <p className="text-xs text-white/30 mt-1">Risk: {alert.risk}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <Section title="Where the Movement Is" text={data.where_movement_is} />
 
-            {intelligence.whale_alerts?.length > 0 && (
-              <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-blue-400">🐋 Whale Alerts</h2>
-                <div className="space-y-3">
-                  {intelligence.whale_alerts.map((alert, i) => (
-                    <div key={i} className="rounded-2xl border border-blue-500/20 bg-black/30 p-4">
-                      <p className="font-bold text-blue-400 mb-1">{alert.coin}</p>
-                      <p className="text-sm text-white/60">{alert.action}</p>
-                      <p className="text-xs text-green-400 mt-1">{alert.impact}</p>
-                    </div>
-                  ))}
-                </div>
+            {/* Majors table */}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white/80">Top 15 by Market Cap</h3>
+                <span className="text-xs text-white/25">CoinGecko</span>
               </div>
-            )}
-
-            {intelligence.coins_to_avoid?.length > 0 && (
-              <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-red-400">❌ Coins to Avoid</h2>
-                <div className="space-y-3">
-                  {intelligence.coins_to_avoid.map((coin, i) => (
-                    <div key={i} className="rounded-2xl border border-red-500/20 bg-black/30 p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-bold text-red-400">{coin.coin}</p>
-                        <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-400">{coin.risk} Risk</span>
-                      </div>
-                      <p className="text-sm text-white/60">{coin.reason}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {intelligence.rug_pull_warnings?.length > 0 && (
-              <div className="rounded-3xl border border-red-500/50 bg-red-500/10 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-red-400">⚠️ Rug Pull Warnings</h2>
-                <div className="space-y-3">
-                  {intelligence.rug_pull_warnings.map((warn, i) => (
-                    <div key={i} className="rounded-2xl border border-red-500/20 bg-black/30 p-4">
-                      <p className="font-bold text-red-400 mb-1">{warn.coin}</p>
-                      <p className="text-sm text-white/60">{warn.warning}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {intelligence.news_items?.length > 0 && (
-              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-                <h2 className="mb-2 text-xl font-semibold">📰 News Sources Used Today</h2>
-                {intelligence.sources_used?.length > 0 && (
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    {intelligence.sources_used.map((s, i) => (
-                      <span key={i} className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">{s}</span>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-white/30">
+                      <th className="pb-2">Coin</th>
+                      <th className="pb-2 text-right">Price</th>
+                      <th className="pb-2 text-right">1h</th>
+                      <th className="pb-2 text-right">24h</th>
+                      <th className="pb-2 text-right">7d</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.majors.map(c => (
+                      <tr key={c.symbol} className="border-t border-white/[0.04]">
+                        <td className="py-2"><span className="font-semibold">{c.symbol}</span></td>
+                        <td className="py-2 text-right tabular-nums">{price(c.price)}</td>
+                        <td className={`py-2 text-right tabular-nums text-xs ${Number(c.change1h) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{c.change1h ? `${c.change1h}%` : "—"}</td>
+                        <td className={`py-2 text-right tabular-nums text-xs ${Number(c.change24h) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{c.change24h ? `${c.change24h}%` : "—"}</td>
+                        <td className={`py-2 text-right tabular-nums text-xs ${Number(c.change7d) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{c.change7d ? `${c.change7d}%` : "—"}</td>
+                      </tr>
                     ))}
-                  </div>
-                )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Trending */}
+            {data.trending.length > 0 && (
+              <div className="rounded-2xl border border-purple-500/20 bg-purple-500/[0.05] p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-purple-300">Trending (most searched)</h3>
+                  <span className="text-xs text-white/25">CoinGecko</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {data.trending.map(t => (
+                    <span key={t.symbol} className="rounded-full bg-black/30 px-3 py-1 text-xs">
+                      {t.symbol} <span className="text-white/30">#{t.rank ?? "?"}</span>
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-white/50">{data.trending_note}</p>
+              </div>
+            )}
+
+            <Section title="Dominance" text={data.dominance_note} />
+
+            {data.what_to_watch?.length > 0 && (
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+                <h3 className="mb-3 text-sm font-semibold text-white/80">What to Watch</h3>
                 <div className="space-y-2">
-                  {intelligence.news_items.map((item, i) => (
-                    <a key={i} href={item.url} target="_blank" rel="noopener noreferrer" className="block rounded-2xl border border-white/10 bg-black/30 p-3 hover:border-white/20 transition">
-                      <p className="text-xs text-blue-400 mb-1">{item.source}</p>
-                      <p className="text-sm text-white/70">{item.title}</p>
-                    </a>
+                  {data.what_to_watch.map((w, i) => (
+                    <div key={i} className="flex gap-3 rounded-xl bg-black/30 p-3">
+                      <span className="text-sm font-semibold text-blue-400">{i + 1}.</span>
+                      <p className="text-sm text-white/70">{w}</p>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {intelligence.weekly_outlook && (
-              <div className="rounded-3xl border border-purple-500/20 bg-purple-500/5 p-6">
-                <h2 className="mb-3 text-xl font-semibold text-purple-400">📅 Weekly Outlook</h2>
-                <p className="text-sm text-white/70 leading-relaxed">{intelligence.weekly_outlook}</p>
+            {data.risk_note && (
+              <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/[0.06] p-5">
+                <h3 className="mb-1 text-xs font-semibold text-yellow-400">Risk Note</h3>
+                <p className="text-sm text-white/60">{data.risk_note}</p>
               </div>
             )}
+
+            <div className="rounded-2xl border border-white/[0.04] bg-white/[0.01] p-4">
+              <p className="text-center text-xs text-white/20">
+                All data fetched live from CoinGecko and Alternative.me at the time shown. Nothing here is financial advice. Crypto is highly volatile.
+              </p>
+            </div>
 
           </div>
         )}
       </div>
     </AppShell>
+  );
+}
+
+function Section({ title, text }: { title: string; text: string }) {
+  if (!text) return null;
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <h3 className="mb-2 text-sm font-semibold text-white/80">{title}</h3>
+      <p className="text-sm text-white/60">{text}</p>
+    </div>
   );
 }
