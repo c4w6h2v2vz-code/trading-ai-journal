@@ -164,10 +164,10 @@ export default function ChallengeSimulatorPage() {
     if (!ended) {
       if (cumulative >= targetAmount) {
         verdict = "PASSED";
-        reason = `Profit target reached (total profit $${cumulative.toFixed(2)}).`;
+        reason = `Profit target of $${targetAmount.toFixed(2)} reached — final profit $${cumulative.toFixed(2)}. No rules breached.`;
       } else {
-        verdict = "IN PROGRESS";
-        reason = `No rule breached, but profit target of $${targetAmount.toFixed(2)} not yet reached (current $${cumulative.toFixed(2)}).`;
+        verdict = "NOT REACHED";
+        reason = `In this date range, no rules were breached, but the profit target of $${targetAmount.toFixed(2)} was NOT reached. Final profit: $${cumulative.toFixed(2)} (short by $${(targetAmount - cumulative).toFixed(2)}).`;
       }
     }
 
@@ -253,13 +253,19 @@ export default function ChallengeSimulatorPage() {
                   result.verdict === "FAILED" ? "border-red-500/30 bg-red-500/[0.08]" :
                   "border-yellow-500/30 bg-yellow-500/[0.08]"
                 }`}>
-                  <p className="text-xs font-medium uppercase tracking-wide text-white/40">Verdict</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-white/40">
+                    Verdict for {fromDate} to {toDate}
+                  </p>
                   <p className={`mt-1 text-3xl font-bold ${
                     result.verdict === "PASSED" ? "text-emerald-400" :
                     result.verdict === "FAILED" ? "text-red-400" :
-                    "text-yellow-400"
+                    result.verdict === "NOT REACHED" ? "text-yellow-400" :
+                    "text-white/50"
                   }`}>
-                    {result.verdict === "PASSED" ? "✅ PASSED" : result.verdict === "FAILED" ? "❌ FAILED" : result.verdict === "NO DATA" ? "NO DATA" : "⏳ IN PROGRESS"}
+                    {result.verdict === "PASSED" ? "✅ PASSED" :
+                     result.verdict === "FAILED" ? "❌ FAILED — Account Blown" :
+                     result.verdict === "NOT REACHED" ? "⚠️ Target Not Reached" :
+                     "NO DATA"}
                   </p>
                   <p className="mt-2 text-sm text-white/70">{result.reason}</p>
                 </div>
