@@ -55,6 +55,7 @@ export default function BacktestPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [pairFilter, setPairFilter] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [resultFilter, setResultFilter] = useState("All");
   const [sortBy, setSortBy] = useState<"date" | "pl" | "pair">("date");
 
@@ -125,10 +126,22 @@ export default function BacktestPage() {
 
       const fullTradeData = { ...tradeData, image_url_before: beforeUrl, image_url_after: afterUrl };
 
-      const { data, error } = await supabase.from("trades").insert([fullTradeData]).select().single();
+let data: any, error: any;
+      if (editingId) {
+        const res = await supabase.from("trades").update(fullTradeData).eq("id", editingId).select().single();
+        data = res.data; error = res.error;
+      } else {
+        const res = await supabase.from("trades").insert([fullTradeData]).select().single();
+        data = res.data; error = res.error;
+      }
       if (error) { setMessage("Save error: " + error.message); setSaving(false); return; }
 
-      setTrades(old => [data as Trade, ...old]);
+      if (editingId) {
+        setTrades(old => old.map(t => t.id === editingId ? (data as Trade) : t));
+        setEditingId(null);
+      } else {
+        setTrades(old => [data as Trade, ...old]);
+      }
       setRow({ ...emptyRow, pair: row.pair, direction: row.direction, session: row.session, timeframe: row.timeframe });
       setNewBefore(null);
       setNewAfter(null);
@@ -340,7 +353,8 @@ const uniquePairs = Array.from(new Set(trades.map(t => t.pair).filter(Boolean)))
                         {t.profit_loss >= 0 ? "+" : ""}{t.profit_loss}
                       </td>
                       <td className="p-3 text-right">
-                        <button onClick={(e) => { e.stopPropagation(); deleteTrade(t.id); }} className="text-xs text-red-400 hover:text-red-300">✕</button>
+                        <button onClick={(e) => { e.stopPropagation(); setEditingId(t.id); setRow({ pair: t.pair ?? "", direction: t.direction ?? "", session: t.session ?? "", timeframe: t.timeframe ?? "", grade: t.grade ?? "", entry_price: t.entry_price != null ? String(t.entry_price) : "", exit_price: t.exit_price != null ? String(t.exit_price) : "", risk_reward: t.risk_reward != null ? String(t.risk_reward) : "", profit_loss: t.profit_loss != null ? String(t.profit_loss) : "", notes: t.notes ?? "" }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mr-2 text-xs text-blue-400 hover:text-blue-300">Edit</button>
+                        <button onClick={(e) => { e.stopPropagation(); setEditingId(t.id); setRow({ trade_date: (t.trade_date || t.created_at || "").slice(0,10), pair: t.pair ?? "", direction: t.direction ?? "", session: t.session ?? "", timeframe: t.timeframe ?? "", grade: t.grade ?? "", entry_price: t.entry_price != null ? String(t.entry_price) : "", exit_price: t.exit_price != null ? String(t.exit_price) : "", risk_reward: t.risk_reward != null ? String(t.risk_reward) : "", profit_loss: t.profit_loss != null ? String(t.profit_loss) : "", notes: t.notes ?? "" }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mr-2 text-xs text-blue-400 hover:text-blue-300">Edit</button><button onClick={(e) => { e.stopPropagation(); deleteTrade(t.id); }} className="text-xs text-red-400 hover:text-red-300">✕</button>
                       </td>
                     </tr>
                     {expandedId === t.id && (
