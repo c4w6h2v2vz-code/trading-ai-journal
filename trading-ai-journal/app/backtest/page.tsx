@@ -111,8 +111,9 @@ export default function BacktestPage() {
         notes: row.notes || "",
       };
 
-      let beforeUrl = "";
-      let afterUrl = "";
+      const editingTrade = editingId ? trades.find(t => t.id === editingId) : null;
+    let beforeUrl = editingTrade?.image_url_before || "";
+    let afterUrl = editingTrade?.image_url_after || "";
       if (newBefore) {
         const fn = `${user.id}/${Date.now()}-b-${newBefore.name}`;
         const { error: e1 } = await supabase.storage.from("trade-screenshots").upload(fn, newBefore);
@@ -145,7 +146,7 @@ let data: any, error: any;
       setRow({ ...emptyRow, pair: row.pair, direction: row.direction, session: row.session, timeframe: row.timeframe });
       setNewBefore(null);
       setNewAfter(null);
-      setMessage("Trade added âœ…");
+      setMessage(editingId ? "Changes saved ✅" : "Trade added ✅");
     } catch (err) {
       setMessage("Error: " + String(err));
     } finally {
@@ -263,9 +264,14 @@ const uniquePairs = Array.from(new Set(trades.map(t => t.pair).filter(Boolean)))
             <input type="number" step="any" placeholder="Exit" value={row.exit_price} onChange={e => setRow({ ...row, exit_price: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
             <input type="number" step="any" placeholder="R:R" value={row.risk_reward} onChange={e => setRow({ ...row, risk_reward: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
             <input type="number" step="any" placeholder="P/L (- for loss)" value={row.profit_loss} onChange={e => setRow({ ...row, profit_loss: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
-            <button onClick={addRow} disabled={saving} className="rounded-xl bg-purple-600 p-2 text-sm font-semibold hover:bg-purple-700 disabled:opacity-50">
-              {saving ? "..." : "Add +"}
+            <button onClick={addRow} disabled={saving} className={`rounded-xl p-2 text-sm font-semibold disabled:opacity-50 ${editingId ? "bg-blue-600 hover:bg-blue-700" : "bg-purple-600 hover:bg-purple-700"}`}>
+              {saving ? "..." : editingId ? "Save Changes" : "Add +"}
             </button>
+            {editingId && (
+              <button onClick={() => { setEditingId(null); setRow({ ...emptyRow }); setMessage(""); }} className="rounded-xl border border-white/10 bg-white/[0.03] p-2 text-sm text-white/60 hover:bg-white/[0.06]">
+                Cancel
+              </button>
+            )}
           </div>
           <input placeholder="Notes (optional)" value={row.notes} onChange={e => setRow({ ...row, notes: e.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
