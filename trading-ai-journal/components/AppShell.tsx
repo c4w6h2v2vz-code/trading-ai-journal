@@ -34,6 +34,7 @@ const navGroups = [
       { name: "Psychology", href: "/psychology" },
       { name: "Analytics", href: "/analytics" },
       { name: "Edge Finder", href: "/edge-finder" },
+      { name: "Pre-Trade Check", href: "/pre-trade-check" },
       { name: "Goals", href: "/goals" },
     ],
   },
