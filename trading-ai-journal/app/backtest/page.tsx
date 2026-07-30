@@ -173,8 +173,9 @@ export default function BacktestPage() {
     setTrades(old => old.filter(t => t.id !== id));
   }
 
+const uniquePairs = Array.from(new Set(trades.map(t => t.pair).filter(Boolean))).sort();
   const filtered = trades
-    .filter(t => pairFilter === "" || t.pair.toLowerCase().includes(pairFilter.toLowerCase()))
+    .filter(t => pairFilter === "" || t.pair === pairFilter)
     .filter(t => {
       if (resultFilter === "All") return true;
       const derived = t.profit_loss > 0 ? "Win" : t.profit_loss < 0 ? "Loss" : "Break Even";
@@ -267,7 +268,10 @@ export default function BacktestPage() {
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
-          <input value={pairFilter} onChange={e => setPairFilter(e.target.value)} placeholder="Filter pair..." className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
+          <select value={pairFilter} onChange={e => setPairFilter(e.target.value)} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500">
+            <option value="">All pairs</option>
+            {uniquePairs.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
           <select value={resultFilter} onChange={e => setResultFilter(e.target.value)} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500">
             <option>All</option><option>Win</option><option>Loss</option><option>Break Even</option>
           </select>
