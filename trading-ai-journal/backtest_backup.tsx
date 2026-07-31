@@ -43,16 +43,6 @@ const emptyRow = {
   notes: "",
 };
 
-// Convert any stored date to the format datetime-local needs: YYYY-MM-DDTHH:mm
-function toInputDate(raw: string | null): string {
-  if (!raw) return new Date().toISOString().slice(0, 16);
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 16);
-  // Adjust for local timezone so the displayed time matches
-  const tzOffset = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
-}
-
 export default function BacktestPage() {
   const router = useRouter();
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -86,36 +76,6 @@ export default function BacktestPage() {
   }
 
   useEffect(() => { load(); }, []);
-
-  const editingTradeObj = editingId ? trades.find(t => t.id === editingId) : null;
-
-  function startEdit(t: Trade) {
-    setEditingId(t.id);
-    setRow({
-      trade_date: toInputDate(t.trade_date || t.created_at),
-      pair: t.pair ?? "",
-      direction: t.direction ?? "Buy",
-      session: t.session ?? "London",
-      timeframe: t.timeframe ?? "H1",
-      grade: t.grade ?? "A",
-      entry_price: t.entry_price != null ? String(t.entry_price) : "",
-      exit_price: t.exit_price != null ? String(t.exit_price) : "",
-      risk_reward: t.risk_reward != null ? String(t.risk_reward) : "",
-      profit_loss: t.profit_loss != null ? String(t.profit_loss) : "",
-      notes: t.notes ?? "",
-    });
-    setNewBefore(null);
-    setNewAfter(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setRow({ ...emptyRow });
-    setNewBefore(null);
-    setNewAfter(null);
-    setMessage("");
-  }
 
   async function addRow() {
     if (!row.pair.trim()) { setMessage("Enter a pair first."); return; }
@@ -152,9 +112,8 @@ export default function BacktestPage() {
       };
 
       const editingTrade = editingId ? trades.find(t => t.id === editingId) : null;
-      let beforeUrl = editingTrade?.image_url_before || "";
-      let afterUrl = editingTrade?.image_url_after || "";
-
+    let beforeUrl = editingTrade?.image_url_before || "";
+    let afterUrl = editingTrade?.image_url_after || "";
       if (newBefore) {
         const fn = `${user.id}/${Date.now()}-b-${newBefore.name}`;
         const { error: e1 } = await supabase.storage.from("trade-screenshots").upload(fn, newBefore);
@@ -168,7 +127,7 @@ export default function BacktestPage() {
 
       const fullTradeData = { ...tradeData, image_url_before: beforeUrl, image_url_after: afterUrl };
 
-      let data: any, error: any;
+let data: any, error: any;
       if (editingId) {
         const res = await supabase.from("trades").update(fullTradeData).eq("id", editingId).select().single();
         data = res.data; error = res.error;
@@ -178,18 +137,16 @@ export default function BacktestPage() {
       }
       if (error) { setMessage("Save error: " + error.message); setSaving(false); return; }
 
-      const wasEditing = !!editingId;
-      if (wasEditing) {
+      if (editingId) {
         setTrades(old => old.map(t => t.id === editingId ? (data as Trade) : t));
         setEditingId(null);
-        setRow({ ...emptyRow });
       } else {
         setTrades(old => [data as Trade, ...old]);
-        setRow({ ...emptyRow, pair: row.pair, direction: row.direction, session: row.session, timeframe: row.timeframe });
       }
+      setRow({ ...emptyRow, pair: row.pair, direction: row.direction, session: row.session, timeframe: row.timeframe });
       setNewBefore(null);
       setNewAfter(null);
-      setMessage(wasEditing ? "Changes saved ✅" : "Trade added ✅");
+      setMessage(editingId ? "Changes saved ✅" : "Trade added ✅");
     } catch (err) {
       setMessage("Error: " + String(err));
     } finally {
@@ -214,7 +171,7 @@ export default function BacktestPage() {
       if (updErr) { setMessage("Save failed: " + updErr.message); return; }
 
       setTrades(old => old.map(t => t.id === tradeId ? { ...t, [column]: url } : t));
-      setMessage("Screenshot added ✅");
+      setMessage("Screenshot added âœ…");
     } catch (err) {
       setMessage("Error: " + String(err));
     } finally {
@@ -230,7 +187,7 @@ export default function BacktestPage() {
     setTrades(old => old.filter(t => t.id !== id));
   }
 
-  const uniquePairs = Array.from(new Set(trades.map(t => t.pair).filter(Boolean))).sort();
+const uniquePairs = Array.from(new Set(trades.map(t => t.pair).filter(Boolean))).sort();
   const filtered = trades
     .filter(t => pairFilter === "" || t.pair === pairFilter)
     .filter(t => {
@@ -251,7 +208,7 @@ export default function BacktestPage() {
   const winRate = n > 0 ? ((wins.length / n) * 100).toFixed(1) : "0";
   const grossWin = wins.reduce((s, t) => s + Number(t.profit_loss), 0);
   const grossLoss = Math.abs(losses.reduce((s, t) => s + Number(t.profit_loss), 0));
-  const pf = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : (grossWin > 0 ? "∞" : "0");
+  const pf = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : (grossWin > 0 ? "âˆž" : "0");
   const expectancy = n > 0 ? (totalPL / n).toFixed(2) : "0";
 
   return (
@@ -260,7 +217,7 @@ export default function BacktestPage() {
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-3">
             <p className="w-fit rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-1 text-sm text-purple-300">
-              🧪 Backtest Lab
+              ðŸ§ª Backtest Lab
             </p>
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-0.5 text-xs text-white/50">
               Table view
@@ -285,10 +242,8 @@ export default function BacktestPage() {
           <StatBox label="Profit Factor" value={String(pf)} color="text-yellow-400" />
         </div>
 
-        <div className={`mb-6 rounded-3xl border p-4 ${editingId ? "border-blue-500/40 bg-blue-500/5" : "border-purple-500/20 bg-purple-500/5"}`}>
-          <p className={`mb-3 text-sm font-semibold ${editingId ? "text-blue-300" : "text-purple-300"}`}>
-            {editingId ? "✏️ Editing trade" : "➕ Add a trade"}
-          </p>
+        <div className="mb-6 rounded-3xl border border-purple-500/20 bg-purple-500/5 p-4">
+          <p className="mb-3 text-sm font-semibold text-purple-300">âž• Add a trade</p>
           <p className="mb-3 text-xs text-white/30">Use a negative P/L for losses (e.g. -80). Win or Loss is decided automatically.</p>
           <div className="grid gap-2 md:grid-cols-6">
             <input type="datetime-local" value={row.trade_date} onChange={e => setRow({ ...row, trade_date: e.target.value })} className="rounded-xl border border-white/10 bg-black/50 p-2 text-xs text-white outline-none focus:border-purple-500" />
@@ -313,7 +268,7 @@ export default function BacktestPage() {
               {saving ? "..." : editingId ? "Save Changes" : "Add +"}
             </button>
             {editingId && (
-              <button onClick={cancelEdit} className="rounded-xl border border-white/10 bg-white/[0.03] p-2 text-sm text-white/60 hover:bg-white/[0.06]">
+              <button onClick={() => { setEditingId(null); setRow({ ...emptyRow }); setMessage(""); }} className="rounded-xl border border-white/10 bg-white/[0.03] p-2 text-sm text-white/60 hover:bg-white/[0.06]">
                 Cancel
               </button>
             )}
@@ -321,28 +276,14 @@ export default function BacktestPage() {
           <input placeholder="Notes (optional)" value={row.notes} onChange={e => setRow({ ...row, notes: e.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-black/50 p-2 text-sm text-white outline-none focus:border-purple-500" />
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 p-2 text-xs text-white/40 hover:border-purple-500">
-              {newBefore ? `✅ Before: ${newBefore.name.slice(0, 20)}` : (editingTradeObj?.image_url_before ? "✅ Has before photo — click to replace" : "📸 Before screenshot (optional)")}
+              {newBefore ? `âœ… Before: ${newBefore.name.slice(0, 20)}` : "ðŸ“¸ Before screenshot (optional)"}
               <input type="file" accept="image/*" className="hidden" onChange={(e) => setNewBefore(e.target.files?.[0] || null)} />
             </label>
             <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 p-2 text-xs text-white/40 hover:border-purple-500">
-              {newAfter ? `✅ After: ${newAfter.name.slice(0, 20)}` : (editingTradeObj?.image_url_after ? "✅ Has after photo — click to replace" : "📸 After screenshot (optional)")}
+              {newAfter ? `âœ… After: ${newAfter.name.slice(0, 20)}` : "ðŸ“¸ After screenshot (optional)"}
               <input type="file" accept="image/*" className="hidden" onChange={(e) => setNewAfter(e.target.files?.[0] || null)} />
             </label>
           </div>
-          {editingTradeObj && (editingTradeObj.image_url_before || editingTradeObj.image_url_after) && (
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {editingTradeObj.image_url_before && (
-                <a href={editingTradeObj.image_url_before} target="_blank" rel="noopener noreferrer">
-                  <img src={editingTradeObj.image_url_before} alt="Current before" className="h-24 w-full rounded-xl border border-white/10 object-cover" />
-                </a>
-              )}
-              {editingTradeObj.image_url_after && (
-                <a href={editingTradeObj.image_url_after} target="_blank" rel="noopener noreferrer">
-                  <img src={editingTradeObj.image_url_after} alt="Current after" className="h-24 w-full rounded-xl border border-white/10 object-cover" />
-                </a>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -364,7 +305,7 @@ export default function BacktestPage() {
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 h-40 animate-pulse" />
         ) : filtered.length === 0 ? (
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-10 text-center">
-            <p className="text-4xl mb-3">🧪</p>
+            <p className="text-4xl mb-3">ðŸ§ª</p>
             <p className="text-white/40">No backtest trades match. Add one above.</p>
           </div>
         ) : (
@@ -391,19 +332,19 @@ export default function BacktestPage() {
                   <>
                     <tr key={t.id} className="border-b border-white/5 hover:bg-white/[0.02] cursor-pointer" onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}>
                       <td className="p-3 text-xs text-white/60">
-                        {t.trade_date ? new Date(t.trade_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "—"}
+                        {t.trade_date ? new Date(t.trade_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "â€”"}
                       </td>
                       <td className="p-3 font-semibold">{t.pair}</td>
                       <td className="p-3">
                         <span className={t.direction === "Buy" ? "text-green-400" : "text-red-400"}>{t.direction}</span>
                       </td>
-                      <td className="p-3 text-white/50">{t.timeframe || "—"}</td>
-                      <td className="p-3 text-white/50 text-xs">{t.session || "—"}</td>
-                      <td className="p-3 text-white/50">{t.entry_price ?? "—"}</td>
-                      <td className="p-3 text-white/50">{t.exit_price ?? "—"}</td>
-                      <td className="p-3 text-white/50">{t.risk_reward ?? "—"}</td>
+                      <td className="p-3 text-white/50">{t.timeframe || "â€”"}</td>
+                      <td className="p-3 text-white/50 text-xs">{t.session || "â€”"}</td>
+                      <td className="p-3 text-white/50">{t.entry_price ?? "â€”"}</td>
+                      <td className="p-3 text-white/50">{t.exit_price ?? "â€”"}</td>
+                      <td className="p-3 text-white/50">{t.risk_reward ?? "â€”"}</td>
                       <td className="p-3">
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{t.grade || "—"}</span>
+                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs">{t.grade || "â€”"}</span>
                       </td>
                       <td className="p-3">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -417,15 +358,14 @@ export default function BacktestPage() {
                       <td className={`p-3 text-right font-bold ${t.profit_loss >= 0 ? "text-green-400" : "text-red-400"}`}>
                         {t.profit_loss >= 0 ? "+" : ""}{t.profit_loss}
                       </td>
-                      <td className="p-3 text-right whitespace-nowrap">
-                        <button onClick={(e) => { e.stopPropagation(); startEdit(t); }} className="mr-2 text-xs text-blue-400 hover:text-blue-300">Edit</button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteTrade(t.id); }} className="text-xs text-red-400 hover:text-red-300">✕</button>
+                      <td className="p-3 text-right">
+                        <button onClick={(e) => { e.stopPropagation(); setEditingId(t.id); setRow({ trade_date: (t.trade_date || t.created_at || "").slice(0,16), pair: t.pair ?? "", direction: t.direction ?? "", session: t.session ?? "", timeframe: t.timeframe ?? "", grade: t.grade ?? "", entry_price: t.entry_price != null ? String(t.entry_price) : "", exit_price: t.exit_price != null ? String(t.exit_price) : "", risk_reward: t.risk_reward != null ? String(t.risk_reward) : "", profit_loss: t.profit_loss != null ? String(t.profit_loss) : "", notes: t.notes ?? "" }); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mr-2 text-xs text-blue-400 hover:text-blue-300">Edit</button><button onClick={(e) => { e.stopPropagation(); deleteTrade(t.id); }} className="text-xs text-red-400 hover:text-red-300">âœ•</button>
                       </td>
                     </tr>
                     {expandedId === t.id && (
                       <tr key={t.id + "-exp"} className="border-b border-white/5 bg-black/30">
                         <td colSpan={12} className="p-4">
-                          {t.notes && <p className="mb-3 text-sm text-white/60">📝 {t.notes}</p>}
+                          {t.notes && <p className="mb-3 text-sm text-white/60">ðŸ“ {t.notes}</p>}
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div>
                               <p className="mb-1 text-xs text-white/40">Before entry</p>
@@ -435,7 +375,7 @@ export default function BacktestPage() {
                                 </a>
                               ) : (
                                 <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-purple-500">
-                                  {uploadingId === t.id ? "Uploading..." : "📸 Click to upload before"}
+                                  {uploadingId === t.id ? "Uploading..." : "ðŸ“¸ Click to upload before"}
                                   <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRowImage(t.id, f, "before"); }} />
                                 </label>
                               )}
@@ -448,7 +388,7 @@ export default function BacktestPage() {
                                 </a>
                               ) : (
                                 <label className="flex h-40 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-black/30 text-xs text-white/40 hover:border-purple-500">
-                                  {uploadingId === t.id ? "Uploading..." : "📸 Click to upload after"}
+                                  {uploadingId === t.id ? "Uploading..." : "ðŸ“¸ Click to upload after"}
                                   <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRowImage(t.id, f, "after"); }} />
                                 </label>
                               )}
@@ -476,3 +416,4 @@ function StatBox({ label, value, color }: { label: string; value: string; color?
     </div>
   );
 }
+
